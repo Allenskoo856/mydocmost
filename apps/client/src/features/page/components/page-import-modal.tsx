@@ -36,12 +36,14 @@ import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
 
 interface PageImportModalProps {
   spaceId: string;
+  targetParentId?: string;
   open: boolean;
   onClose: () => void;
 }
 
 export default function PageImportModal({
   spaceId,
+  targetParentId,
   open,
   onClose,
 }: PageImportModalProps) {
@@ -65,7 +67,11 @@ export default function PageImportModal({
             <Modal.CloseButton />
           </Modal.Header>
           <Modal.Body>
-            <ImportFormatSelection spaceId={spaceId} onClose={onClose} />
+            <ImportFormatSelection
+              spaceId={spaceId}
+              targetParentId={targetParentId}
+              onClose={onClose}
+            />
           </Modal.Body>
         </Modal.Content>
       </Modal.Root>
@@ -75,9 +81,14 @@ export default function PageImportModal({
 
 interface ImportFormatSelection {
   spaceId: string;
+  targetParentId?: string;
   onClose: () => void;
 }
-function ImportFormatSelection({ spaceId, onClose }: ImportFormatSelection) {
+function ImportFormatSelection({
+  spaceId,
+  targetParentId,
+  onClose,
+}: ImportFormatSelection) {
   const { t } = useTranslation();
   const [treeData, setTreeData] = useAtom(treeDataAtom);
   const [workspace] = useAtom(workspaceAtom);
@@ -109,7 +120,12 @@ function ImportFormatSelection({ spaceId, onClose }: ImportFormatSelection) {
         autoClose: false,
       });
 
-      const importTask = await importZip(selectedFile, spaceId, source);
+      const importTask = await importZip(
+        selectedFile,
+        spaceId,
+        source,
+        targetParentId,
+      );
       notifications.update({
         id: "import",
         title: t("Importing pages"),
@@ -242,7 +258,7 @@ function ImportFormatSelection({ spaceId, onClose }: ImportFormatSelection) {
 
     for (const file of selectedFiles) {
       try {
-        const page = await importPage(file, spaceId);
+        const page = await importPage(file, spaceId, targetParentId);
         pages.push(page);
         pageCount += 1;
       } catch (err) {

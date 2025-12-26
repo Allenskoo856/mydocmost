@@ -43,6 +43,7 @@ export class ImportService {
     userId: string,
     spaceId: string,
     workspaceId: string,
+    targetParentId?: string,
   ): Promise<void> {
     const file = await filePromise;
     const fileBuffer = await file.toBuffer();
@@ -80,7 +81,10 @@ export class ImportService {
 
     if (prosemirrorJson) {
       try {
-        const pagePosition = await this.getNewPagePosition(spaceId);
+        const pagePosition = await this.getNewPagePosition(
+          spaceId,
+          targetParentId || null,
+        );
 
         createdPage = await this.pageRepo.insertPage({
           slugId: generateSlugId(),
@@ -89,6 +93,7 @@ export class ImportService {
           textContent: jsonToText(prosemirrorJson),
           ydoc: await this.createYdoc(prosemirrorJson),
           position: pagePosition,
+          parentPageId: targetParentId || null,
           spaceId: spaceId,
           creatorId: userId,
           workspaceId: workspaceId,
@@ -173,14 +178,17 @@ export class ImportService {
     };
   }
 
-  async getNewPagePosition(spaceId: string): Promise<string> {
+  async getNewPagePosition(
+    spaceId: string,
+    parentPageId: string | null = null,
+  ): Promise<string> {
     const lastPage = await this.db
       .selectFrom('pages')
       .select(['id', 'position'])
       .where('spaceId', '=', spaceId)
+      .where('parentPageId', parentPageId ? '=' : 'is', parentPageId)
       .orderBy('position', (ob) => ob.collate('C').desc())
       .limit(1)
-      .where('parentPageId', 'is', null)
       .executeTakeFirst();
 
     if (lastPage) {
@@ -196,6 +204,7 @@ export class ImportService {
     userId: string,
     spaceId: string,
     workspaceId: string,
+    targetParentId?: string,
   ) {
     const file = await filePromise;
     const fileBuffer = await file.toBuffer();
@@ -227,6 +236,7 @@ export class ImportService {
         creatorId: userId,
         spaceId: spaceId,
         workspaceId: workspaceId,
+        parentPageId: targetParentId || null,
       })
       .returningAll()
       .executeTakeFirst();

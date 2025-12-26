@@ -24,6 +24,7 @@ import * as path from 'path';
 import { ImportService } from './services/import.service';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { EnvironmentService } from '../environment/environment.service';
+import { PageRepo } from '@docmost/db/repos/page/page.repo';
 
 @Controller()
 export class ImportController {
@@ -33,6 +34,7 @@ export class ImportController {
     private readonly importService: ImportService,
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly environmentService: EnvironmentService,
+    private readonly pageRepo: PageRepo,
   ) {}
 
   @UseInterceptors(FileInterceptor)
@@ -73,6 +75,7 @@ export class ImportController {
     }
 
     const spaceId = file.fields?.spaceId?.value;
+    const targetParentId = file.fields?.targetParentId?.value;
 
     if (!spaceId) {
       throw new BadRequestException('spaceId is required');
@@ -83,7 +86,27 @@ export class ImportController {
       throw new ForbiddenException();
     }
 
-    return this.importService.importPage(file, user.id, spaceId, workspace.id);
+    // Validate targetParentId if provided
+    if (targetParentId) {
+      const parentPage = await this.pageRepo.findById(targetParentId);
+      if (!parentPage || parentPage.deletedAt) {
+        throw new BadRequestException('Target parent page not found or deleted');
+      }
+      if (parentPage.spaceId !== spaceId) {
+        throw new BadRequestException('Parent page must be in the same space');
+      }
+      if (parentPage.isLocked) {
+        throw new ForbiddenException('Cannot import to locked page');
+      }
+    }
+
+    return this.importService.importPage(
+      file,
+      user.id,
+      spaceId,
+      workspace.id,
+      targetParentId,
+    );
   }
 
   @UseInterceptors(FileInterceptor)
@@ -125,6 +148,7 @@ export class ImportController {
 
     const spaceId = file.fields?.spaceId?.value;
     const source = file.fields?.source?.value;
+    const targetParentId = file.fields?.targetParentId?.value;
 
     const validZipSources = ['generic', 'notion', 'confluence'];
     if (!validZipSources.includes(source)) {
@@ -142,12 +166,27 @@ export class ImportController {
       throw new ForbiddenException();
     }
 
+    // Validate targetParentId if provided
+    if (targetParentId) {
+      const parentPage = await this.pageRepo.findById(targetParentId);
+      if (!parentPage || parentPage.deletedAt) {
+        throw new BadRequestException('Target parent page not found or deleted');
+      }
+      if (parentPage.spaceId !== spaceId) {
+        throw new BadRequestException('Parent page must be in the same space');
+      }
+      if (parentPage.isLocked) {
+        throw new ForbiddenException('Cannot import to locked page');
+      }
+    }
+
     return this.importService.importZip(
       file,
       source,
       user.id,
       spaceId,
       workspace.id,
+      targetParentId,
     );
   }
 }

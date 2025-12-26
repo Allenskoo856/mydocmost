@@ -257,6 +257,15 @@ export class FileImportTaskService {
       if (parentPage) page.parentPageId = parentPage.id;
     });
 
+    // If targetParentId is provided, attach all root pages to it
+    if (fileTask.parentPageId) {
+      pagesMap.forEach((page) => {
+        if (page.parentPageId === null) {
+          page.parentPageId = fileTask.parentPageId;
+        }
+      });
+    }
+
     // generate position keys
     const siblingsMap = new Map<string | null, ImportPageNode[]>();
 
@@ -266,8 +275,9 @@ export class FileImportTaskService {
       siblingsMap.set(page.parentPageId, group);
     });
 
-    // get root pages
-    const rootSibs = siblingsMap.get(null);
+    // get root pages (or pages that will be children of targetParentId)
+    const rootParentId = fileTask.parentPageId || null;
+    const rootSibs = siblingsMap.get(rootParentId);
 
     if (rootSibs?.length) {
       rootSibs.sort((a, b) => a.name.localeCompare(b.name));
@@ -275,6 +285,7 @@ export class FileImportTaskService {
       // get first position key from the server
       const nextPosition = await this.pageService.nextPagePosition(
         fileTask.spaceId,
+        rootParentId,
       );
 
       let prevPos: string | null = null;

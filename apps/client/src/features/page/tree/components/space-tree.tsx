@@ -25,6 +25,7 @@ import {
   IconDotsVertical,
   IconFileDescription,
   IconFileExport,
+  IconFileImport,
   IconLink,
   IconPlus,
   IconPointFilled,
@@ -73,6 +74,7 @@ import { mobileSidebarAtom } from "@/components/layouts/global/hooks/atoms/sideb
 import { useToggleSidebar } from "@/components/layouts/global/hooks/hooks/use-toggle-sidebar.ts";
 import CopyPageModal from "../../components/copy-page-modal.tsx";
 import { duplicatePage } from "../../services/page-service.ts";
+import PageImportModal from "../../components/page-import-modal.tsx";
 
 interface SpaceTreeProps {
   spaceId: string;
@@ -476,6 +478,10 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
     copyPageModalOpened,
     { open: openCopyPageModal, close: closeCopySpaceModal },
   ] = useDisclosure(false);
+  const [
+    importModalOpened,
+    { open: openImportModal, close: closeImportModal },
+  ] = useDisclosure(false);
 
   const handleCopyLink = () => {
     const pageUrl =
@@ -591,7 +597,18 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
           {!(treeApi.props.disableEdit as boolean) && (
             <>
               <Menu.Item
-                leftSection={<IconCopy size={16} />}
+                leftSection={<IconFileImport size={16} />}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openImportModal();
+                }}
+              >
+                {t("Import into this page")}
+              </Menu.Item>
+
+              <Menu.Item
+                leftSection={<IconCopy size={16} />}}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -660,6 +677,13 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
         id={node.id}
         open={exportOpened}
         onClose={closeExportModal}
+      />
+
+      <PageImportModal
+        spaceId={spaceId}
+        targetParentId={node.id}
+        open={importModalOpened}
+        onClose={closeImportModal}
       />
     </>
   );

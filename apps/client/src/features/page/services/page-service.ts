@@ -121,9 +121,16 @@ export async function exportPage(data: IExportPageParams): Promise<void> {
   saveAs(req.data, decodeURIComponent(fileName));
 }
 
-export async function importPage(file: File, spaceId: string) {
+export async function importPage(
+  file: File,
+  spaceId: string,
+  targetParentId?: string,
+) {
   const formData = new FormData();
   formData.append("spaceId", spaceId);
+  if (targetParentId) {
+    formData.append("targetParentId", targetParentId);
+  }
   formData.append("file", file);
 
   const req = await api.post<IPage>("/pages/import", formData, {
@@ -139,10 +146,14 @@ export async function importZip(
   file: File,
   spaceId: string,
   source?: string,
+  targetParentId?: string,
 ): Promise<IFileTask> {
   const formData = new FormData();
   formData.append("spaceId", spaceId);
   formData.append("source", source);
+  if (targetParentId) {
+    formData.append("targetParentId", targetParentId);
+  }
   formData.append("file", file);
 
   const req = await api.post<any>("/pages/import-zip", formData, {
