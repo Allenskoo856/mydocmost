@@ -277,10 +277,12 @@ function MoveTargetNode({ node, style, selectedId, onNodeClick, tree }: MoveTarg
         ...style,
         cursor: "pointer",
         backgroundColor: isSelected 
-          ? "var(--mantine-color-blue-0)" 
+          ? "var(--mantine-color-blue-1)" 
           : node.isSelected 
           ? "var(--mantine-color-gray-1)" 
           : "transparent",
+        color: isSelected ? "var(--mantine-color-blue-9)" : "inherit",
+        fontWeight: isSelected ? 500 : "normal",
       }}
       className={clsx(classes.node)}
       onClick={(e) => {
@@ -291,7 +293,7 @@ function MoveTargetNode({ node, style, selectedId, onNodeClick, tree }: MoveTarg
       <ActionIcon
         size={20}
         variant="subtle"
-        c="gray"
+        c={isSelected ? "blue" : "gray"}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -311,7 +313,7 @@ function MoveTargetNode({ node, style, selectedId, onNodeClick, tree }: MoveTarg
         ) : null}
       </ActionIcon>
 
-      <Box style={{ marginRight: "4px", marginLeft: "4px" }}>
+      <Box style={{ marginRight: "8px", marginLeft: "6px", display: "flex", alignItems: "center" }}>
         {node.data.icon ? (
           <span>{node.data.icon}</span>
         ) : (
