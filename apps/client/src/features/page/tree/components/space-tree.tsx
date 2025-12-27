@@ -83,6 +83,13 @@ interface SpaceTreeProps {
 
 const openTreeNodesAtom = atom<OpenMap>({});
 
+// Atom to manage import modal state - lifted to avoid react-arborist context issues
+interface ImportModalState {
+  isOpen: boolean;
+  targetParentId: string | null;
+}
+const importModalAtom = atom<ImportModalState>({ isOpen: false, targetParentId: null });
+
 export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   const { pageSlug } = useParams();
   const { data, setData, controllers } =
@@ -98,6 +105,7 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   const [, setTreeApi] = useAtom<TreeApi<SpaceTreeNode>>(treeApiAtom);
   const treeApiRef = useRef<TreeApi<SpaceTreeNode>>();
   const [openTreeNodes, setOpenTreeNodes] = useAtom<OpenMap>(openTreeNodesAtom);
+  const [importModalState, setImportModalState] = useAtom(importModalAtom);
   const rootElement = useRef<HTMLDivElement>();
   const [isRootReady, setIsRootReady] = useState(false);
   const { ref: sizeRef, width, height } = useElementSize();
@@ -223,39 +231,49 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   }, [setTreeApi]);
 
   return (
-    <div ref={mergedRef} className={classes.treeContainer}>
-      {isRootReady && rootElement.current && (
-        <Tree
-          data={data.filter((node) => node?.spaceId === spaceId)}
-          disableDrag={readOnly}
-          disableDrop={readOnly}
-          disableEdit={readOnly}
-          {...controllers}
-          width={width}
-          height={rootElement.current.clientHeight}
-          ref={(ref) => {
-            treeApiRef.current = ref;
-            if (ref) {
-              //@ts-ignore
-              setTreeApi(ref);
-            }
-          }}
-          openByDefault={false}
-          disableMultiSelection={true}
-          className={classes.tree}
-          rowClassName={classes.row}
-          rowHeight={30}
-          overscanCount={10}
-          dndRootElement={rootElement.current}
-          onToggle={() => {
-            setOpenTreeNodes(treeApiRef.current?.openState);
-          }}
-          initialOpenState={openTreeNodes}
-        >
-          {Node}
-        </Tree>
-      )}
-    </div>
+    <>
+      <div ref={mergedRef} className={classes.treeContainer}>
+        {isRootReady && rootElement.current && (
+          <Tree
+            data={data.filter((node) => node?.spaceId === spaceId)}
+            disableDrag={readOnly}
+            disableDrop={readOnly}
+            disableEdit={readOnly}
+            {...controllers}
+            width={width}
+            height={rootElement.current.clientHeight}
+            ref={(ref) => {
+              treeApiRef.current = ref;
+              if (ref) {
+                //@ts-ignore
+                setTreeApi(ref);
+              }
+            }}
+            openByDefault={false}
+            disableMultiSelection={true}
+            className={classes.tree}
+            rowClassName={classes.row}
+            rowHeight={30}
+            overscanCount={10}
+            dndRootElement={rootElement.current}
+            onToggle={() => {
+              setOpenTreeNodes(treeApiRef.current?.openState);
+            }}
+            initialOpenState={openTreeNodes}
+          >
+            {Node}
+          </Tree>
+        )}
+      </div>
+      
+      {/* PageImportModal lifted outside of react-arborist tree context */}
+      <PageImportModal
+        spaceId={spaceId}
+        targetParentId={importModalState.targetParentId || undefined}
+        open={importModalState.isOpen}
+        onClose={() => setImportModalState({ isOpen: false, targetParentId: null })}
+      />
+    </>
   );
 }
 
@@ -468,6 +486,7 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
   const { openDeleteModal } = useDeletePageModal();
   const [data, setData] = useAtom(treeDataAtom);
   const emit = useQueryEmit();
+  const [, setImportModalState] = useAtom(importModalAtom);
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
   const [
@@ -478,10 +497,10 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
     copyPageModalOpened,
     { open: openCopyPageModal, close: closeCopySpaceModal },
   ] = useDisclosure(false);
-  const [
-    importModalOpened,
-    { open: openImportModal, close: closeImportModal },
-  ] = useDisclosure(false);
+
+  const openImportModal = () => {
+    setImportModalState({ isOpen: true, targetParentId: node.id });
+  };
 
   const handleCopyLink = () => {
     const pageUrl =
@@ -677,13 +696,6 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
         id={node.id}
         open={exportOpened}
         onClose={closeExportModal}
-      />
-
-      <PageImportModal
-        spaceId={spaceId}
-        targetParentId={node.id}
-        open={importModalOpened}
-        onClose={closeImportModal}
       />
     </>
   );

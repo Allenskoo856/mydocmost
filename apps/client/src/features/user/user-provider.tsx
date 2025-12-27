@@ -36,6 +36,14 @@ export function UserProvider({ children }: React.PropsWithChildren) {
       console.log("ws connected");
     });
 
+    newSocket.on("connect_error", (error) => {
+      console.error("ws connection error:", error);
+    });
+
+    newSocket.on("error", (error) => {
+      console.error("ws error:", error);
+    });
+
     return () => {
       console.log("ws disconnected");
       newSocket.disconnect();

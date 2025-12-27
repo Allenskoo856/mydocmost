@@ -2,7 +2,6 @@ import {
   Modal,
   Button,
   SimpleGrid,
-  FileButton,
   Group,
   Text,
   Tooltip,
@@ -58,7 +57,8 @@ export default function PageImportModal({
         yOffset="10vh"
         xOffset={0}
         mah={400}
-        keepMounted={true}
+        withinPortal={true}
+        trapFocus={false}
       >
         <Modal.Overlay />
         <Modal.Content style={{ overflow: "hidden" }}>
@@ -95,11 +95,12 @@ function ImportFormatSelection({
   const [fileTaskId, setFileTaskId] = useState<string | null>(null);
   const emit = useQueryEmit();
 
-  const markdownFileRef = useRef<() => void>(null);
-  const htmlFileRef = useRef<() => void>(null);
-  const notionFileRef = useRef<() => void>(null);
-  const confluenceFileRef = useRef<() => void>(null);
-  const zipFileRef = useRef<() => void>(null);
+  // Use native input refs instead of FileButton refs
+  const markdownInputRef = useRef<HTMLInputElement>(null);
+  const htmlInputRef = useRef<HTMLInputElement>(null);
+  const notionInputRef = useRef<HTMLInputElement>(null);
+  const confluenceInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
 
   const canUseConfluence = isCloud() || workspace?.hasLicenseKey;
 
@@ -140,12 +141,12 @@ function ImportFormatSelection({
       setFileTaskId(importTask.id);
 
       // Reset file input after successful upload
-      if (source === "notion" && notionFileRef.current) {
-        notionFileRef.current();
-      } else if (source === "confluence" && confluenceFileRef.current) {
-        confluenceFileRef.current();
-      } else if (source === "generic" && zipFileRef.current) {
-        zipFileRef.current();
+      if (source === "notion" && notionInputRef.current) {
+        notionInputRef.current.value = "";
+      } else if (source === "confluence" && confluenceInputRef.current) {
+        confluenceInputRef.current.value = "";
+      } else if (source === "generic" && zipInputRef.current) {
+        zipInputRef.current.value = "";
       }
     } catch (err) {
       console.log("Failed to upload import file", err);
@@ -267,16 +268,50 @@ function ImportFormatSelection({
     }
 
     if (pages?.length > 0 && pageCount > 0) {
-      const newTreeNodes = buildTree(pages);
-      const fullTree = treeData.concat(newTreeNodes);
-
-      if (newTreeNodes?.length && fullTree?.length > 0) {
-        setTreeData(fullTree);
-      }
-
       // Reset file inputs after successful upload
-      if (markdownFileRef.current) markdownFileRef.current();
-      if (htmlFileRef.current) htmlFileRef.current();
+      if (markdownInputRef.current) markdownInputRef.current.value = "";
+      if (htmlInputRef.current) htmlInputRef.current.value = "";
+
+      // Build tree nodes from imported pages
+      const newTreeNodes = buildTree(pages);
+
+      if (targetParentId) {
+        // If importing into a specific page, append new nodes to existing children
+        // We need to find the parent node and append to its children array
+        const addChildrenToParent = (
+          nodes: typeof treeData,
+          parentId: string,
+          newChildren: typeof treeData
+        ): typeof treeData => {
+          return nodes.map((node) => {
+            if (node.id === parentId) {
+              // Found the parent, append new children to existing ones
+              const existingChildren = node.children || [];
+              return {
+                ...node,
+                hasChildren: true,
+                children: [...existingChildren, ...newChildren],
+              };
+            }
+            if (node.children && node.children.length > 0) {
+              return {
+                ...node,
+                children: addChildrenToParent(node.children, parentId, newChildren),
+              };
+            }
+            return node;
+          });
+        };
+
+        const updatedTree = addChildrenToParent(treeData, targetParentId, newTreeNodes);
+        setTreeData(updatedTree);
+      } else {
+        // If importing to root, add to root level
+        const fullTree = treeData.concat(newTreeNodes);
+        if (newTreeNodes?.length && fullTree?.length > 0) {
+          setTreeData(fullTree);
+        }
+      }
 
       const pageCountText =
         pageCount === 1 ? `1 ${t("page")}` : `${pageCount} ${t("pages")}`;
@@ -303,80 +338,118 @@ function ImportFormatSelection({
     }
   };
 
-  // @ts-ignore
   return (
     <>
+      {/* Hidden file inputs */}
+      <input
+        type="file"
+        ref={markdownInputRef}
+        style={{ display: 'none' }}
+        accept=".md,.markdown"
+        multiple
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleFileUpload(Array.from(e.target.files));
+          }
+        }}
+      />
+      <input
+        type="file"
+        ref={htmlInputRef}
+        style={{ display: 'none' }}
+        accept=".html,.htm"
+        multiple
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleFileUpload(Array.from(e.target.files));
+          }
+        }}
+      />
+      <input
+        type="file"
+        ref={notionInputRef}
+        style={{ display: 'none' }}
+        accept=".zip"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleZipUpload(e.target.files[0], "notion");
+          }
+        }}
+      />
+      <input
+        type="file"
+        ref={confluenceInputRef}
+        style={{ display: 'none' }}
+        accept=".zip"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleZipUpload(e.target.files[0], "confluence");
+          }
+        }}
+      />
+      <input
+        type="file"
+        ref={zipInputRef}
+        style={{ display: 'none' }}
+        accept=".zip"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleZipUpload(e.target.files[0], "generic");
+          }
+        }}
+      />
+
       <SimpleGrid cols={2}>
-        <FileButton onChange={handleFileUpload} accept=".md" multiple resetRef={markdownFileRef}>
-          {(props) => (
-            <Button
-              justify="start"
-              variant="default"
-              leftSection={<IconMarkdown size={18} />}
-              {...props}
-            >
-              Markdown
-            </Button>
-          )}
-        </FileButton>
-
-        <FileButton onChange={handleFileUpload} accept="text/html" multiple resetRef={htmlFileRef}>
-          {(props) => (
-            <Button
-              justify="start"
-              variant="default"
-              leftSection={<IconFileCode size={18} />}
-              {...props}
-            >
-              HTML
-            </Button>
-          )}
-        </FileButton>
-
-        <FileButton
-          onChange={(file) => handleZipUpload(file, "notion")}
-          accept="application/zip"
-          resetRef={notionFileRef}
+        <Button
+          justify="start"
+          variant="default"
+          leftSection={<IconMarkdown size={18} />}
+          onClick={() => markdownInputRef.current?.click()}
         >
-          {(props) => (
+          Markdown
+        </Button>
+
+        <Button
+          justify="start"
+          variant="default"
+          leftSection={<IconFileCode size={18} />}
+          onClick={() => htmlInputRef.current?.click()}
+        >
+          HTML
+        </Button>
+
+        <Button
+          justify="start"
+          variant="default"
+          leftSection={<IconBrandNotion size={18} />}
+          onClick={() => notionInputRef.current?.click()}
+        >
+          Notion
+        </Button>
+
+        <Tooltip
+          label={t("Available in enterprise edition")}
+          disabled={canUseConfluence}
+          withinPortal
+        >
+          <div>
             <Button
+              disabled={!canUseConfluence}
               justify="start"
               variant="default"
-              leftSection={<IconBrandNotion size={18} />}
-              {...props}
+              leftSection={<ConfluenceIcon size={18} />}
+              onClick={() => canUseConfluence && confluenceInputRef.current?.click()}
             >
-              Notion
+              Confluence
             </Button>
-          )}
-        </FileButton>
-        <FileButton
-          onChange={(file) => handleZipUpload(file, "confluence")}
-          accept="application/zip"
-          resetRef={confluenceFileRef}
-        >
-          {(props) => (
-            <Tooltip
-              label={t("Available in enterprise edition")}
-              disabled={canUseConfluence}
-            >
-              <Button
-                disabled={!canUseConfluence}
-                justify="start"
-                variant="default"
-                leftSection={<ConfluenceIcon size={18} />}
-                {...props}
-              >
-                Confluence
-              </Button>
-            </Tooltip>
-          )}
-        </FileButton>
+          </div>
+        </Tooltip>
       </SimpleGrid>
 
       <Group justify="center" gap="xl" mih={150}>
         <div>
           <Text ta="center" size="lg" inline>
-            Import zip file
+            {t("Import zip file")}
           </Text>
           <Text ta="center" size="sm" c="dimmed" inline py="sm">
             {t(
@@ -386,23 +459,15 @@ function ImportFormatSelection({
               },
             )}
           </Text>
-          <FileButton
-            onChange={(file) => handleZipUpload(file, "generic")}
-            accept="application/zip"
-            resetRef={zipFileRef}
-          >
-            {(props) => (
-              <Group justify="center">
-                <Button
-                  justify="center"
-                  leftSection={<IconFileTypeZip size={18} />}
-                  {...props}
-                >
-                  {t("Upload file")}
-                </Button>
-              </Group>
-            )}
-          </FileButton>
+          <Group justify="center">
+            <Button
+              justify="center"
+              leftSection={<IconFileTypeZip size={18} />}
+              onClick={() => zipInputRef.current?.click()}
+            >
+              {t("Upload file")}
+            </Button>
+          </Group>
         </div>
       </Group>
     </>

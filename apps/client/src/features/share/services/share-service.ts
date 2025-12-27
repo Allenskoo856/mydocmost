@@ -35,9 +35,10 @@ export async function updateShare(data: IUpdateShare): Promise<any> {
   return req.data;
 }
 
-export async function getShareForPage(pageId: string): Promise<IShareForPage> {
+export async function getShareForPage(pageId: string): Promise<IShareForPage | null> {
   const req = await api.post<any>("/shares/for-page", { pageId });
-  return req.data;
+  // 后端可能返回 undefined，我们将其转换为 null 以符合 TanStack Query 的要求
+  return req.data ?? null;
 }
 
 export async function getSharePageInfo(
