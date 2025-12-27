@@ -215,3 +215,70 @@ export function mergeRootTrees(
 
   return sortPositionKeys(merged);
 }
+
+/**
+ * Move a node to a new parent within the tree
+ * Returns a new tree with the node moved to the target parent
+ */
+export function moveNodeInTree(
+  treeItems: SpaceTreeNode[],
+  nodeId: string,
+  targetParentId: string | null,
+  newPosition: string,
+): SpaceTreeNode[] {
+  // First, find and remove the node from its current location
+  let movedNode: SpaceTreeNode | null = null;
+
+  const removeNode = (items: SpaceTreeNode[]): SpaceTreeNode[] => {
+    return items
+      .filter((item) => {
+        if (item.id === nodeId) {
+          movedNode = { ...item, position: newPosition, parentPageId: targetParentId };
+          return false; // Remove from current location
+        }
+        return true;
+      })
+      .map((item) => ({
+        ...item,
+        children: item.children ? removeNode(item.children) : [],
+      }));
+  };
+
+  let newTree = removeNode(treeItems);
+
+  if (!movedNode) {
+    console.warn('[moveNodeInTree] Node not found:', nodeId);
+    return treeItems;
+  }
+
+  // Then, add the node to its new location
+  if (targetParentId === null) {
+    // Moving to root
+    newTree = sortPositionKeys([...newTree, movedNode]);
+  } else {
+    // Moving to a specific parent
+    const addToParent = (items: SpaceTreeNode[]): SpaceTreeNode[] => {
+      return items.map((item) => {
+        if (item.id === targetParentId) {
+          const newChildren = sortPositionKeys([...(item.children || []), movedNode!]);
+          return {
+            ...item,
+            hasChildren: true,
+            children: newChildren,
+          };
+        }
+        if (item.children) {
+          return {
+            ...item,
+            children: addToParent(item.children),
+          };
+        }
+        return item;
+      });
+    };
+
+    newTree = addToParent(newTree);
+  }
+
+  return newTree;
+}

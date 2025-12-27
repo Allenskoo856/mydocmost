@@ -75,6 +75,7 @@ import { useToggleSidebar } from "@/components/layouts/global/hooks/hooks/use-to
 import CopyPageModal from "../../components/copy-page-modal.tsx";
 import { duplicatePage } from "../../services/page-service.ts";
 import PageImportModal from "../../components/page-import-modal.tsx";
+import MovePageInSpaceModal from "../../components/move-page-in-space-modal.tsx";
 
 interface SpaceTreeProps {
   spaceId: string;
@@ -497,6 +498,10 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
     copyPageModalOpened,
     { open: openCopyPageModal, close: closeCopySpaceModal },
   ] = useDisclosure(false);
+  const [
+    moveInSpaceOpened,
+    { open: openMoveInSpaceModal, close: closeMoveInSpaceModal },
+  ] = useDisclosure(false);
 
   const openImportModal = () => {
     setImportModalState({ isOpen: true, targetParentId: node.id });
@@ -645,7 +650,18 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
                   openMovePageModal();
                 }}
               >
-                {t("Move")}
+                {t("Move to space")}
+              </Menu.Item>
+
+              <Menu.Item
+                leftSection={<IconArrowRight size={16} />}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openMoveInSpaceModal();
+                }}
+              >
+                {t("Move to page in space")}
               </Menu.Item>
 
               <Menu.Item
@@ -689,6 +705,13 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
         currentSpaceSlug={spaceSlug}
         onClose={closeCopySpaceModal}
         open={copyPageModalOpened}
+      />
+
+      <MovePageInSpaceModal
+        pageId={node.id}
+        spaceId={spaceId}
+        open={moveInSpaceOpened}
+        onClose={closeMoveInSpaceModal}
       />
 
       <ExportModal

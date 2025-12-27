@@ -476,6 +476,13 @@ export class PageService {
   }
 
   async movePage(dto: MovePageDto, movedPage: Page) {
+    console.log('[MovePage] Starting move operation:', {
+      pageId: dto.pageId,
+      currentParentPageId: movedPage.parentPageId,
+      newParentPageId: dto.parentPageId,
+      position: dto.position,
+    });
+
     // validate position value by attempting to generate a key
     try {
       generateJitteredKeyBetween(dto.position, null);
@@ -486,6 +493,7 @@ export class PageService {
     let parentPageId = null;
     if (movedPage.parentPageId === dto.parentPageId) {
       parentPageId = undefined;
+      console.log('[MovePage] Parent page unchanged, parentPageId set to undefined');
     } else {
       // changing the page's parent
       if (dto.parentPageId) {
@@ -494,16 +502,21 @@ export class PageService {
           throw new NotFoundException('Parent page not found');
         }
         parentPageId = parentPage.id;
+        console.log('[MovePage] Parent page changed, validated new parent:', parentPageId);
+      } else {
+        console.log('[MovePage] Moving to root (parentPageId will be null)');
       }
     }
 
-    await this.pageRepo.updatePage(
-      {
-        position: dto.position,
-        parentPageId: parentPageId,
-      },
-      dto.pageId,
-    );
+    const updateData = {
+      position: dto.position,
+      parentPageId: parentPageId,
+    };
+    console.log('[MovePage] Calling pageRepo.updatePage with:', updateData);
+
+    await this.pageRepo.updatePage(updateData, dto.pageId);
+    
+    console.log('[MovePage] Page moved successfully');
   }
 
   async getPageBreadCrumbs(childPageId: string) {
