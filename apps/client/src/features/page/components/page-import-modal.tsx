@@ -17,12 +17,14 @@ import {
 import {
   importPage,
   importZip,
+  getSidebarPages,
 } from "@/features/page/services/page-service.ts";
 import { notifications } from "@mantine/notifications";
 import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom.ts";
 import { useAtom } from "jotai";
 import { buildTree } from "@/features/page/tree/utils";
 import { IPage } from "@/features/page/types/page.types.ts";
+import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfluenceIcon } from "@/components/icons/confluence-icon.tsx";
@@ -93,7 +95,13 @@ function ImportFormatSelection({
   const [treeData, setTreeData] = useAtom(treeDataAtom);
   const [workspace] = useAtom(workspaceAtom);
   const [fileTaskId, setFileTaskId] = useState<string | null>(null);
+  // Store the targetParentId when zip upload starts, before modal closes
+  const [savedTargetParentId, setSavedTargetParentId] = useState<string | null>(null);
   const emit = useQueryEmit();
+  
+  // Use ref to keep latest values for use in useEffect closure
+  const treeDataRef = useRef(treeData);
+  treeDataRef.current = treeData;
 
   // Use native input refs instead of FileButton refs
   const markdownInputRef = useRef<HTMLInputElement>(null);
@@ -108,6 +116,9 @@ function ImportFormatSelection({
     if (!selectedFile) {
       return;
     }
+
+    // Save targetParentId before closing modal
+    setSavedTargetParentId(targetParentId || null);
 
     try {
       onClose();
@@ -185,16 +196,80 @@ function ImportFormatSelection({
           clearInterval(intervalId);
           setFileTaskId(null);
 
-          await queryClient.refetchQueries({
-            queryKey: ["root-sidebar-pages", fileTask.spaceId],
-          });
+          // Update tree based on import target
+          console.log('ZIP import success, savedTargetParentId:', savedTargetParentId);
+          if (savedTargetParentId) {
+            // Fetch the updated children for the parent page
+            try {
+              console.log('Fetching children for parent:', savedTargetParentId);
+              const childrenResponse = await getSidebarPages({
+                spaceId: fileTask.spaceId,
+                pageId: savedTargetParentId,
+              });
+              console.log('Children response:', childrenResponse);
+              
+              if (childrenResponse?.items?.length > 0) {
+                const newTreeNodes = buildTree(childrenResponse.items);
+                console.log('New tree nodes:', newTreeNodes);
+                
+                // Helper function to update children for a specific parent
+                const updateChildrenForParent = (
+                  nodes: SpaceTreeNode[],
+                  parentId: string,
+                  newChildren: SpaceTreeNode[]
+                ): SpaceTreeNode[] => {
+                  return nodes.map((node) => {
+                    if (node.id === parentId) {
+                      return {
+                        ...node,
+                        hasChildren: true,
+                        children: newChildren,
+                      };
+                    }
+                    if (node.children && node.children.length > 0) {
+                      return {
+                        ...node,
+                        children: updateChildrenForParent(node.children, parentId, newChildren),
+                      };
+                    }
+                    return node;
+                  });
+                };
 
-          setTimeout(() => {
-            emit({
-              operation: "refetchRootTreeNodeEvent",
-              spaceId: spaceId,
-            });
-          }, 50);
+                const currentTree = treeDataRef.current;
+                const updatedTree = updateChildrenForParent(currentTree, savedTargetParentId, newTreeNodes);
+                setTreeData(updatedTree);
+              }
+            } catch (err) {
+              console.error("Failed to fetch updated children:", err);
+            }
+          } else {
+            // Importing to root - refetch root pages and update tree
+            try {
+              const rootResponse = await getSidebarPages({
+                spaceId: fileTask.spaceId,
+              });
+              
+              if (rootResponse?.items?.length > 0) {
+                const newRootNodes = buildTree(rootResponse.items);
+                const currentTree = treeDataRef.current;
+                // Merge with existing tree, keeping existing node's children
+                const mergedTree = newRootNodes.map((newNode) => {
+                  const existingNode = currentTree.find((n) => n.id === newNode.id);
+                  if (existingNode && existingNode.children) {
+                    return { ...newNode, children: existingNode.children };
+                  }
+                  return newNode;
+                });
+                // Add any new nodes that weren't in previous tree
+                const existingIds = new Set(currentTree.map((n) => n.id));
+                const brandNewNodes = newRootNodes.filter((n) => !existingIds.has(n.id));
+                setTreeData([...currentTree.filter((n) => newRootNodes.some((nn) => nn.id === n.id)), ...brandNewNodes]);
+              }
+            } catch (err) {
+              console.error("Failed to fetch updated root pages:", err);
+            }
+          }
         }
 
         if (status === "failed") {
@@ -238,7 +313,7 @@ function ImportFormatSelection({
         console.error("Failed to fetch import status", err);
       }
     }, 3000);
-  }, [fileTaskId]);
+  }, [fileTaskId, savedTargetParentId]);
 
   const handleFileUpload = async (selectedFiles: File[]) => {
     if (!selectedFiles) {
