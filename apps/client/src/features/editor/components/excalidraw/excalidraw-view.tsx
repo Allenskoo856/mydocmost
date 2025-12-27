@@ -90,10 +90,11 @@ export default function ExcalidrawView(props: NodeViewProps) {
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(svg);
 
-    svgString = svgString.replace(
-      /https:\/\/unpkg\.com\/@excalidraw\/excalidraw@undefined/g,
-      "https://unpkg.com/@excalidraw/excalidraw@latest",
-    );
+    // Note: Excalidraw library should be bundled locally for internal network deployment
+    // svgString = svgString.replace(
+    //   /https:\/\/unpkg\.com\/@excalidraw\/excalidraw@undefined/g,
+    //   "https://unpkg.com/@excalidraw/excalidraw@latest",
+    // );
 
     const fileName = "diagram.excalidraw.svg";
     const excalidrawSvgFile = await svgStringToFile(svgString, fileName);

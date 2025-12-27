@@ -8,11 +8,7 @@ import {
   IconUsersGroup,
   IconSpaces,
   IconBrush,
-  IconCoin,
-  IconLock,
-  IconKey,
   IconWorld,
-  IconSparkles,
 } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import classes from "./settings.module.css";
@@ -22,14 +18,9 @@ import useUserRole from "@/hooks/use-user-role.tsx";
 import { useAtom } from "jotai";
 import { workspaceAtom } from "@/features/user/atoms/current-user-atom.ts";
 import {
-  prefetchApiKeyManagement,
-  prefetchApiKeys,
-  prefetchBilling,
   prefetchGroups,
-  prefetchLicense,
   prefetchShares,
   prefetchSpaces,
-  prefetchSsoProviders,
   prefetchWorkspaceMembers,
 } from "@/components/settings/settings-queries.tsx";
 import AppVersion from "@/components/settings/app-version.tsx";
@@ -53,6 +44,7 @@ interface DataGroup {
   items: DataItem[];
 }
 
+// EE features (Billing, Security, API Keys, License, AI) have been removed for internal network deployment
 const groupedData: DataGroup[] = [
   {
     heading: "Account",
@@ -62,14 +54,6 @@ const groupedData: DataGroup[] = [
         label: "Preferences",
         icon: IconBrush,
         path: "/settings/account/preferences",
-      },
-      {
-        label: "API keys",
-        icon: IconKey,
-        path: "/settings/account/api-keys",
-        isCloud: true,
-        isEnterprise: true,
-        showDisabledInNonEE: true,
       },
     ],
   },
@@ -82,51 +66,9 @@ const groupedData: DataGroup[] = [
         icon: IconUsers,
         path: "/settings/members",
       },
-      {
-        label: "Billing",
-        icon: IconCoin,
-        path: "/settings/billing",
-        isCloud: true,
-        isAdmin: true,
-      },
-      {
-        label: "Security & SSO",
-        icon: IconLock,
-        path: "/settings/security",
-        isCloud: true,
-        isEnterprise: true,
-        isAdmin: true,
-        showDisabledInNonEE: true,
-      },
       { label: "Groups", icon: IconUsersGroup, path: "/settings/groups" },
       { label: "Spaces", icon: IconSpaces, path: "/settings/spaces" },
       { label: "Public sharing", icon: IconWorld, path: "/settings/sharing" },
-      {
-        label: "API management",
-        icon: IconKey,
-        path: "/settings/api-keys",
-        isCloud: true,
-        isEnterprise: true,
-        isAdmin: true,
-        showDisabledInNonEE: true,
-      },
-      {
-        label: "AI settings",
-        icon: IconSparkles,
-        path: "/settings/ai",
-        isAdmin: true,
-        isSelfhosted: true,
-      },
-    ],
-  },
-  {
-    heading: "System",
-    items: [
-      {
-        label: "License & Edition",
-        icon: IconKey,
-        path: "/settings/license",
-      },
     ],
   },
 ];
@@ -183,10 +125,6 @@ export default function SettingsSidebar() {
   };
 
   const menuItems = groupedData.map((group) => {
-    if (group.heading === "System" && (!isAdmin || isCloud())) {
-      return null;
-    }
-
     return (
       <div key={group.heading}>
         <Text c="dimmed" className={classes.linkHeader}>
@@ -208,25 +146,8 @@ export default function SettingsSidebar() {
             case "Groups":
               prefetchHandler = prefetchGroups;
               break;
-            case "Billing":
-              prefetchHandler = prefetchBilling;
-              break;
-            case "License & Edition":
-              if (workspace?.hasLicenseKey) {
-                prefetchHandler = prefetchLicense;
-              }
-              break;
-            case "Security & SSO":
-              prefetchHandler = prefetchSsoProviders;
-              break;
             case "Public sharing":
               prefetchHandler = prefetchShares;
-              break;
-            case "API keys":
-              prefetchHandler = prefetchApiKeys;
-              break;
-            case "API management":
-              prefetchHandler = prefetchApiKeyManagement;
               break;
             default:
               break;
