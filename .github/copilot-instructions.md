@@ -81,6 +81,7 @@
 ## 输出规范  
 - 语言要求：所有回复、思考过程及任务清单，均须使用中文。
 - 固定指令Implementation Plan, Task List and Thought in Chinese
+- 输出要求：除非用户许可，或者主动要求，否则禁止随意创建markdown文件、shell脚本。
 
 
 

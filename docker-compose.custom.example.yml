@@ -1,0 +1,77 @@
+# Docker Compose 配置示例 - 使用自定义镜像
+# 
+# 使用说明：
+# 1. 复制此文件为 docker-compose.custom.yml
+# 2. 修改 image 字段为你的镜像名称
+# 3. 修改环境变量（APP_SECRET 必须修改）
+# 4. 运行: docker-compose -f docker-compose.custom.yml up -d
+
+version: '3.8'
+
+services:
+  # 数据库服务
+  db:
+    image: postgres:16-alpine
+    container_name: docmost-db
+    environment:
+      POSTGRES_DB: docmost
+      POSTGRES_USER: docmost
+      POSTGRES_PASSWORD: STRONG_DB_PASSWORD  # 请修改为强密码
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 服务
+  redis:
+    image: redis:7.2-alpine
+    container_name: docmost-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Docmost 应用（使用自定义镜像）
+  docmost:
+    image: 你的DockerHub用户名/docmost:latest  # 修改为你的镜像
+    container_name: docmost-app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_URL: 'http://localhost:3000'
+      APP_SECRET: 'your-secret-key-min-32-chars-long'  # 必须修改！至少32字符
+      DATABASE_URL: 'postgresql://docmost:STRONG_DB_PASSWORD@db:5432/docmost'
+      REDIS_URL: 'redis://redis:6379'
+      
+      # 可选配置
+      # MAIL_DRIVER: 'smtp'
+      # MAIL_FROM_ADDRESS: 'noreply@example.com'
+      # MAIL_FROM_NAME: 'Docmost'
+      # SMTP_HOST: 'smtp.gmail.com'
+      # SMTP_PORT: 587
+      # SMTP_USERNAME: 'your-email@gmail.com'
+      # SMTP_PASSWORD: 'your-app-password'
+    ports:
+      - "3000:3000"
+    volumes:
+      - docmost_storage:/app/data/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  db_data:
+  docmost_storage:
