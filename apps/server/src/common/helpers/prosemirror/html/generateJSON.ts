@@ -1,7 +1,6 @@
 import type { Extensions } from '@tiptap/core';
 import { getSchema } from '@tiptap/core';
 import { type ParseOptions, DOMParser as PMDOMParser } from '@tiptap/pm/model';
-import { Window } from 'happy-dom';
 
 /**
  * Generates a JSON object from the given HTML string and converts it into a Prosemirror node with content.
@@ -13,20 +12,21 @@ import { Window } from 'happy-dom';
  * @example
  * const html = '<p>Hello, world!</p>'
  * const extensions = [...]
- * const json = generateJSON(html, extensions)
+ * const json = await generateJSON(html, extensions)
  * console.log(json) // { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello, world!' }] }] }
  */
-export function generateJSON(
+export async function generateJSON(
   html: string,
   extensions: Extensions,
   options?: ParseOptions,
-): Record<string, any> {
+): Promise<Record<string, any>> {
   if (typeof window !== 'undefined') {
     throw new Error(
       'generateJSON can only be used in a Node environment\nIf you want to use this in a browser environment, use the `@tiptap/html` import instead.',
     );
   }
 
+  const { Window } = await import('happy-dom');
   const localWindow = new Window();
   const localDOMParser = new localWindow.DOMParser();
   let result: Record<string, any>;

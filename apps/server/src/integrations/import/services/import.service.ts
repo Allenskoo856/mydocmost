@@ -124,7 +124,7 @@ export class ImportService {
 
   async processHTML(htmlInput: string): Promise<any> {
     try {
-      return htmlToJson(htmlInput);
+      return await htmlToJson(htmlInput);
     } catch (err) {
       throw err;
     }

@@ -66,7 +66,7 @@ export class ExportService {
       prosemirrorJson.content.unshift(titleNode);
     }
 
-    const pageHtml = jsonToHtml(prosemirrorJson);
+    const pageHtml = await jsonToHtml(prosemirrorJson);
 
     if (format === ExportFormat.HTML) {
       return `<!DOCTYPE html>

@@ -11,11 +11,11 @@ import { getHTMLFromFragment } from './getHTMLFromFragment';
  * @returns The generated HTML string.
  * @example
  * ```js
- * const html = generateHTML(doc, extensions)
+ * const html = await generateHTML(doc, extensions)
  * console.log(html)
  * ```
  */
-export function generateHTML(doc: JSONContent, extensions: Extensions): string {
+export async function generateHTML(doc: JSONContent, extensions: Extensions): Promise<string> {
   if (typeof window !== 'undefined') {
     throw new Error(
       'generateHTML can only be used in a Node environment\nIf you want to use this in a browser environment, use the `@tiptap/html` import instead.',

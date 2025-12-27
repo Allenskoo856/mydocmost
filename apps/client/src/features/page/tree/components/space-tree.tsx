@@ -608,7 +608,7 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
               </Menu.Item>
 
               <Menu.Item
-                leftSection={<IconCopy size={16} />}}
+                leftSection={<IconCopy size={16} />}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

@@ -15,7 +15,6 @@ import { AttachmentType } from '../../../core/attachment/attachment.constants';
 import { unwrapFromParagraph } from '../utils/import-formatter';
 import { resolveRelativeAttachmentPath } from '../utils/import.utils';
 import { load } from 'cheerio';
-import pLimit from 'p-limit';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { QueueJob, QueueName } from '../../queue/constants';
@@ -66,6 +65,7 @@ export class ImportAttachmentService {
       isConfluenceImport,
     } = opts;
 
+    const { default: pLimit } = await import('p-limit');
     const attachmentTasks: (() => Promise<void>)[] = [];
     const limit = pLimit(this.CONCURRENT_UPLOADS);
     const uploadStats = {

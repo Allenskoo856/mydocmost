@@ -1,6 +1,5 @@
 import type { Node, Schema } from '@tiptap/pm/model';
 import { DOMSerializer } from '@tiptap/pm/model';
-import { Window } from 'happy-dom';
 
 /**
  * Returns the HTML string representation of a given document node.
@@ -12,14 +11,14 @@ import { Window } from 'happy-dom';
  *
  * @example
  * ```typescript
- * const html = getHTMLFromFragment(doc, schema)
+ * const html = await getHTMLFromFragment(doc, schema)
  * ```
  */
-export function getHTMLFromFragment(
+export async function getHTMLFromFragment(
   doc: Node,
   schema: Schema,
   options?: { document?: Document },
-): string {
+): Promise<string> {
   if (options?.document) {
     const wrap = options.document.createElement('div');
 
@@ -31,6 +30,7 @@ export function getHTMLFromFragment(
     return wrap.innerHTML;
   }
 
+  const { Window } = await import('happy-dom');
   const localWindow = new Window();
   let result: string;
 

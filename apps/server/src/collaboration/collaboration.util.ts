@@ -90,12 +90,12 @@ export const tiptapExtensions = [
   Subpages,
 ] as any;
 
-export function jsonToHtml(tiptapJson: any) {
+export async function jsonToHtml(tiptapJson: any) {
   return generateHTML(tiptapJson, tiptapExtensions);
 }
 
-export function htmlToJson(html: string) {
-  const pmJson = generateJSON(html, tiptapExtensions);
+export async function htmlToJson(html: string) {
+  const pmJson = await generateJSON(html, tiptapExtensions);
 
   try {
     return addUniqueIdsToDoc(pmJson, tiptapExtensions);
