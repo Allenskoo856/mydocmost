@@ -5,12 +5,14 @@ on:
     branches:
       - main
       - master
+      - feature_nonetwork
     tags:
       - 'v*.*.*'
   pull_request:
     branches:
       - main
       - master
+      - feature_nonetwork
   workflow_dispatch:
 
 env:
