@@ -7,6 +7,7 @@ WORKDIR /app
 
 ARG BASE_PATH="/lbandoc"
 ENV BASE_PATH=$BASE_PATH
+ENV NX_DAEMON=false
 
 COPY . .
 
