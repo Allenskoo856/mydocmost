@@ -12,7 +12,6 @@ import { Typography } from "@tiptap/extension-typography";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import GlobalDragHandle from "tiptap-extension-global-drag-handle";
-import { Youtube } from "@tiptap/extension-youtube";
 import SlashCommand from "@/features/editor/extensions/slash-command";
 import { Collaboration, isChangeOrigin } from "@tiptap/extension-collaboration";
 import { CollaborationCursor } from "@tiptap/extension-collaboration-cursor";
@@ -191,11 +190,6 @@ export const mainExtensions = [
   Details,
   DetailsSummary,
   DetailsContent,
-  Youtube.configure({
-    addPasteHandler: false,
-    controls: true,
-    nocookie: true,
-  }),
   TiptapImage.configure({
     view: ImageView,
     allowBase64: false,

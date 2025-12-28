@@ -46,9 +46,9 @@ export class ImportController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const validFileExtensions = ['.md', '.html'];
+    const validFileExtensions = ['.md', '.html', '.docx'];
 
-    const maxFileSize = bytes('10mb');
+    const maxFileSize = bytes('20mb'); // 增加到20MB以支持Word文件
 
     let file = null;
     try {
@@ -59,7 +59,7 @@ export class ImportController {
       this.logger.error(err.message);
       if (err?.statusCode === 413) {
         throw new BadRequestException(
-          `File too large. Exceeds the 10mb import limit`,
+          `File too large. Exceeds the 20mb import limit`,
         );
       }
     }

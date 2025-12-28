@@ -59,9 +59,8 @@
   - Generate from schema: `pnpm --filter ./apps/server run migration:codegen`
   - Apply latest: `pnpm --filter ./apps/server run migration:latest`
   - Up/Down/Redo: see scripts in `apps/server/package.json`.
-- Tests (server):
-  - Unit: `pnpm --filter ./apps/server test`
-  - E2E: `pnpm --filter ./apps/server test:e2e`
+- 本地启动项目命令：
+  - nvm use 22 && cd /Users/lizonglun/code/mydocmost && pnpm dev 
 
 ## Patterns & Conventions
 - Keep API routes under `/api/*` and return DTOs the client expects; the frontend Axios interceptor unwraps bodies.

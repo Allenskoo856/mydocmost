@@ -10,6 +10,7 @@ import {
   IconBrandNotion,
   IconCheck,
   IconFileCode,
+  IconFileTypeDoc,
   IconFileTypeZip,
   IconMarkdown,
   IconX,
@@ -27,8 +28,7 @@ import { IPage } from "@/features/page/types/page.types.ts";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ConfluenceIcon } from "@/components/icons/confluence-icon.tsx";
-import { getFileImportSizeLimit, isCloud } from "@/lib/config.ts";
+import { getFileImportSizeLimit } from "@/lib/config.ts";
 import { formatBytes } from "@/lib";
 import { workspaceAtom } from "@/features/user/atoms/current-user-atom.ts";
 import { getFileTaskById } from "@/features/file-task/services/file-task-service.ts";
@@ -106,11 +106,9 @@ function ImportFormatSelection({
   // Use native input refs instead of FileButton refs
   const markdownInputRef = useRef<HTMLInputElement>(null);
   const htmlInputRef = useRef<HTMLInputElement>(null);
+  const wordInputRef = useRef<HTMLInputElement>(null);
   const notionInputRef = useRef<HTMLInputElement>(null);
-  const confluenceInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
-
-  const canUseConfluence = isCloud() || workspace?.hasLicenseKey;
 
   const handleZipUpload = async (selectedFile: File, source: string) => {
     if (!selectedFile) {
@@ -154,8 +152,6 @@ function ImportFormatSelection({
       // Reset file input after successful upload
       if (source === "notion" && notionInputRef.current) {
         notionInputRef.current.value = "";
-      } else if (source === "confluence" && confluenceInputRef.current) {
-        confluenceInputRef.current.value = "";
       } else if (source === "generic" && zipInputRef.current) {
         zipInputRef.current.value = "";
       }
@@ -442,23 +438,24 @@ function ImportFormatSelection({
       />
       <input
         type="file"
+        ref={wordInputRef}
+        style={{ display: 'none' }}
+        accept=".docx"
+        multiple
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleFileUpload(Array.from(e.target.files));
+          }
+        }}
+      />
+      <input
+        type="file"
         ref={notionInputRef}
         style={{ display: 'none' }}
         accept=".zip"
         onChange={(e) => {
           if (e.target.files && e.target.files[0]) {
             handleZipUpload(e.target.files[0], "notion");
-          }
-        }}
-      />
-      <input
-        type="file"
-        ref={confluenceInputRef}
-        style={{ display: 'none' }}
-        accept=".zip"
-        onChange={(e) => {
-          if (e.target.files && e.target.files[0]) {
-            handleZipUpload(e.target.files[0], "confluence");
           }
         }}
       />
@@ -502,23 +499,14 @@ function ImportFormatSelection({
           Notion
         </Button>
 
-        <Tooltip
-          label={t("Available in enterprise edition")}
-          disabled={canUseConfluence}
-          withinPortal
+        <Button
+          justify="start"
+          variant="default"
+          leftSection={<IconFileTypeDoc size={18} />}
+          onClick={() => wordInputRef.current?.click()}
         >
-          <div>
-            <Button
-              disabled={!canUseConfluence}
-              justify="start"
-              variant="default"
-              leftSection={<ConfluenceIcon size={18} />}
-              onClick={() => canUseConfluence && confluenceInputRef.current?.click()}
-            >
-              Confluence
-            </Button>
-          </div>
-        </Tooltip>
+          Word
+        </Button>
       </SimpleGrid>
 
       <Group justify="center" gap="xl" mih={150}>
