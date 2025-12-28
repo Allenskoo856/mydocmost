@@ -76,7 +76,7 @@ export function AppHeader() {
             component={Link}
             to="/home"
           >
-            Docmost
+            文档中心
           </Text>
 
           <Group ml={50} gap={5} className={classes.links} visibleFrom="sm">

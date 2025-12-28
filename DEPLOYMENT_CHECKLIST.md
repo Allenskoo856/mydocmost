@@ -198,7 +198,7 @@ grep -E "CLOUD|DISABLE_TELEMETRY" .env
 ### 服务状态
 - [ ] PostgreSQL服务运行正常
 - [ ] Redis服务运行正常
-- [ ] Docmost服务运行正常
+- [ ] 文档中心服务运行正常
 - [ ] Nginx/Caddy服务运行正常
 - [ ] 邮件服务正常（发送测试邮件）
 
@@ -207,6 +207,6 @@ grep -E "CLOUD|DISABLE_TELEMETRY" .env
 **日期**: __________________
 
 **备注**: 
-- 本检查清单基于 Docmost 内网部署方案
+- 本检查清单基于 文档中心 内网部署方案
 - 所有修改已记录在 `INTERNAL_NETWORK_DEPLOYMENT_GUIDE.md`
 - EE功能已通过配置禁用，代码保留以符合AGPL 3.0

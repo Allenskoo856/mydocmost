@@ -24,7 +24,7 @@
 
 ### 1.4 品牌外链 ✅
 **文件**: `apps/client/src/features/share/components/share-branding.tsx`
-**修改**: 移除 "Powered by Docmost" 链接
+**修改**: 移除 "Powered by 文档中心" 链接
 **状态**: 已完成
 
 ### 1.5 Draw.io服务 ⚠️
