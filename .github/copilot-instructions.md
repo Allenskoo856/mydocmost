@@ -66,7 +66,7 @@
 ## Patterns & Conventions
 - Keep API routes under `/api/*` and return DTOs the client expects; the frontend Axios interceptor unwraps bodies.
 - Websocket endpoints: Socket.IO under `/socket.io`, collaboration under `/collab`.
-- Env keys surfaced to client via `window.CONFIG`: `APP_URL, CLOUD, COLLAB_URL, FILE_*_SIZE_LIMIT, DRAWIO_URL, SUBDOMAIN_HOST, BILLING_TRIAL_DAYS, POSTHOG_*`.
+- Env keys surfaced to client via `window.CONFIG`: `APP_URL, CLOUD, COLLAB_URL, FILE_*_SIZE_LIMIT, DRAWIO_URL, SUBDOMAIN_HOST, BILLING_TRIAL_DAYS`.
 - Patched deps: `react-arborist@3.4.0.patch` via pnpm patches—be careful when upgrading.
 
 ## 核心理念与原则 
