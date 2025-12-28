@@ -7,18 +7,18 @@ RUN npm install -g pnpm@10.4.0
 
 WORKDIR /app
 
-# Copy dependency files first for better caching
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy dependency and config files first for better caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json ./
 COPY patches ./patches
-COPY apps/server/package.json ./apps/server/
-COPY apps/client/package.json ./apps/client/
-COPY packages/editor-ext/package.json ./packages/editor-ext/
+COPY apps/server/package.json apps/server/tsconfig*.json ./apps/server/
+COPY apps/client/package.json apps/client/tsconfig*.json ./apps/client/
+COPY packages/editor-ext/package.json packages/editor-ext/tsconfig.json ./packages/editor-ext/
 
 # Install dependencies with cache mount
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
-# Copy source code
+# Copy all source code
 COPY . .
 
 # Build with Nx cache mount
