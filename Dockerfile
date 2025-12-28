@@ -8,11 +8,24 @@ WORKDIR /app
 ARG BASE_PATH="/lbandoc"
 ENV BASE_PATH=$BASE_PATH
 ENV NX_DAEMON=false
-
-COPY . .
+ENV CI=true
 
 RUN npm install -g pnpm@10.4.0
+
+# 先复制依赖文件，利用 Docker 层缓存
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+COPY apps/server/package.json ./apps/server/
+COPY apps/client/package.json ./apps/client/
+COPY packages/editor-ext/package.json ./packages/editor-ext/
+
+# 安装依赖（这层会被缓存，除非依赖文件变化）
 RUN pnpm install --frozen-lockfile
+
+# 复制源代码
+COPY . .
+
+# 构建
 RUN pnpm build
 
 FROM base AS installer
