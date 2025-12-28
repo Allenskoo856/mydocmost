@@ -5,7 +5,7 @@ FROM base AS builder
 
 WORKDIR /app
 
-ARG BASE_PATH="/"
+ARG BASE_PATH="/lbandoc"
 ENV BASE_PATH=$BASE_PATH
 
 COPY . .
