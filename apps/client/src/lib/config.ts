@@ -12,8 +12,12 @@ export function getAppName(): string {
   return "文档中心";
 }
 
+export function getBasePath(): string {
+  return getConfigValue("BASE_PATH", "");
+}
+
 export function getAppUrl(): string {
-  return `${window.location.protocol}//${window.location.host}`;
+  return `${window.location.protocol}//${window.location.host}${getBasePath()}`;
 }
 
 export function getServerAppUrl(): string {
@@ -29,7 +33,7 @@ export function getCollaborationUrl(): string {
     getConfigValue("COLLAB_URL") ||
     (import.meta.env.DEV ? process.env.APP_URL : getAppUrl());
 
-  const collabUrl = new URL("/collab", baseUrl);
+  const collabUrl = new URL(getBasePath() + "/collab", baseUrl);
   collabUrl.protocol = collabUrl.protocol === "https:" ? "wss:" : "ws:";
   return collabUrl.toString();
 }

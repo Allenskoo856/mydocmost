@@ -13,6 +13,7 @@ import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import "./i18n";
+import { getBasePath } from "@/lib/config.ts";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +31,7 @@ const root = ReactDOM.createRoot(
 );
 
 root.render(
-  <BrowserRouter>
+  <BrowserRouter basename={getBasePath()}>
     <MantineProvider theme={theme} cssVariablesResolver={mantineCssResolver}>
       <ModalsProvider>
         <QueryClientProvider client={queryClient}>

@@ -5,6 +5,9 @@ FROM base AS builder
 
 WORKDIR /app
 
+ARG BASE_PATH="/"
+ENV BASE_PATH=$BASE_PATH
+
 COPY . .
 
 RUN npm install -g pnpm@10.4.0

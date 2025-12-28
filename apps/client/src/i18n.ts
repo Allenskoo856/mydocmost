@@ -2,6 +2,10 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import Backend from "i18next-http-backend";
 
+const basePath = import.meta.env.DEV
+  ? (process.env.BASE_PATH || "")
+  : (window?.CONFIG?.BASE_PATH || "");
+
 i18n
   // load translation using http -> see /public/locales (i.e. https://github.com/i18next/react-i18next/tree/master/example/react/public/locales)
   // learn more: https://github.com/i18next/i18next-http-backend
@@ -15,7 +19,9 @@ i18n
     fallbackLng: "en-US",
     debug: false,
     load: 'currentOnly',
-
+    backend: {
+      loadPath: `${basePath}/locales/{{lng}}/{{ns}}.json`,
+    },
     interpolation: {
       escapeValue: false, // not needed for react as it escapes by default
     },

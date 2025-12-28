@@ -23,6 +23,14 @@ export class EnvironmentService {
     return origin;
   }
 
+  getBasePath(): string {
+    const basePath = this.configService.get<string>('BASE_PATH', '');
+    if (!basePath || basePath === '/') {
+      return '';
+    }
+    return basePath.startsWith('/') ? basePath : `/${basePath}`;
+  }
+
   isHttps(): boolean {
     const appUrl = this.configService.get<string>('APP_URL');
     try {

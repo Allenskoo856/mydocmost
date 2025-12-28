@@ -10,6 +10,7 @@ import { WsRedisIoAdapter } from './ws/adapter/ws-redis.adapter';
 import { InternalLogFilter } from './common/logger/internal-log-filter';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyCookie from '@fastify/cookie';
+import { EnvironmentService } from './integrations/environment/environment.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -28,12 +29,17 @@ async function bootstrap() {
     },
   );
 
-  app.setGlobalPrefix('api', {
+  const environmentService = app.get(EnvironmentService);
+  const basePath = environmentService.getBasePath();
+  const apiPrefix = basePath ? `${basePath.replace(/^\//, '')}/api` : 'api';
+  const fullApiPrefix = `/${apiPrefix}`;
+
+  app.setGlobalPrefix(apiPrefix, {
     exclude: ['robots.txt', 'share/:shareId/p/:pageSlug'],
   });
 
   const reflector = app.get(Reflector);
-  const redisIoAdapter = new WsRedisIoAdapter(app);
+  const redisIoAdapter = new WsRedisIoAdapter(app, basePath);
   await redisIoAdapter.connectToRedis();
 
   app.useWebSocketAdapter(redisIoAdapter);
@@ -53,20 +59,20 @@ async function bootstrap() {
     .addHook('preHandler', function (req, reply, done) {
       // don't require workspaceId for the following paths
       const excludedPaths = [
-        '/api/auth/setup',
-        '/api/health',
-        '/api/billing/stripe/webhook',
-        '/api/workspace/check-hostname',
-        '/api/sso/google',
-        '/api/workspace/create',
-        '/api/workspace/joined',
+        `${fullApiPrefix}/auth/setup`,
+        `${fullApiPrefix}/health`,
+        `${fullApiPrefix}/billing/stripe/webhook`,
+        `${fullApiPrefix}/workspace/check-hostname`,
+        `${fullApiPrefix}/sso/google`,
+        `${fullApiPrefix}/workspace/create`,
+        `${fullApiPrefix}/workspace/joined`,
       ];
 
       if (
-        req.originalUrl.startsWith('/api') &&
+        req.originalUrl.startsWith(fullApiPrefix) &&
         !excludedPaths.some((path) => req.originalUrl.startsWith(path))
       ) {
-        if (!req.raw?.['workspaceId'] && req.originalUrl !== '/api') {
+        if (!req.raw?.['workspaceId'] && req.originalUrl !== fullApiPrefix) {
           throw new NotFoundException('Workspace not found');
         }
         done();

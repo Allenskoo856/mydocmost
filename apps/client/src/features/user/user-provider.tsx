@@ -10,6 +10,7 @@ import { useQuerySubscription } from "@/features/websocket/use-query-subscriptio
 import { useTreeSocket } from "@/features/websocket/use-tree-socket.ts";
 import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
 import { Error404 } from "@/components/ui/error-404.tsx";
+import { getBasePath } from "@/lib/config.ts";
 
 export function UserProvider({ children }: React.PropsWithChildren) {
   const [, setCurrentUser] = useAtom(currentUserAtom);
@@ -27,6 +28,7 @@ export function UserProvider({ children }: React.PropsWithChildren) {
     const newSocket = io(SOCKET_URL, {
       transports: ["websocket"],
       withCredentials: true,
+      path: getBasePath() ? `${getBasePath()}/socket.io` : undefined,
     });
 
     // @ts-ignore

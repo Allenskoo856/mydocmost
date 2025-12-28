@@ -34,6 +34,7 @@ export class StaticModule implements OnModuleInit {
       const configString = {
         ENV: this.environmentService.getNodeEnv(),
         APP_URL: this.environmentService.getAppUrl(),
+        BASE_PATH: this.environmentService.getBasePath(),
         CLOUD: this.environmentService.isCloud(),
         FILE_UPLOAD_SIZE_LIMIT:
           this.environmentService.getFileUploadSizeLimit(),
@@ -60,17 +61,44 @@ export class StaticModule implements OnModuleInit {
 
       fs.writeFileSync(indexFilePath, transformedHtml);
 
-      const RENDER_PATH = '*';
+      const basePath = this.environmentService.getBasePath();
 
-      await app.register(fastifyStatic, {
-        root: clientDistPath,
-        wildcard: false,
-      });
+      if (!basePath) {
+        // 根目录部署：使用 fastify-static 的默认行为
+        await app.register(fastifyStatic, {
+          root: clientDistPath,
+          wildcard: false,
+        });
 
-      app.get(RENDER_PATH, (req: any, res: any) => {
-        const stream = fs.createReadStream(indexFilePath);
-        res.type('text/html').send(stream);
-      });
+        app.get('*', (req: any, res: any) => {
+          res.type('text/html').send(fs.createReadStream(indexFilePath));
+        });
+      } else {
+        // 子目录部署：需要精确控制路径
+        const normalizedBasePath = basePath.endsWith('/')
+          ? basePath.slice(0, -1)
+          : basePath;
+
+        // 注册静态文件服务（不包括 index.html）
+        await app.register(fastifyStatic, {
+          root: clientDistPath,
+          prefix: `${normalizedBasePath}/`,
+          wildcard: false,
+          index: false,
+          redirect: false,
+        });
+
+        // 手动处理 index.html 的所有可能路径
+        // 1. 不带斜杠的路径 (例如 /doc)
+        app.get(normalizedBasePath, (req: any, res: any) => {
+          res.type('text/html').send(fs.createReadStream(indexFilePath));
+        });
+
+        // 2. 通配符匹配所有子路径 (例如 /doc/*, 包括 /doc/)
+        app.get(`${normalizedBasePath}/*`, (req: any, res: any) => {
+          res.type('text/html').send(fs.createReadStream(indexFilePath));
+        });
+      }
     }
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "文档中心",
   "short_name": "文档中心",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#222",
   "theme_color": "#222",

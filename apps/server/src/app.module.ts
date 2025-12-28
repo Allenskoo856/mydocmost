@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { CoreModule } from './core/core.module';
 import { EnvironmentModule } from './integrations/environment/environment.module';
 import { CollaborationModule } from './collaboration/collaboration.module';
@@ -57,7 +55,5 @@ try {
     SecurityModule,
     ...enterpriseModules,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

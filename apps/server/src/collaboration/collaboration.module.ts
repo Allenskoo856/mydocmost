@@ -9,6 +9,7 @@ import { WebSocket } from 'ws';
 import { TokenModule } from '../core/auth/token.module';
 import { HistoryListener } from './listeners/history.listener';
 import { LoggerExtension } from './extensions/logger.extension';
+import { EnvironmentService } from '../integrations/environment/environment.service';
 
 @Module({
   providers: [
@@ -24,18 +25,21 @@ import { LoggerExtension } from './extensions/logger.extension';
 export class CollaborationModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CollaborationModule.name);
   private collabWsAdapter: CollabWsAdapter;
-  private path = '/collab';
 
   constructor(
     private readonly collaborationGateway: CollaborationGateway,
     private readonly httpAdapterHost: HttpAdapterHost,
+    private readonly environmentService: EnvironmentService,
   ) {}
 
   onModuleInit() {
     this.collabWsAdapter = new CollabWsAdapter();
     const httpServer = this.httpAdapterHost.httpAdapter.getHttpServer();
 
-    const wss = this.collabWsAdapter.handleUpgrade(this.path, httpServer);
+    const basePath = this.environmentService.getBasePath();
+    const collabPath = basePath ? `${basePath}/collab` : '/collab';
+
+    const wss = this.collabWsAdapter.handleUpgrade(collabPath, httpServer);
 
     wss.on('connection', (client: WebSocket, request: IncomingMessage) => {
       this.collaborationGateway.handleConnection(client, request);

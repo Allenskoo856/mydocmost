@@ -7,10 +7,17 @@ import {
   parseRedisUrl,
   RedisConfig,
 } from '../../common/helpers';
+import { INestApplicationContext } from '@nestjs/common';
 
 export class WsRedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
   private redisConfig: RedisConfig;
+  private path: string;
+
+  constructor(appOrHttpServer?: INestApplicationContext | any, path?: string) {
+    super(appOrHttpServer);
+    this.path = path;
+  }
 
   async connectToRedis(): Promise<void> {
     this.redisConfig = parseRedisUrl(process.env.REDIS_URL);
@@ -27,6 +34,12 @@ export class WsRedisIoAdapter extends IoAdapter {
   }
 
   createIOServer(port: number, options?: ServerOptions): any {
+    if (this.path) {
+      options = {
+        ...options,
+        path: `${this.path}/socket.io`,
+      };
+    }
     const server = super.createIOServer(port, options);
     server.adapter(this.adapterConstructor);
     return server;
