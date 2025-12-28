@@ -75,4 +75,4 @@ jobs:
           provenance: false
 
       - name: Image digest
-        run: echo ${{ steps.meta.outputs.tags }}
+        run: echo "${{ steps.meta.outputs.tags }}"

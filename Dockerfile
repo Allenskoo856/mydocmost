@@ -3,13 +3,27 @@ LABEL org.opencontainers.image.source="https://github.com/docmost/docmost"
 
 FROM base AS builder
 
+RUN npm install -g pnpm@10.4.0
+
 WORKDIR /app
 
+# Copy dependency files first for better caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+COPY apps/server/package.json ./apps/server/
+COPY apps/client/package.json ./apps/client/
+COPY packages/editor-ext/package.json ./packages/editor-ext/
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Copy source code
 COPY . .
 
-RUN npm install -g pnpm@10.4.0
-RUN pnpm install --frozen-lockfile
-RUN pnpm build
+# Build with Nx cache mount
+RUN --mount=type=cache,target=/app/node_modules/.cache/nx \
+    pnpm build
 
 FROM base AS installer
 

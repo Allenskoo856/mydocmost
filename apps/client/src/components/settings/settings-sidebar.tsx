@@ -146,6 +146,18 @@ export default function SettingsSidebar() {
   }, [location.pathname]);
 
   const canShowItem = (item: DataItem) => {
+    const hiddenItems = [
+      "API keys",
+      "Security & SSO",
+      "API management",
+      "AI settings",
+      "License & Edition",
+    ];
+
+    if (hiddenItems.includes(item.label)) {
+      return false;
+    }
+
     if (item.showDisabledInNonEE && item.isEnterprise) {
       // Check admin permission regardless of license
       return item.isAdmin ? isAdmin : true;
@@ -301,19 +313,6 @@ export default function SettingsSidebar() {
       <ScrollArea w="100%">{menuItems}</ScrollArea>
 
       {!isCloud() && <AppVersion />}
-
-      {isCloud() && (
-        <div className={classes.text}>
-          <Text
-            size="sm"
-            c="dimmed"
-            component="a"
-            href="mailto:help@docmost.com"
-          >
-            help@docmost.com
-          </Text>
-        </div>
-      )}
     </div>
   );
 }

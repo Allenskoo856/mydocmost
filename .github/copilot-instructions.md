@@ -1,4 +1,4 @@
-# Copilot Instructions for Docmost
+# Copilot Instructions for 文档中心
 
 ## Monorepo Overview
 - Tooling: `pnpm` workspaces + Nx. Packages live under `apps/*` and `packages/*`.
