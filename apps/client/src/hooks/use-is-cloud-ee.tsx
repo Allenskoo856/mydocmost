@@ -1,7 +1,6 @@
 import { isCloud } from "@/lib/config";
-import { useLicense } from "@/ee/hooks/use-license";
 
+// EE功能已移除 - 内网部署版本
 export const useIsCloudEE = () => {
-  const { hasLicenseKey } = useLicense();
-  return isCloud() || !!hasLicenseKey;
+  return isCloud();
 }; 

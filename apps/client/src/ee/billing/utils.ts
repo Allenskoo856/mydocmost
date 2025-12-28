@@ -1,17 +1,8 @@
-import { differenceInCalendarDays } from "date-fns";
-
-export function formatInterval(interval: string): string {
-  if (interval === "month") {
-    return "monthly";
-  }
-  if (interval === "year") {
-    return "yearly";
-  }
+// EE功能已禁用 - Stub实现
+export function getTrialDaysLeft() {
+  return 0;
 }
 
-export function getTrialDaysLeft(trialEndAt: Date) {
-  if (!trialEndAt) return null;
-
-  const daysLeft = differenceInCalendarDays(trialEndAt, new Date());
-  return daysLeft > 0 ? daysLeft : 0;
+export function formatInterval() {
+  return '';
 }

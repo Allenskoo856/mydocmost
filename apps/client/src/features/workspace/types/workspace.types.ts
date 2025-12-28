@@ -1,4 +1,9 @@
-import { IAuthProvider } from "@/ee/security/types/security.types.ts";
+// EE功能已移除 - 内网部署版本
+export interface IAuthProvider {
+  id: string;
+  name: string;
+  type: string;
+}
 
 export interface IWorkspace {
   id: string;

@@ -1,16 +1,11 @@
-import { getServerAppUrl, getSubdomainHost } from "@/lib/config.ts";
+// EE功能已禁用 - Stub实现
+import { isCloud } from "@/lib/config";
+import APP_ROUTE from "@/lib/app-route";
 
-export function getHostnameUrl(hostname: string): string {
-  const url = new URL(getServerAppUrl());
-  const isHttps = url.protocol === "https:";
-
-  const protocol = isHttps ? "https" : "http";
-  return `${protocol}://${hostname}.${getSubdomainHost()}`;
+export function exchangeTokenRedirectUrl(token: string) {
+  return isCloud() ? `/exchange-token?token=${token}` : APP_ROUTE.HOME;
 }
 
-export function exchangeTokenRedirectUrl(
-  hostname: string,
-  exchangeToken: string,
-) {
-  return getHostnameUrl(hostname) + "/api/auth/exchange?token=" + exchangeToken;
+export function getHostnameUrl() {
+  return '';
 }

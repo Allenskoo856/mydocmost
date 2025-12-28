@@ -1,16 +1,12 @@
 import { queryClient } from "@/main.tsx";
-import {
-  getBilling,
-  getBillingPlans,
-} from "@/ee/billing/services/billing-service.ts";
 import { getSpaces } from "@/features/space/services/space-service.ts";
 import { getGroups } from "@/features/group/services/group-service.ts";
 import { QueryParams } from "@/lib/types.ts";
 import { getWorkspaceMembers } from "@/features/workspace/services/workspace-service.ts";
-import { getLicenseInfo } from "@/ee/licence/services/license-service.ts";
-import { getSsoProviders } from "@/ee/security/services/security-service.ts";
 import { getShares } from "@/features/share/services/share-service.ts";
 import { getApiKeys } from "@/ee/api-key";
+
+// EE功能已移除 - 内网部署版本
 
 export const prefetchWorkspaceMembers = () => {
   const params = { limit: 100, page: 1, query: "" } as QueryParams;
@@ -34,31 +30,7 @@ export const prefetchGroups = () => {
   });
 };
 
-export const prefetchBilling = () => {
-  queryClient.prefetchQuery({
-    queryKey: ["billing"],
-    queryFn: () => getBilling(),
-  });
-
-  queryClient.prefetchQuery({
-    queryKey: ["billing-plans"],
-    queryFn: () => getBillingPlans(),
-  });
-};
-
-export const prefetchLicense = () => {
-  queryClient.prefetchQuery({
-    queryKey: ["license"],
-    queryFn: () => getLicenseInfo(),
-  });
-};
-
-export const prefetchSsoProviders = () => {
-  queryClient.prefetchQuery({
-    queryKey: ["sso-providers"],
-    queryFn: () => getSsoProviders(),
-  });
-};
+// EE Prefetch函数已移除（Billing, License, SSO）
 
 export const prefetchShares = () => {
   queryClient.prefetchQuery({

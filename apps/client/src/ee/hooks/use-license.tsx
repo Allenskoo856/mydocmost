@@ -1,9 +1,10 @@
-import { useAtom } from "jotai";
-import { currentUserAtom } from "@/features/user/atoms/current-user-atom.ts";
-
-export const useLicense = () => {
-  const [currentUser] = useAtom(currentUserAtom);
-  return { hasLicenseKey: currentUser?.workspace?.hasLicenseKey };
-};
+// EE功能已禁用 - Stub实现
+export function useLicense() {
+  return {
+    hasLicenseKey: false,
+    isLicenseValid: false,
+    licenseType: null,
+  };
+}
 
 export default useLicense;

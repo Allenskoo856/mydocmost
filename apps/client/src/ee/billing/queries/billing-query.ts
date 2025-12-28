@@ -1,20 +1,14 @@
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
-import {
-  getBilling,
-  getBillingPlans,
-} from "@/ee/billing/services/billing-service.ts";
-import { IBilling, IBillingPlan } from "@/ee/billing/types/billing.types.ts";
-
-export function useBillingQuery(): UseQueryResult<IBilling, Error> {
-  return useQuery({
-    queryKey: ["billing"],
-    queryFn: () => getBilling(),
-  });
+// EE功能已禁用 - Stub实现
+export function useBillingQuery() {
+  return {
+    data: { plan: 'free' },
+    isLoading: false,
+  };
 }
 
-export function useBillingPlans(): UseQueryResult<IBillingPlan[], Error> {
-  return useQuery({
-    queryKey: ["billing-plans"],
-    queryFn: () => getBillingPlans(),
-  });
+export function useBillingPlans() {
+  return {
+    data: [],
+    isLoading: false,
+  };
 }

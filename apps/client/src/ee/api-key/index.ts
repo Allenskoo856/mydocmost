@@ -1,11 +1,37 @@
-export { ApiKeyTable } from "./components/api-key-table";
-export { CreateApiKeyModal } from "./components/create-api-key-modal";
-export { ApiKeyCreatedModal } from "./components/api-key-created-modal";
-export { UpdateApiKeyModal } from "./components/update-api-key-modal";
-export { RevokeApiKeyModal } from "./components/revoke-api-key-modal";
+// EE功能已禁用 - Stub实现
+export interface IApiKey {
+  id: string;
+  name: string;
+}
 
-// Services
-export * from "./services/api-key-service";
+export async function getApiKeys(params?: any) {
+  return [];
+}
 
-// Types
-export * from "./types/api-key.types";
+export function useGetApiKeysQuery() {
+  return {
+    data: [],
+    isLoading: false,
+  };
+}
+
+export function useCreateApiKeyMutation() {
+  return {
+    mutate: () => {},
+    isPending: false,
+  };
+}
+
+export function useUpdateApiKeyMutation() {
+  return {
+    mutate: () => {},
+    isPending: false,
+  };
+}
+
+export function useRevokeApiKeyMutation() {
+  return {
+    mutate: () => {},
+    isPending: false,
+  };
+}

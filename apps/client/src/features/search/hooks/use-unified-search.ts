@@ -8,8 +8,9 @@ import {
   IPageSearch,
   IPageSearchParams,
 } from "@/features/search/types/search.types";
-import { useLicense } from "@/ee/hooks/use-license";
 import { isCloud } from "@/lib/config";
+
+// EE功能已移除 - 附件搜索仅cloud可用
 
 export type UnifiedSearchResult = IPageSearch | IAttachmentSearch;
 
@@ -21,10 +22,8 @@ export function useUnifiedSearch(
   params: UseUnifiedSearchParams,
   enabled: boolean = true,
 ): UseQueryResult<UnifiedSearchResult[], Error> {
-  const { hasLicenseKey } = useLicense();
-
   const isAttachmentSearch =
-    params.contentType === "attachment" && (isCloud() || hasLicenseKey);
+    params.contentType === "attachment" && isCloud();
   const searchType = isAttachmentSearch ? "attachment" : "page";
 
   return useQuery({

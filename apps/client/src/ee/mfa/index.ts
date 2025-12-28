@@ -1,19 +1,22 @@
-// Components
-export { MfaChallenge } from "./components/mfa-challenge";
-export { MfaSettings } from "./components/mfa-settings";
-export { MfaSetupModal } from "./components/mfa-setup-modal";
-export { MfaDisableModal } from "./components/mfa-disable-modal";
-export { MfaBackupCodesModal } from "./components/mfa-backup-codes-modal";
+// EE功能已禁用 - Stub实现
+import React from 'react';
 
-// Pages
-export { MfaChallengePage } from "./pages/mfa-challenge-page";
-export { MfaSetupRequiredPage } from "./pages/mfa-setup-required-page";
+export function MfaSettings() {
+  return null;
+}
 
-// Services
-export * from "./services/mfa-service";
+export function MfaChallenge() {
+  return null;
+}
 
-// Types
-export * from "./types/mfa.types";
+export function MfaSetupModal() {
+  return null;
+}
 
-// Hooks
-export { useMfaPageProtection } from "./hooks/use-mfa-page-protection.ts";
+export function useMfaPageProtection() {
+  return {};
+}
+
+export function validateMfaAccess() {
+  return true;
+}

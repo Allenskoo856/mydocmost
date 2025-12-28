@@ -27,7 +27,11 @@ import APP_ROUTE from "@/lib/app-route.ts";
 import { RESET } from "jotai/utils";
 import { useTranslation } from "react-i18next";
 import { isCloud } from "@/lib/config.ts";
-import { exchangeTokenRedirectUrl } from "@/ee/utils.ts";
+
+// EE功能已移除 - stub实现
+const exchangeTokenRedirectUrl = (token: string) => {
+  return isCloud() ? `/exchange-token?token=${token}` : APP_ROUTE.HOME;
+};
 
 export default function useAuth() {
   const { t } = useTranslation();
@@ -92,13 +96,9 @@ export default function useAuth() {
     try {
       if (isCloud()) {
         const res = await createWorkspace(data);
-        const hostname = res?.workspace?.hostname;
         const exchangeToken = res?.exchangeToken;
-        if (hostname && exchangeToken) {
-          window.location.href = exchangeTokenRedirectUrl(
-            hostname,
-            exchangeToken,
-          );
+        if (exchangeToken) {
+          window.location.href = exchangeTokenRedirectUrl(exchangeToken);
         }
       } else {
         const res = await setupWorkspace(data);
