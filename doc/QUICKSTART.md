@@ -18,6 +18,19 @@
    - Name: DOCKERHUB_TOKEN,    Value: 刚才复制的token
    ```
 
+### 环境变量配置
+- [ ] 复制 `.env.internal.example` 为 `.env`
+- [ ] 设置 `APP_SECRET` (至少32字符)
+- [ ] 设置 `APP_URL` 为内网域名
+- [ ] 设置 `DATABASE_URL` 连接信息
+- [ ] 设置 `REDIS_URL` 连接信息
+- [ ] 设置 `CLOUD=false` ⚠️ **必须**
+- [ ] 设置 `DISABLE_TELEMETRY=true` ⚠️ **必须**
+- [ ] 配置 `MAIL_DRIVER=smtp` 和邮件服务器信息
+- [ ] 配置 `STORAGE_DRIVER` (local 或 s3)
+- [ ] 如使用Draw.io，配置 `DRAWIO_URL` 为内网地址
+
+
 ## 第二步：修改镜像名称（如果需要）
 
 编辑 `.github/workflows/docker-build.yml`:
@@ -144,9 +157,7 @@ git push origin v1.0.0
 
 添加到 README.md:
 
-```markdown
-[![Docker Build](https://github.com/你的用户名/mydocmost/actions/workflows/docker-build.yml/badge.svg)](https://github.com/你的用户名/mydocmost/actions/workflows/docker-build.yml)
-```
+
 
 ## 技术支持
 
