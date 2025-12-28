@@ -3,6 +3,7 @@ import { currentUserAtom } from "@/features/user/atoms/current-user-atom.ts";
 import { useEffect, useState } from "react";
 import { Button, CopyButton, Group, Text, TextInput } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { getAppUrl } from "@/lib/config.ts";
 
 export default function WorkspaceInviteSection() {
   const { t } = useTranslation();
@@ -12,7 +13,7 @@ export default function WorkspaceInviteSection() {
   /*
   useEffect(() => {
     setInviteLink(
-      `${window.location.origin}/invite/${currentUser.workspace.inviteCode}`,
+      `${getAppUrl()}/invite/${currentUser.workspace.inviteCode}`,
     );
   }, [currentUser.workspace.inviteCode]);
 */

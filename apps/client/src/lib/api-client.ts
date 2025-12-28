@@ -31,7 +31,8 @@ api.interceptors.response.use(
         case 401: {
           const url = new URL(error.request.responseURL)?.pathname;
           if (url === `${basePath}/api/auth/collab-token`) return;
-          if (window.location.pathname.startsWith("/share/")) return;
+          const currentPath = window.location.pathname.replace(basePath, '');
+          if (currentPath.startsWith("/share/")) return;
 
           // Handle unauthorized error
           redirectToLogin();
@@ -48,9 +49,10 @@ api.interceptors.response.use(
               .includes("workspace not found")
           ) {
             console.log("workspace not found");
+            const currentPath = window.location.pathname.replace(basePath, '');
             if (
               !isCloud() &&
-              window.location.pathname != APP_ROUTE.AUTH.SETUP
+              currentPath != APP_ROUTE.AUTH.SETUP
             ) {
               window.location.href = APP_ROUTE.AUTH.SETUP;
             }
@@ -68,6 +70,7 @@ api.interceptors.response.use(
 );
 
 function redirectToLogin() {
+  const basePath = getBasePath();
   const exemptPaths = [
     APP_ROUTE.AUTH.LOGIN,
     APP_ROUTE.AUTH.SIGNUP,
@@ -75,7 +78,8 @@ function redirectToLogin() {
     APP_ROUTE.AUTH.PASSWORD_RESET,
     "/invites",
   ];
-  if (!exemptPaths.some((path) => window.location.pathname.startsWith(path))) {
+  const currentPath = window.location.pathname.replace(basePath, '');
+  if (!exemptPaths.some((path) => currentPath.startsWith(path))) {
     window.location.href = APP_ROUTE.AUTH.LOGIN;
   }
 }
