@@ -49,7 +49,7 @@ export class EnvironmentVariables {
   APP_SECRET: string;
 
   @IsOptional()
-  @IsIn(['smtp', 'postmark'])
+  @IsIn(['smtp', 'postmark', 'log'])
   MAIL_DRIVER: string;
 
   @IsOptional()

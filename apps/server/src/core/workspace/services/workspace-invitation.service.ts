@@ -369,7 +369,8 @@ export class WorkspaceInvitationService {
     hostname?: string;
   }): Promise<string> {
     const { invitationId, inviteToken, hostname } = opts;
-    return `${this.domainService.getUrl(hostname)}/invites/${invitationId}?token=${inviteToken}`;
+    const basePath = this.environmentService.getBasePath();
+    return `${this.domainService.getUrl(hostname)}${basePath}/invites/${invitationId}?token=${inviteToken}`;
   }
 
   async sendInvitationMail(
@@ -391,7 +392,7 @@ export class WorkspaceInvitationService {
 
     await this.mailService.sendToQueue({
       to: inviteeEmail,
-      subject: `${invitedByName} invited you to Docmost`,
+      subject: `${invitedByName} invited you to 文档中心`,
       template: emailTemplate,
     });
   }
