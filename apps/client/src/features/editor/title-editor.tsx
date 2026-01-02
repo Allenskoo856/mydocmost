@@ -75,9 +75,12 @@ export function TitleEditor({
     ],
     onCreate({ editor }) {
       if (editor) {
-        // @ts-ignore
-        setTitleEditor(editor);
-        setActivePageId(pageId);
+        // Use microtask to avoid React rendering warning
+        Promise.resolve().then(() => {
+          // @ts-ignore
+          setTitleEditor(editor);
+          setActivePageId(pageId);
+        });
       }
     },
     onUpdate({ editor }) {

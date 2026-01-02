@@ -132,7 +132,9 @@ export default function PageEditor({
   useEffect(() => {
     if (!providersRef.current) {
       const local = new IndexeddbPersistence(documentName, ydoc);
-      local.on("synced", () => setLocalSynced(true));
+      local.on("synced", () => {
+        Promise.resolve().then(() => setLocalSynced(true));
+      });
       const remote = new HocuspocusProvider({
         name: documentName,
         url: collaborationURL,
@@ -158,13 +160,20 @@ export default function PageEditor({
         },
         onStatus: (status) => {
           if (status.status === "connected") {
-            setYjsConnectionStatus(status.status);
+            // Use microtask to avoid React rendering warning
+            Promise.resolve().then(() => {
+              setYjsConnectionStatus(status.status);
+            });
           }
         },
       });
-      remote.on("synced", () => setRemoteSynced(true));
+      remote.on("synced", () => {
+        Promise.resolve().then(() => setRemoteSynced(true));
+      });
       remote.on("disconnect", () => {
-        setYjsConnectionStatus(WebSocketStatus.Disconnected);
+        Promise.resolve().then(() => {
+          setYjsConnectionStatus(WebSocketStatus.Disconnected);
+        });
       });
       providersRef.current = { local, remote };
       setProvidersReady(true);
@@ -273,18 +282,24 @@ export default function PageEditor({
       },
       onCreate({ editor }) {
         if (editor) {
-          // @ts-ignore
-          setEditor(editor);
-          editor.storage.pageId = pageId;
-          handleScrollTo(editor);
-          editorCreated.current = true;
+          // Use microtask to avoid React rendering warning
+          Promise.resolve().then(() => {
+            // @ts-ignore
+            setEditor(editor);
+            editor.storage.pageId = pageId;
+            handleScrollTo(editor);
+            editorCreated.current = true;
+          });
         }
       },
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
         //update local page cache to reduce flickers
-        debouncedUpdateContent(editorJson);
+        // Use microtask to avoid React rendering warning
+        Promise.resolve().then(() => {
+          debouncedUpdateContent(editorJson);
+        });
       },
     },
     [pageId, editable, remoteProvider],
