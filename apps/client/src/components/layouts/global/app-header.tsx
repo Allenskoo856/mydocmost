@@ -36,6 +36,8 @@ export function AppHeader() {
 
   const isHomeRoute = location.pathname.startsWith("/home");
   const isSpacesRoute = location.pathname === "/spaces";
+  const isSpaceRoute = location.pathname.startsWith("/s/");
+  const isPageRoute = location.pathname.includes("/p/");
   const hideSidebar = isHomeRoute || isSpacesRoute;
 
   const items = links.map((link) => (
@@ -72,29 +74,35 @@ export function AppHeader() {
             </>
           )}
 
-          <Text
-            size="lg"
-            fw={600}
-            style={{ cursor: "pointer", userSelect: "none" }}
-            component={Link}
-            to="/home"
-          >
-            {getAppName()}
-          </Text>
+          {isSpaceRoute ? (
+            <TopMenu />
+          ) : (
+            <Text
+              size="lg"
+              fw={600}
+              style={{ cursor: "pointer", userSelect: "none" }}
+              component={Link}
+              to="/home"
+            >
+              {getAppName()}
+            </Text>
+          )}
 
           <Group ml={50} gap={5} className={classes.links} visibleFrom="sm">
             {items}
           </Group>
         </Group>
 
-        <div>
-          <Group visibleFrom="sm">
-            <SearchControl onClick={searchSpotlight.open} />
-          </Group>
-          <Group hiddenFrom="sm">
-            <SearchMobileControl onSearch={searchSpotlight.open} />
-          </Group>
-        </div>
+        {!isPageRoute && (
+          <div>
+            <Group visibleFrom="sm">
+              <SearchControl onClick={searchSpotlight.open} />
+            </Group>
+            <Group hiddenFrom="sm">
+              <SearchMobileControl onSearch={searchSpotlight.open} />
+            </Group>
+          </div>
+        )}
 
         <Group px={"xl"} wrap="nowrap">
           {isCloud() && isTrial && trialDaysLeft !== 0 && (
@@ -110,7 +118,7 @@ export function AppHeader() {
                 : `${trialDaysLeft} days left`}
             </Badge>
           )}
-          <TopMenu />
+          {!isSpaceRoute && <TopMenu />}
         </Group>
       </Group>
     </>

@@ -97,7 +97,7 @@ export default function GlobalAppShell({
           collapsed: { mobile: !isAsideOpen, desktop: !isAsideOpen },
         }
       }
-      padding="md"
+      padding={isPageRoute ? 0 : "md"}
     >
       {!isPageRoute && (
         <AppShell.Header px="md" className={classes.header}>

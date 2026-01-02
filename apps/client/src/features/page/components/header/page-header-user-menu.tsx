@@ -4,8 +4,8 @@ import {
   Text,
   UnstyledButton,
   useMantineColorScheme,
-  useMediaQuery,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import {
   IconBrightnessFilled,
   IconBrush,

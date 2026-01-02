@@ -30,9 +30,9 @@ import { AvatarIconType } from "@/features/attachments/types/attachment.types.ts
 
 interface TopMenuCompactProps {
   /**
-   * 菜单位置：'icon-only' 仅显示头像，'compact' 显示头像+名称（缩小），'full' 完整显示
+   * 菜单位置：'icon-only' 仅显示头像，'compact' 显示头像（缩小），'text-only' 仅显示工作区名称，'full' 完整显示
    */
-  variant?: "icon-only" | "compact" | "full";
+  variant?: "icon-only" | "compact" | "text-only" | "full";
 }
 
 /**
@@ -62,7 +62,7 @@ export default function TopMenuCompact({ variant = "full" }: TopMenuCompactProps
             avatarUrl={user.avatarUrl}
             name={user.name}
             size="sm"
-            type={AvatarIconType.USER_ICON}
+            type={AvatarIconType.AVATAR}
           />
         </ActionIcon>
       );
@@ -76,8 +76,21 @@ export default function TopMenuCompact({ variant = "full" }: TopMenuCompactProps
               avatarUrl={user.avatarUrl}
               name={user.name}
               size="sm"
-              type={AvatarIconType.USER_ICON}
+              type={AvatarIconType.AVATAR}
             />
+            <IconChevronDown size={14} />
+          </Group>
+        </UnstyledButton>
+      );
+    }
+
+    if (variant === "text-only") {
+      return (
+        <UnstyledButton>
+          <Group gap={6} wrap={"nowrap"}>
+            <Text fw={500} size="sm" lh={1.25} lineClamp={1}>
+              {workspace?.name}
+            </Text>
             <IconChevronDown size={14} />
           </Group>
         </UnstyledButton>

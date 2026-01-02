@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Menu, Text, Tooltip, useMediaQuery } from "@mantine/core";
+import { ActionIcon, Group, Menu, Text, Tooltip } from "@mantine/core";
 import {
   IconArrowRight,
   IconArrowsHorizontal,
@@ -22,6 +22,7 @@ import {
   useClipboard,
   useDisclosure,
   useHotkeys,
+  useMediaQuery,
 } from "@mantine/hooks";
 import { useParams } from "react-router-dom";
 import { usePageQuery } from "@/features/page/queries/page-query.ts";
@@ -52,7 +53,6 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
   const { t } = useTranslation();
   const toggleAside = useToggleAside();
   const [yjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
-  const isMobile = useMediaQuery("(max-width: 640px)");
 
   useHotkeys(
     [
@@ -88,9 +88,9 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
         </Tooltip>
       )}
 
-      {!readOnly && !isMobile && <PageStateSegmentedControl size="xs" />}
+      {!readOnly && <PageStateSegmentedControl size="xs" />}
 
-      {!isMobile && <ShareModal readOnly={readOnly} />}
+      <ShareModal readOnly={readOnly} />
 
       <Tooltip label={t("Comments")} openDelay={250} withArrow>
         <ActionIcon
@@ -112,16 +112,15 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
         </ActionIcon>
       </Tooltip>
 
-      <PageActionMenu readOnly={readOnly} isMobile={isMobile} />
+      <PageActionMenu readOnly={readOnly} />
     </>
   );
 }
 
 interface PageActionMenuProps {
   readOnly?: boolean;
-  isMobile?: boolean;
 }
-function PageActionMenu({ readOnly, isMobile }: PageActionMenuProps) {
+function PageActionMenu({ readOnly }: PageActionMenuProps) {
   const { t } = useTranslation();
   const [, setHistoryModalOpen] = useAtom(historyAtoms);
   const clipboard = useClipboard({ timeout: 500 });
@@ -166,10 +165,10 @@ function PageActionMenu({ readOnly, isMobile }: PageActionMenuProps) {
     <>
       <Menu
         shadow="xl"
-        position={isMobile ? "bottom-center" : "bottom-end"}
-        offset={isMobile ? 5 : 20}
-        width={isMobile ? "calc(100vw - 32px)" : 230}
-        withArrow={!isMobile}
+        position="bottom-end"
+        offset={20}
+        width={230}
+        withArrow
         arrowPosition="center"
       >
         <Menu.Target>
@@ -179,12 +178,6 @@ function PageActionMenu({ readOnly, isMobile }: PageActionMenuProps) {
         </Menu.Target>
 
         <Menu.Dropdown>
-          {isMobile && (
-            <>
-              <Menu.Label>{t("Edit")}</Menu.Label>
-            </>
-          )}
-
           <Menu.Item
             leftSection={<IconLink size={16} />}
             onClick={handleCopyLink}
@@ -193,15 +186,11 @@ function PageActionMenu({ readOnly, isMobile }: PageActionMenuProps) {
           </Menu.Item>
           <Menu.Divider />
 
-          {!isMobile && (
-            <>
-              <Menu.Item leftSection={<IconArrowsHorizontal size={16} />}>
-                <Group wrap="nowrap">
-                  <PageWidthToggle label={t("Full width")} />
-                </Group>
-              </Menu.Item>
-            </>
-          )}
+          <Menu.Item leftSection={<IconArrowsHorizontal size={16} />}>
+            <Group wrap="nowrap">
+              <PageWidthToggle label={t("Full width")} />
+            </Group>
+          </Menu.Item>
 
           <Menu.Item
             leftSection={<IconHistory size={16} />}
@@ -248,44 +237,40 @@ function PageActionMenu({ readOnly, isMobile }: PageActionMenuProps) {
             </>
           )}
 
-          {!isMobile && (
-            <>
-              <Menu.Divider />
+          <Menu.Divider />
 
-              <>
-                <Group px="sm" wrap="nowrap" style={{ cursor: "pointer" }}>
-                  <Tooltip
-                    label={t("Edited by {{name}} {{time}}", {
-                      name: page.lastUpdatedBy.name,
-                      time: pageUpdatedAt,
+          <>
+            <Group px="sm" wrap="nowrap" style={{ cursor: "pointer" }}>
+              <Tooltip
+                label={t("Edited by {{name}} {{time}}", {
+                  name: page.lastUpdatedBy.name,
+                  time: pageUpdatedAt,
+                })}
+                position="left-start"
+              >
+                <div style={{ width: 210 }}>
+                  <Text size="xs" c="dimmed" truncate="end">
+                    {t("Word count: {{wordCount}}", {
+                      wordCount: pageEditor?.storage?.characterCount?.words(),
                     })}
-                    position="left-start"
-                  >
-                    <div style={{ width: 210 }}>
-                      <Text size="xs" c="dimmed" truncate="end">
-                        {t("Word count: {{wordCount}}", {
-                          wordCount: pageEditor?.storage?.characterCount?.words(),
-                        })}
-                      </Text>
+                  </Text>
 
-                      <Text size="xs" c="dimmed" lineClamp={1}>
-                        <Trans
-                          defaults="Created by: <b>{{creatorName}}</b>"
-                          values={{ creatorName: page?.creator?.name }}
-                          components={{ b: <Text span fw={500} /> }}
-                        />
-                      </Text>
-                      <Text size="xs" c="dimmed" truncate="end">
-                        {t("Created at: {{time}}", {
-                          time: formattedDate(page.createdAt),
-                        })}
-                      </Text>
-                    </div>
-                  </Tooltip>
-                </Group>
-              </>
-            </>
-          )}
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    <Trans
+                      defaults="Created by: <b>{{creatorName}}</b>"
+                      values={{ creatorName: page?.creator?.name }}
+                      components={{ b: <Text span fw={500} /> }}
+                    />
+                  </Text>
+                  <Text size="xs" c="dimmed" truncate="end">
+                    {t("Created at: {{time}}", {
+                      time: formattedDate(page.createdAt),
+                    })}
+                  </Text>
+                </div>
+              </Tooltip>
+            </Group>
+          </>
         </Menu.Dropdown>
       </Menu>
 
