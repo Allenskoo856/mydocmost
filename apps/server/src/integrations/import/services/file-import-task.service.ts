@@ -396,7 +396,22 @@ export class FileImportTaskService {
               content = await fs.readFile(absPath, 'utf-8');
 
               if (page.fileExtension.toLowerCase() === '.md') {
-                content = await markdownToHtml(content);
+                try {
+                  content = await markdownToHtml(content);
+                } catch (mdErr: any) {
+                  this.logger.error(
+                    `Failed to parse markdown for ${filePath}: ${mdErr?.message}`
+                  );
+                  // 降级处理：使用 HTML 转义的纯文本
+                  content = `<pre>${content
+                    .replace(/[&<>"']/g, (m) => ({
+                      '&': '&amp;',
+                      '<': '&lt;',
+                      '>': '&gt;',
+                      '"': '&quot;',
+                      "'": '&#039;',
+                    })[m] || m)}</pre>`;
+                }
               }
             } catch (err: any) {
               if (err?.code === 'ENOENT') {

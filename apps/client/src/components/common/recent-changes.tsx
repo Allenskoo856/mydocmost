@@ -31,7 +31,7 @@ export default function RecentChanges({spaceId}: Props) {
     return <Text>{t("Failed to fetch recent pages")}</Text>;
   }
 
-  return pages && pages.items.length > 0 ? (
+  return pages && pages.items && pages.items.length > 0 ? (
     <Table.ScrollContainer minWidth={500}>
       <Table highlightOnHover verticalSpacing="sm">
         <Table.Tbody>
