@@ -1,14 +1,20 @@
-/* Database Table Styles */
+/* Database Table Styles - AppFlowy Style */
 
 .tableWrapper {
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: 6px;
-  overflow: hidden;
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: 4px;
+  overflow-x: auto;
+  overflow-y: visible;
   background: var(--mantine-color-body);
 }
 
+[data-mantine-color-scheme="dark"] .tableWrapper {
+  border-color: var(--mantine-color-dark-4);
+}
+
 .table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -23,19 +29,26 @@
 }
 
 .headerRow {
-  height: 36px;
+  height: 40px;
 }
 
 .headerCell {
   position: relative;
-  padding: 0 10px;
+  padding: 0 12px;
   font-weight: 500;
   font-size: 13px;
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-gray-6);
   text-align: left;
-  border-right: 1px solid var(--mantine-color-default-border);
-  border-bottom: 1px solid var(--mantine-color-default-border);
+  border-right: 1px solid var(--mantine-color-gray-3);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
   user-select: none;
+  vertical-align: middle;
+}
+
+[data-mantine-color-scheme="dark"] .headerCell {
+  color: var(--mantine-color-gray-5);
+  border-right-color: var(--mantine-color-dark-4);
+  border-bottom-color: var(--mantine-color-dark-4);
 }
 
 .headerCell:last-child {
@@ -45,13 +58,33 @@
 .headerCellContent {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 100%;
   cursor: pointer;
+  color: var(--mantine-color-gray-6);
+}
+
+[data-mantine-color-scheme="dark"] .headerCellContent {
+  color: var(--mantine-color-gray-5);
 }
 
 .headerCellContent:hover {
-  color: var(--mantine-color-text);
+  color: var(--mantine-color-gray-8);
+}
+
+[data-mantine-color-scheme="dark"] .headerCellContent:hover {
+  color: var(--mantine-color-gray-3);
+}
+
+.headerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-gray-5);
+}
+
+[data-mantine-color-scheme="dark"] .headerIcon {
+  color: var(--mantine-color-gray-6);
 }
 
 .resizeHandle {
@@ -105,6 +138,7 @@
 
 .row {
   position: relative;
+  height: 42px;
 }
 
 .row:hover {
@@ -116,26 +150,37 @@
 }
 
 .cell {
-  padding: 6px 10px;
+  padding: 8px 12px;
   font-size: 14px;
-  border-right: 1px solid var(--mantine-color-default-border);
-  border-bottom: 1px solid var(--mantine-color-default-border);
+  border-right: 1px solid var(--mantine-color-gray-3);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
   vertical-align: middle;
+  color: var(--mantine-color-text);
+  height: 42px;
+}
+
+[data-mantine-color-scheme="dark"] .cell {
+  border-right-color: var(--mantine-color-dark-4);
+  border-bottom-color: var(--mantine-color-dark-4);
 }
 
 .cell:last-child {
   border-right: none;
 }
 
+.cell:first-child {
+  font-weight: 400;
+}
+
 /* Row Actions */
 .rowActions {
   position: absolute;
-  left: -28px;
+  left: -48px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 10;
@@ -149,20 +194,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 4px;
   cursor: pointer;
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-gray-5);
 }
 
 .rowActionBtn:hover {
   background: var(--mantine-color-gray-2);
-  color: var(--mantine-color-text);
+  color: var(--mantine-color-gray-7);
 }
 
 [data-mantine-color-scheme="dark"] .rowActionBtn:hover {
   background: var(--mantine-color-dark-5);
+  color: var(--mantine-color-gray-4);
 }
 
 /* Add Row */
@@ -171,42 +217,46 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  height: 36px;
+  height: 40px;
   padding: 0 12px;
   font-size: 13px;
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-gray-5);
   cursor: pointer;
-  border-top: 1px solid var(--mantine-color-default-border);
+  border-top: 1px solid var(--mantine-color-gray-3);
   transition: all 0.15s;
 }
 
+[data-mantine-color-scheme="dark"] .addRowBtn {
+  border-top-color: var(--mantine-color-dark-4);
+}
+
 .addRowBtn:hover {
-  background: var(--mantine-color-gray-1);
-  color: var(--mantine-color-text);
+  background: var(--mantine-color-gray-0);
+  color: var(--mantine-color-gray-7);
 }
 
 [data-mantine-color-scheme="dark"] .addRowBtn:hover {
   background: var(--mantine-color-dark-6);
+  color: var(--mantine-color-gray-4);
 }
 
 /* Cell Editors */
 .cellInput {
   width: 100%;
-  padding: 4px 8px;
+  padding: 4px 0;
   font-size: 14px;
   border: none;
   background: transparent;
   outline: none;
+  color: var(--mantine-color-text);
 }
 
 .cellInput:focus {
-  background: var(--mantine-color-body);
-  box-shadow: 0 0 0 2px var(--mantine-color-blue-5);
-  border-radius: 4px;
+  background: transparent;
 }
 
 .numberInput {
-  text-align: right;
+  text-align: left;
 }
 
 .textArea {
@@ -228,31 +278,33 @@
 .checkboxCell {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 /* Select Tags */
 .selectTag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  margin: 2px;
+  padding: 3px 10px;
   font-size: 12px;
+  font-weight: 500;
   border-radius: 4px;
   color: white;
+  white-space: nowrap;
 }
 
 .selectTags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   cursor: pointer;
   min-height: 28px;
-  padding: 4px 0;
+  padding: 2px 0;
+  align-items: center;
 }
 
 .selectPlaceholder {
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-gray-5);
   font-size: 14px;
 }
 

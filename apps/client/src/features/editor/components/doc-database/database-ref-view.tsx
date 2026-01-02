@@ -24,6 +24,8 @@ import {
   IconPlus,
   IconTrash,
   IconCheck,
+  IconArrowUp,
+  IconRowInsertBottom,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -1002,6 +1004,24 @@ export default function DatabaseRefView(props: NodeViewProps) {
     [ydoc, isEditable]
   );
 
+  // Insert row below
+  const insertRowBelow = useCallback(
+    (rowId: string) => {
+      if (!isEditable) return;
+      const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
+      const index = rowsArray.toArray().findIndex((r) => r.get("id") === rowId);
+      if (index < 0) return;
+
+      ydoc.transact(() => {
+        const row = new Y.Map<any>();
+        row.set("id", uuid7());
+        row.set("cells", new Y.Map());
+        rowsArray.insert(index + 1, [row]);
+      });
+    },
+    [ydoc, isEditable]
+  );
+
   // Column resize handlers
   const handleResizeStart = useCallback(
     (e: React.PointerEvent, columnId: string, currentWidth: number) => {
@@ -1172,24 +1192,39 @@ export default function DatabaseRefView(props: NodeViewProps) {
                       {/* Row Actions - 只在第一个单元格显示 */}
                       {cellIndex === 0 && isEditable && (
                         <div className={styles.rowActions}>
+                          {/* 快捷添加行按钮 */}
+                          <div 
+                            className={styles.rowActionBtn}
+                            onClick={() => insertRowBelow(row.original.id)}
+                            title="点击添加到下方"
+                          >
+                            <IconPlus size={14} />
+                          </div>
+                          {/* 行操作菜单 */}
                           <Menu position="bottom-start" withinPortal>
                             <Menu.Target>
-                              <div className={styles.rowActionBtn}>
-                                <IconGripVertical size={16} />
+                              <div className={styles.rowActionBtn} title="更多操作">
+                                <IconGripVertical size={14} />
                               </div>
                             </Menu.Target>
                             <Menu.Dropdown>
                               <Menu.Item
-                                leftSection={<IconPlus size={14} />}
+                                leftSection={<IconArrowUp size={14} />}
                                 onClick={() => insertRowAbove(row.original.id)}
                               >
-                                上方插入
+                                在上方插入记录
+                              </Menu.Item>
+                              <Menu.Item
+                                leftSection={<IconRowInsertBottom size={14} />}
+                                onClick={() => insertRowBelow(row.original.id)}
+                              >
+                                点击添加到下方
                               </Menu.Item>
                               <Menu.Item
                                 leftSection={<IconCopy size={14} />}
                                 onClick={() => duplicateRow(row.original.id)}
                               >
-                                复制行
+                                复制
                               </Menu.Item>
                               <Menu.Divider />
                               <Menu.Item
@@ -1197,7 +1232,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
                                 color="red"
                                 onClick={() => deleteRow(row.original.id)}
                               >
-                                删除行
+                                删除
                               </Menu.Item>
                             </Menu.Dropdown>
                           </Menu>

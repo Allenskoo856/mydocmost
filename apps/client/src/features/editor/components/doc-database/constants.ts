@@ -20,7 +20,7 @@ export const GridSize = {
   /** 添加列按钮宽度 */
   newColumnBtnWidth: 120,
   /** 行操作区域宽度 */
-  rowActionsWidth: 32,
+  rowActionsWidth: 52,
   /** 添加行按钮高度 */
   addRowBtnHeight: 36,
 } as const;
