@@ -53,7 +53,6 @@ export default function MovePageInSpaceModal({
   const handleMove = async () => {
     if (isMoving) return;
 
-    console.log('[MoveInSpace] Starting move operation:', { pageId, targetParentId, spaceId });
     setIsMoving(true);
     try {
       // Find node in original tree data (not filtered) to get correct children
@@ -71,7 +70,6 @@ export default function MovePageInSpaceModal({
       // Find the page being moved to get its current parent
       const movedNode = findNode(treeData, pageId);
       const currentParentId = movedNode?.parentPageId || null;
-      console.log('[MoveInSpace] Current parent ID:', currentParentId);
 
       // Get target parent's children to calculate position
       let position: string;
@@ -95,27 +93,21 @@ export default function MovePageInSpaceModal({
         position = generateJitteredKeyBetween(lastPosition, null);
       }
 
-      console.log('[MoveInSpace] Calculated position:', position);
-
       // Call API to move page
       const movePayload = {
         pageId,
         parentPageId: targetParentId,
         position,
       };
-      console.log('[MoveInSpace] Calling movePage API with:', movePayload);
       await movePage(movePayload);
-      console.log('[MoveInSpace] movePage API call succeeded');
 
       // Update local tree data immediately (optimistic update after API success)
-      console.log('[MoveInSpace] Updating local tree data');
       const updatedTree = moveNodeInTree(treeData, pageId, targetParentId, position);
       setTreeData(updatedTree);
-      console.log('[MoveInSpace] Local tree data updated');
 
       // Emit WebSocket event for real-time collaboration
       setTimeout(() => {
-        const wsPayload = {
+        emit({
           operation: "moveTreeNode" as const,
           spaceId,
           payload: { 
@@ -124,18 +116,10 @@ export default function MovePageInSpaceModal({
             index: 0, // Not used for append operation
             position 
           },
-        };
-        console.log('[MoveInSpace] Emitting WebSocket event:', wsPayload);
-        emit(wsPayload);
+        });
       }, 50);
 
       // Refetch queries to refresh tree immediately
-      console.log('[MoveInSpace] Refetching queries:', { 
-        rootQuery: ["root-sidebar-pages", spaceId],
-        currentParentQuery: currentParentId ? ["sidebar-pages", currentParentId] : null,
-        targetParentQuery: targetParentId ? ["sidebar-pages", targetParentId] : null 
-      });
-      
       const queriesToRefetch = [
         queryClient.refetchQueries({
           queryKey: ["root-sidebar-pages", spaceId],
@@ -161,8 +145,6 @@ export default function MovePageInSpaceModal({
       }
       
       await Promise.all(queriesToRefetch);
-      
-      console.log('[MoveInSpace] Query refetch complete');
 
       notifications.show({
         message: t("Page moved successfully"),

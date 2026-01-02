@@ -197,20 +197,16 @@ function ImportFormatSelection({
           setFileTaskId(null);
 
           // Update tree based on import target
-          console.log('ZIP import success, savedTargetParentId:', savedTargetParentId);
           if (savedTargetParentId) {
             // Fetch the updated children for the parent page
             try {
-              console.log('Fetching children for parent:', savedTargetParentId);
               const childrenResponse = await getSidebarPages({
                 spaceId: fileTask.spaceId,
                 pageId: savedTargetParentId,
               });
-              console.log('Children response:', childrenResponse);
               
               if (childrenResponse?.items?.length > 0) {
                 const newTreeNodes = buildTree(childrenResponse.items);
-                console.log('New tree nodes:', newTreeNodes);
                 
                 // Helper function to update children for a specific parent
                 const updateChildrenForParent = (
@@ -313,6 +309,11 @@ function ImportFormatSelection({
         console.error("Failed to fetch import status", err);
       }
     }, 3000);
+
+    // Clean up interval on unmount or when dependencies change
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [fileTaskId, savedTargetParentId]);
 
   const handleFileUpload = async (selectedFiles: File[]) => {

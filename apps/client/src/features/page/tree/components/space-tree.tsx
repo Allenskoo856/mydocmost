@@ -289,6 +289,16 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
   const [mobileSidebarOpened] = useAtom(mobileSidebarAtom);
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
 
+  // Clean up timer on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
   const prefetchPage = () => {
     timerRef.current = setTimeout(() => {
       queryClient.prefetchQuery({
