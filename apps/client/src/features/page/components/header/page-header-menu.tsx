@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Menu, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Menu, Text, Tooltip, useMediaQuery } from "@mantine/core";
 import {
   IconArrowRight,
   IconArrowsHorizontal,
@@ -52,6 +52,7 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
   const { t } = useTranslation();
   const toggleAside = useToggleAside();
   const [yjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
+  const isMobile = useMediaQuery("(max-width: 640px)");
 
   useHotkeys(
     [
@@ -87,9 +88,9 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
         </Tooltip>
       )}
 
-      {!readOnly && <PageStateSegmentedControl size="xs" />}
+      {!readOnly && !isMobile && <PageStateSegmentedControl size="xs" />}
 
-      <ShareModal readOnly={readOnly} />
+      {!isMobile && <ShareModal readOnly={readOnly} />}
 
       <Tooltip label={t("Comments")} openDelay={250} withArrow>
         <ActionIcon
@@ -111,15 +112,16 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
         </ActionIcon>
       </Tooltip>
 
-      <PageActionMenu readOnly={readOnly} />
+      <PageActionMenu readOnly={readOnly} isMobile={isMobile} />
     </>
   );
 }
 
 interface PageActionMenuProps {
   readOnly?: boolean;
+  isMobile?: boolean;
 }
-function PageActionMenu({ readOnly }: PageActionMenuProps) {
+function PageActionMenu({ readOnly, isMobile }: PageActionMenuProps) {
   const { t } = useTranslation();
   const [, setHistoryModalOpen] = useAtom(historyAtoms);
   const clipboard = useClipboard({ timeout: 500 });
@@ -164,10 +166,10 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
     <>
       <Menu
         shadow="xl"
-        position="bottom-end"
-        offset={20}
-        width={230}
-        withArrow
+        position={isMobile ? "bottom-center" : "bottom-end"}
+        offset={isMobile ? 5 : 20}
+        width={isMobile ? "calc(100vw - 32px)" : 230}
+        withArrow={!isMobile}
         arrowPosition="center"
       >
         <Menu.Target>
@@ -177,6 +179,12 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
         </Menu.Target>
 
         <Menu.Dropdown>
+          {isMobile && (
+            <>
+              <Menu.Label>{t("Edit")}</Menu.Label>
+            </>
+          )}
+
           <Menu.Item
             leftSection={<IconLink size={16} />}
             onClick={handleCopyLink}
@@ -185,11 +193,15 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
           </Menu.Item>
           <Menu.Divider />
 
-          <Menu.Item leftSection={<IconArrowsHorizontal size={16} />}>
-            <Group wrap="nowrap">
-              <PageWidthToggle label={t("Full width")} />
-            </Group>
-          </Menu.Item>
+          {!isMobile && (
+            <>
+              <Menu.Item leftSection={<IconArrowsHorizontal size={16} />}>
+                <Group wrap="nowrap">
+                  <PageWidthToggle label={t("Full width")} />
+                </Group>
+              </Menu.Item>
+            </>
+          )}
 
           <Menu.Item
             leftSection={<IconHistory size={16} />}
@@ -236,40 +248,44 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
             </>
           )}
 
-          <Menu.Divider />
+          {!isMobile && (
+            <>
+              <Menu.Divider />
 
-          <>
-            <Group px="sm" wrap="nowrap" style={{ cursor: "pointer" }}>
-              <Tooltip
-                label={t("Edited by {{name}} {{time}}", {
-                  name: page.lastUpdatedBy.name,
-                  time: pageUpdatedAt,
-                })}
-                position="left-start"
-              >
-                <div style={{ width: 210 }}>
-                  <Text size="xs" c="dimmed" truncate="end">
-                    {t("Word count: {{wordCount}}", {
-                      wordCount: pageEditor?.storage?.characterCount?.words(),
+              <>
+                <Group px="sm" wrap="nowrap" style={{ cursor: "pointer" }}>
+                  <Tooltip
+                    label={t("Edited by {{name}} {{time}}", {
+                      name: page.lastUpdatedBy.name,
+                      time: pageUpdatedAt,
                     })}
-                  </Text>
+                    position="left-start"
+                  >
+                    <div style={{ width: 210 }}>
+                      <Text size="xs" c="dimmed" truncate="end">
+                        {t("Word count: {{wordCount}}", {
+                          wordCount: pageEditor?.storage?.characterCount?.words(),
+                        })}
+                      </Text>
 
-                  <Text size="xs" c="dimmed" lineClamp={1}>
-                    <Trans
-                      defaults="Created by: <b>{{creatorName}}</b>"
-                      values={{ creatorName: page?.creator?.name }}
-                      components={{ b: <Text span fw={500} /> }}
-                    />
-                  </Text>
-                  <Text size="xs" c="dimmed" truncate="end">
-                    {t("Created at: {{time}}", {
-                      time: formattedDate(page.createdAt),
-                    })}
-                  </Text>
-                </div>
-              </Tooltip>
-            </Group>
-          </>
+                      <Text size="xs" c="dimmed" lineClamp={1}>
+                        <Trans
+                          defaults="Created by: <b>{{creatorName}}</b>"
+                          values={{ creatorName: page?.creator?.name }}
+                          components={{ b: <Text span fw={500} /> }}
+                        />
+                      </Text>
+                      <Text size="xs" c="dimmed" truncate="end">
+                        {t("Created at: {{time}}", {
+                          time: formattedDate(page.createdAt),
+                        })}
+                      </Text>
+                    </div>
+                  </Tooltip>
+                </Group>
+              </>
+            </>
+          )}
         </Menu.Dropdown>
       </Menu>
 

@@ -1,7 +1,7 @@
 .editor {
     height: 100%;
     padding: 8px 0;
-    margin: 48px auto;
+    margin: 45px auto 0;
 
     @media print {
         padding: 0;

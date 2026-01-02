@@ -79,7 +79,7 @@ export default function GlobalAppShell({
 
   return (
     <AppShell
-      header={{ height: 45 }}
+      header={!isPageRoute ? { height: 45 } : undefined}
       navbar={
         !hideSidebar && {
           width: isSpaceRoute ? sidebarWidth : 300,
@@ -99,9 +99,11 @@ export default function GlobalAppShell({
       }
       padding="md"
     >
-      <AppShell.Header px="md" className={classes.header}>
-        <AppHeader />
-      </AppShell.Header>
+      {!isPageRoute && (
+        <AppShell.Header px="md" className={classes.header}>
+          <AppHeader />
+        </AppShell.Header>
+      )}
       {!hideSidebar && (
         <AppShell.Navbar
           className={classes.navbar}
