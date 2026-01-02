@@ -147,6 +147,9 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   }, [pagesData, hasNextPage]);
 
   useEffect(() => {
+    let cancelled = false;
+    let selectTimeoutId: number | null = null;
+
     const fetchData = async () => {
       if (isDataLoaded && currentPage) {
         // check if pageId node is present in the tree
@@ -187,6 +190,8 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
 
           // Wait for all fetch operations to complete
           Promise.all(fetchPromises).then(() => {
+            if (cancelled) return;
+
             // build tree with children
             const ancestorsTree = buildTreeWithChildren(flatTreeItems);
             // child of root page we're attaching the built ancestors to
@@ -200,9 +205,13 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
             );
             setData(updatedTree);
 
-            setTimeout(() => {
+            if (selectTimeoutId) {
+              window.clearTimeout(selectTimeoutId);
+            }
+            selectTimeoutId = window.setTimeout(() => {
+              if (cancelled) return;
               // focus on node and open all parents
-              treeApiRef.current.select(currentPage.id);
+              treeApiRef.current?.select(currentPage.id);
             }, 100);
           });
         }
@@ -210,17 +219,32 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
     };
 
     fetchData();
-  }, [isDataLoaded, currentPage?.id]);
+
+    return () => {
+      cancelled = true;
+      if (selectTimeoutId) {
+        window.clearTimeout(selectTimeoutId);
+      }
+    };
+  }, [isDataLoaded, currentPage?.id, data]);
 
   useEffect(() => {
+    let selectTimeoutId: number | null = null;
+
     if (currentPage?.id) {
-      setTimeout(() => {
+      selectTimeoutId = window.setTimeout(() => {
         // focus on node and open all parents
         treeApiRef.current?.select(currentPage.id, { align: "auto" });
       }, 200);
     } else {
       treeApiRef.current?.deselectAll();
     }
+
+    return () => {
+      if (selectTimeoutId) {
+        window.clearTimeout(selectTimeoutId);
+      }
+    };
   }, [currentPage?.id]);
 
   // Clean up tree API on unmount

@@ -74,9 +74,24 @@ export default function PageEditor({
   const collaborationURL = useCollaborationUrl();
   const isComponentMounted = useRef(false);
   const editorCreated = useRef(false);
+  const authReconnectTimeoutRef = useRef<number | null>(null);
+  const collabReadyTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     isComponentMounted.current = true;
+    return () => {
+      isComponentMounted.current = false;
+
+      if (authReconnectTimeoutRef.current) {
+        window.clearTimeout(authReconnectTimeoutRef.current);
+        authReconnectTimeoutRef.current = null;
+      }
+
+      if (collabReadyTimeoutRef.current) {
+        window.clearTimeout(collabReadyTimeoutRef.current);
+        collabReadyTimeoutRef.current = null;
+      }
+    };
   }, []);
   
   const [currentUser] = useAtom(currentUserAtom);
@@ -105,7 +120,10 @@ export default function PageEditor({
   const userPageEditMode =
     currentUser?.user?.settings?.preferences?.pageEditMode ?? PageEditMode.Edit;
   
-    const canScroll = useCallback(() => isComponentMounted.current && editorCreated.current, [isComponentMounted, editorCreated]);
+  const canScroll = useCallback(
+    () => isComponentMounted.current && editorCreated.current,
+    [],
+  );
   const { handleScrollTo } = useEditorScroll({ canScroll });
   // Providers only created once per pageId
   const providersRef = useRef<{
@@ -133,7 +151,10 @@ export default function PageEditor({
     if (!providersRef.current) {
       const local = new IndexeddbPersistence(documentName, ydoc);
       local.on("synced", () => {
-        Promise.resolve().then(() => setLocalSynced(true));
+        Promise.resolve().then(() => {
+          if (!isComponentMounted.current) return;
+          setLocalSynced(true);
+        });
       });
       const remote = new HocuspocusProvider({
         name: documentName,
@@ -143,14 +164,25 @@ export default function PageEditor({
         connect: true,
         preserveConnection: false,
         onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-          const payload = jwtDecode(collabQuery?.token);
+          const token = auth?.token ?? collabQuery?.token;
+          if (!token) return;
+
+          const payload = jwtDecode(token);
           const now = Date.now().valueOf() / 1000;
           const isTokenExpired = now >= payload.exp;
           if (isTokenExpired) {
             refetchCollabToken().then((result) => {
+              if (!isComponentMounted.current) return;
+              if (providersRef.current?.remote !== remote) return;
+
               if (result.data?.token) {
                 remote.disconnect();
-                setTimeout(() => {
+                if (authReconnectTimeoutRef.current) {
+                  window.clearTimeout(authReconnectTimeoutRef.current);
+                }
+                authReconnectTimeoutRef.current = window.setTimeout(() => {
+                  if (!isComponentMounted.current) return;
+                  if (providersRef.current?.remote !== remote) return;
                   remote.configuration.token = result.data.token;
                   remote.connect();
                 }, 100);
@@ -162,26 +194,39 @@ export default function PageEditor({
           if (status.status === "connected") {
             // Use microtask to avoid React rendering warning
             Promise.resolve().then(() => {
+              if (!isComponentMounted.current) return;
               setYjsConnectionStatus(status.status);
             });
           }
         },
       });
       remote.on("synced", () => {
-        Promise.resolve().then(() => setRemoteSynced(true));
+        Promise.resolve().then(() => {
+          if (!isComponentMounted.current) return;
+          setRemoteSynced(true);
+        });
       });
       remote.on("disconnect", () => {
         Promise.resolve().then(() => {
+          if (!isComponentMounted.current) return;
           setYjsConnectionStatus(WebSocketStatus.Disconnected);
         });
       });
       providersRef.current = { local, remote };
-      setProvidersReady(true);
+      if (isComponentMounted.current) {
+        setProvidersReady(true);
+      }
     } else {
-      setProvidersReady(true);
+      if (isComponentMounted.current) {
+        setProvidersReady(true);
+      }
     }
     // Only destroy on final unmount
     return () => {
+      if (authReconnectTimeoutRef.current) {
+        window.clearTimeout(authReconnectTimeoutRef.current);
+        authReconnectTimeoutRef.current = null;
+      }
       providersRef.current?.remote.destroy();
       providersRef.current?.local.destroy();
       providersRef.current = null;
@@ -222,8 +267,22 @@ export default function PageEditor({
     ) {
       resetIdle();
       remoteProvider.connect();
-      setTimeout(() => setIsCollabReady(true), 500);
+
+      if (collabReadyTimeoutRef.current) {
+        window.clearTimeout(collabReadyTimeoutRef.current);
+      }
+      collabReadyTimeoutRef.current = window.setTimeout(() => {
+        if (!isComponentMounted.current) return;
+        setIsCollabReady(true);
+      }, 500);
     }
+
+    return () => {
+      if (collabReadyTimeoutRef.current) {
+        window.clearTimeout(collabReadyTimeoutRef.current);
+        collabReadyTimeoutRef.current = null;
+      }
+    };
   }, [isIdle, documentState, providersReady, resetIdle]);
 
   const extensions = useMemo(() => {
@@ -284,6 +343,7 @@ export default function PageEditor({
         if (editor) {
           // Use microtask to avoid React rendering warning
           Promise.resolve().then(() => {
+            if (!isComponentMounted.current) return;
             // @ts-ignore
             setEditor(editor);
             editor.storage.pageId = pageId;
@@ -298,6 +358,7 @@ export default function PageEditor({
         //update local page cache to reduce flickers
         // Use microtask to avoid React rendering warning
         Promise.resolve().then(() => {
+          if (!isComponentMounted.current) return;
           debouncedUpdateContent(editorJson);
         });
       },
