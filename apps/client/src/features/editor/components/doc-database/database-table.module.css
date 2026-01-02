@@ -1,11 +1,26 @@
 /* Database Table Styles - AppFlowy Style */
 
+.tableContainer {
+  position: relative;
+  display: flex;
+}
+
+.rowActionsColumn {
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.tableScrollArea {
+  flex: 1;
+  overflow-x: auto;
+}
+
 .tableWrapper {
   border: 1px solid var(--mantine-color-gray-3);
   border-radius: 4px;
-  overflow-x: auto;
-  overflow-y: visible;
   background: var(--mantine-color-body);
+  display: inline-block;
+  min-width: 100%;
 }
 
 [data-mantine-color-scheme="dark"] .tableWrapper {
@@ -134,7 +149,9 @@
 }
 
 /* Body */
-.tbody {}
+.tbody {
+  /* tbody styles */
+}
 
 .row {
   position: relative;
@@ -173,20 +190,24 @@
 }
 
 /* Row Actions */
+.rowActionsCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 43px;
+  padding-right: 4px;
+  border-bottom: 1px solid transparent;
+}
+
 .rowActions {
-  position: absolute;
-  left: -48px;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 4px;
   opacity: 0;
   transition: opacity 0.15s;
-  z-index: 10;
 }
 
-.row:hover .rowActions {
+.rowActionsCell:hover .rowActions {
   opacity: 1;
 }
 
@@ -194,8 +215,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 4px;
   cursor: pointer;
   color: var(--mantine-color-gray-5);

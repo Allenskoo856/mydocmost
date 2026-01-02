@@ -1121,23 +1121,84 @@ export default function DatabaseRefView(props: NodeViewProps) {
         </Group>
 
         {/* Table */}
-        <div className={styles.tableWrapper} style={{ marginLeft: GridSize.rowActionsWidth }}>
-          <table className={styles.table}>
-            <thead className={styles.thead}>
-              <tr className={styles.headerRow}>
-                {columns.map((col) => (
-                  <th
-                    key={col.id}
-                    className={styles.headerCell}
-                    style={{ width: col.width }}
-                  >
-                    <Popover
-                      opened={editingColumnId === col.id}
-                      onClose={() => setEditingColumnId(null)}
-                      position="bottom-start"
-                      withinPortal
-                      closeOnClickOutside={false}
-                      trapFocus={false}
+        <div className={styles.tableContainer}>
+          {/* Row Actions Column */}
+          {isEditable && (
+            <div className={styles.rowActionsColumn}>
+              {/* Header spacer */}
+              <div style={{ height: 40 }} />
+              {/* Row actions for each row */}
+              {rows.map((row) => (
+                <div key={row.id} className={styles.rowActionsCell}>
+                  <div className={styles.rowActions}>
+                    {/* 快捷添加行按钮 */}
+                    <div 
+                      className={styles.rowActionBtn}
+                      onClick={() => insertRowBelow(row.id)}
+                      title="点击添加到下方"
+                    >
+                      <IconPlus size={14} />
+                    </div>
+                    {/* 行操作菜单 */}
+                    <Menu position="bottom-start" withinPortal>
+                      <Menu.Target>
+                        <div className={styles.rowActionBtn} title="更多操作">
+                          <IconGripVertical size={14} />
+                        </div>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item
+                          leftSection={<IconArrowUp size={14} />}
+                          onClick={() => insertRowAbove(row.id)}
+                        >
+                          在上方插入记录
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconRowInsertBottom size={14} />}
+                          onClick={() => insertRowBelow(row.id)}
+                        >
+                          点击添加到下方
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconCopy size={14} />}
+                          onClick={() => duplicateRow(row.id)}
+                        >
+                          复制
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Item
+                          leftSection={<IconTrash size={14} />}
+                          color="red"
+                          onClick={() => deleteRow(row.id)}
+                        >
+                          删除
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Table Scroll Area */}
+          <div className={styles.tableScrollArea}>
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead className={styles.thead}>
+                  <tr className={styles.headerRow}>
+                    {columns.map((col) => (
+                      <th
+                        key={col.id}
+                        className={styles.headerCell}
+                        style={{ width: col.width }}
+                      >
+                        <Popover
+                        opened={editingColumnId === col.id}
+                        onClose={() => setEditingColumnId(null)}
+                        position="bottom-start"
+                        withinPortal
+                        closeOnClickOutside={false}
+                        trapFocus={false}
                     >
                       <Popover.Target>
                         <div
@@ -1178,66 +1239,14 @@ export default function DatabaseRefView(props: NodeViewProps) {
               </tr>
             </thead>
             <tbody className={styles.tbody}>
-              {table.getRowModel().rows.map((row, rowIndex) => (
+              {table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className={styles.row}>
-                  {row.getVisibleCells().map((cell, cellIndex) => (
+                  {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
                       className={styles.cell}
-                      style={{ 
-                        width: cell.column.getSize(),
-                        position: cellIndex === 0 ? 'relative' : undefined,
-                      }}
+                      style={{ width: cell.column.getSize() }}
                     >
-                      {/* Row Actions - 只在第一个单元格显示 */}
-                      {cellIndex === 0 && isEditable && (
-                        <div className={styles.rowActions}>
-                          {/* 快捷添加行按钮 */}
-                          <div 
-                            className={styles.rowActionBtn}
-                            onClick={() => insertRowBelow(row.original.id)}
-                            title="点击添加到下方"
-                          >
-                            <IconPlus size={14} />
-                          </div>
-                          {/* 行操作菜单 */}
-                          <Menu position="bottom-start" withinPortal>
-                            <Menu.Target>
-                              <div className={styles.rowActionBtn} title="更多操作">
-                                <IconGripVertical size={14} />
-                              </div>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                leftSection={<IconArrowUp size={14} />}
-                                onClick={() => insertRowAbove(row.original.id)}
-                              >
-                                在上方插入记录
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<IconRowInsertBottom size={14} />}
-                                onClick={() => insertRowBelow(row.original.id)}
-                              >
-                                点击添加到下方
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<IconCopy size={14} />}
-                                onClick={() => duplicateRow(row.original.id)}
-                              >
-                                复制
-                              </Menu.Item>
-                              <Menu.Divider />
-                              <Menu.Item
-                                leftSection={<IconTrash size={14} />}
-                                color="red"
-                                onClick={() => deleteRow(row.original.id)}
-                              >
-                                删除
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </div>
-                      )}
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -1255,6 +1264,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
               <span>添加一行</span>
             </div>
           )}
+            </div>
+          </div>
         </div>
       </Stack>
     </NodeViewWrapper>
