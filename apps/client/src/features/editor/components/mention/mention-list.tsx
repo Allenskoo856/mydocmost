@@ -56,7 +56,7 @@ const MentionList = forwardRef<any, MentionListProps>((props, ref) => {
     query: props.query,
     includeUsers: true,
     includePages: true,
-    spaceId: space.id,
+    spaceId: space?.id ?? "",
     limit: 10,
   });
 

@@ -136,10 +136,29 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
     tippyOptions: {
       moveTransition: "transform 0.15s ease-out",
       onCreate: (instance) => {
-        instance.popper.firstChild?.addEventListener("blur", (event) => {
+        const target = instance.popper.firstChild as HTMLElement | null;
+        if (!target) return;
+
+        const handler = (event: Event) => {
           event.preventDefault();
-          event.stopImmediatePropagation();
-        });
+          // @ts-ignore
+          event.stopImmediatePropagation?.();
+        };
+
+        // @ts-expect-error attach for cleanup
+        instance.__docmostBlurHandler = handler;
+        target.addEventListener("blur", handler);
+      },
+      onDestroy: (instance) => {
+        const target = instance.popper.firstChild as HTMLElement | null;
+        // @ts-expect-error attached in onCreate
+        const handler = instance.__docmostBlurHandler as
+          | ((e: Event) => void)
+          | undefined;
+
+        if (target && handler) {
+          target.removeEventListener("blur", handler);
+        }
       },
       onHide: () => {
         setIsNodeSelectorOpen(false);

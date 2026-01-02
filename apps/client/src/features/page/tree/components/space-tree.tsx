@@ -13,7 +13,7 @@ import {
   usePageQuery,
   useUpdatePageMutation,
 } from "@/features/page/queries/page-query.ts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import classes from "@/features/page/tree/styles/tree.module.css";
 import { ActionIcon, Box, Menu, rem } from "@mantine/core";
@@ -285,22 +285,33 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
   const [, appendChildren] = useAtom(appendNodeChildrenAtom);
   const emit = useQueryEmit();
   const { spaceSlug } = useParams();
-  const timerRef = useRef(null);
+  const timerRef = useRef<number | null>(null);
+  const openOnDropTimeoutRef = useRef<number | null>(null);
   const [mobileSidebarOpened] = useAtom(mobileSidebarAtom);
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
 
-  // Clean up timer on unmount to prevent memory leaks
+  // Clean up timers on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         window.clearTimeout(timerRef.current);
         timerRef.current = null;
       }
+
+      if (openOnDropTimeoutRef.current) {
+        window.clearTimeout(openOnDropTimeoutRef.current);
+        openOnDropTimeoutRef.current = null;
+      }
     };
   }, []);
 
   const prefetchPage = () => {
-    timerRef.current = setTimeout(() => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    timerRef.current = window.setTimeout(() => {
       queryClient.prefetchQuery({
         queryKey: ["pages", node.data.slugId],
         queryFn: () => getPageById({ pageId: node.data.slugId }),
@@ -316,29 +327,63 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
     }
   };
 
-  async function handleLoadChildren(node: NodeApi<SpaceTreeNode>) {
-    if (!node.data.hasChildren) return;
-    // in conflict with use-query-subscription.ts => case "addTreeNode","moveTreeNode" etc with websocket
-    // if (node.data.children && node.data.children.length > 0) {
-    //   return;
-    // }
+  const handleLoadChildren = useCallback(
+    async (nodeApi: NodeApi<SpaceTreeNode>) => {
+      if (!nodeApi.data.hasChildren) return;
 
-    try {
-      const params: SidebarPagesParams = {
-        pageId: node.data.id,
-        spaceId: node.data.spaceId,
-      };
+      try {
+        const params: SidebarPagesParams = {
+          pageId: nodeApi.data.id,
+          spaceId: nodeApi.data.spaceId,
+        };
 
-      const childrenTree = await fetchAllAncestorChildren(params);
+        const childrenTree = await fetchAllAncestorChildren(params);
 
-      appendChildren({
-        parentId: node.data.id,
-        children: childrenTree,
-      });
-    } catch (error) {
-      console.error("Failed to fetch children:", error);
+        appendChildren({
+          parentId: nodeApi.data.id,
+          children: childrenTree,
+        });
+      } catch (error) {
+        console.error("Failed to fetch children:", error);
+      }
+    },
+    [appendChildren],
+  );
+
+  // Avoid side-effects in render: auto-load/open node only when dnd state changes
+  useEffect(() => {
+    if (
+      node.willReceiveDrop &&
+      node.isClosed &&
+      (node.children.length > 0 || node.data.hasChildren)
+    ) {
+      handleLoadChildren(node);
+
+      if (openOnDropTimeoutRef.current) {
+        window.clearTimeout(openOnDropTimeoutRef.current);
+      }
+
+      openOnDropTimeoutRef.current = window.setTimeout(() => {
+        if (node.state.willReceiveDrop) {
+          node.open();
+        }
+      }, 650);
     }
-  }
+
+    return () => {
+      if (openOnDropTimeoutRef.current) {
+        window.clearTimeout(openOnDropTimeoutRef.current);
+        openOnDropTimeoutRef.current = null;
+      }
+    };
+  }, [
+    handleLoadChildren,
+    node,
+    node.willReceiveDrop,
+    node.isClosed,
+    node.children.length,
+    node.data.hasChildren,
+  ]);
 
   const handleUpdateNodeIcon = (nodeId: string, newIcon: string) => {
     const updatedTree = updateTreeNodeIcon(treeData, nodeId, newIcon);
@@ -381,19 +426,6 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
       });
     }, 50);
   };
-
-  if (
-    node.willReceiveDrop &&
-    node.isClosed &&
-    (node.children.length > 0 || node.data.hasChildren)
-  ) {
-    handleLoadChildren(node);
-    setTimeout(() => {
-      if (node.state.willReceiveDrop) {
-        node.open();
-      }
-    }, 650);
-  }
 
   const pageUrl = buildPageUrl(spaceSlug, node.data.slugId, node.data.name);
 
