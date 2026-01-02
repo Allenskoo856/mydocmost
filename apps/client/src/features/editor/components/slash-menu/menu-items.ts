@@ -25,6 +25,7 @@ import {
   CommandProps,
   SlashMenuGroupedItemsType,
 } from "@/features/editor/components/slash-menu/types";
+import { createDocDatabase } from "@/features/editor/services/doc-database-service";
 import { uploadImageAction } from "@/features/editor/components/image/upload-image-action.tsx";
 import { uploadVideoAction } from "@/features/editor/components/video/upload-video-action.tsx";
 import { uploadAttachmentAction } from "@/features/editor/components/attachment/upload-attachment-action.tsx";
@@ -242,6 +243,52 @@ const CommandGroups: SlashMenuGroupedItemsType = {
           .deleteRange(range)
           .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
           .run(),
+    },
+    {
+      title: "Database",
+      description: "Insert a database table.",
+      searchTerms: ["database", "db", "table"],
+      icon: IconAppWindow,
+      command: async ({ editor, range }: CommandProps) => {
+        console.log("[Database] command triggered");
+        editor.chain().focus().deleteRange(range).run();
+
+        const spaceId = editor.storage?.spaceId;
+        console.log("[Database] spaceId:", spaceId);
+        if (!spaceId) {
+          console.warn("[Database] spaceId is missing, aborting");
+          return;
+        }
+
+        let result;
+        try {
+          result = await createDocDatabase({
+            spaceId,
+            title: "未命名数据库",
+          });
+          console.log("[Database] createDocDatabase result:", result);
+        } catch (err) {
+          console.error("[Database] createDocDatabase error:", err);
+          return;
+        }
+
+        const databaseId = result?.data?.database?.id;
+        const viewId = result?.data?.view?.id;
+        console.log("[Database] databaseId:", databaseId, "viewId:", viewId);
+        if (!databaseId || !viewId) {
+          console.warn("[Database] databaseId or viewId missing, aborting");
+          return;
+        }
+
+        console.log("[Database] inserting databaseRef node");
+        const success = editor
+          .chain()
+          .focus()
+          // @ts-ignore
+          .insertDatabaseRef({ databaseId, viewId })
+          .run();
+        console.log("[Database] insertDatabaseRef result:", success);
+      },
     },
     {
       title: "Toggle block",

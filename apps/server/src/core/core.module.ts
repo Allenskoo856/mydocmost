@@ -16,6 +16,7 @@ import { GroupModule } from './group/group.module';
 import { CaslModule } from './casl/casl.module';
 import { DomainMiddleware } from '../common/middlewares/domain.middleware';
 import { ShareModule } from './share/share.module';
+import { DocDatabaseModule } from './doc-database/doc-database.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ShareModule } from './share/share.module';
     AuthModule,
     WorkspaceModule,
     PageModule,
+    DocDatabaseModule,
     AttachmentModule,
     CommentModule,
     SearchModule,

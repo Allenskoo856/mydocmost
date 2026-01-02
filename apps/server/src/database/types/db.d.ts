@@ -154,6 +154,34 @@ export interface Comments {
   workspaceId: string;
 }
 
+export interface DocDatabaseViews {
+  config: Json | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  databaseId: string;
+  deletedAt: Timestamp | null;
+  id: Generated<string>;
+  isDefault: Generated<boolean>;
+  name: string | null;
+  type: Generated<string>;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
+}
+
+export interface DocDatabases {
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  deletedAt: Timestamp | null;
+  id: Generated<string>;
+  lastUpdatedById: string | null;
+  schema: Json | null;
+  spaceId: string;
+  title: string | null;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
+  ydoc: Buffer | null;
+}
+
 export interface FileTasks {
   createdAt: Generated<Timestamp>;
   creatorId: string | null;
@@ -364,6 +392,8 @@ export interface DB {
   backlinks: Backlinks;
   billing: Billing;
   comments: Comments;
+  docDatabaseViews: DocDatabaseViews;
+  docDatabases: DocDatabases;
   fileTasks: FileTasks;
   groups: Groups;
   groupUsers: GroupUsers;

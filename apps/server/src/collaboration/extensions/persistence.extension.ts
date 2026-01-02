@@ -8,8 +8,13 @@ import {
 import * as Y from 'yjs';
 import { Injectable, Logger } from '@nestjs/common';
 import { TiptapTransformer } from '@hocuspocus/transformer';
-import { getPageId, jsonToText, tiptapExtensions } from '../collaboration.util';
+import {
+  getCollabDocumentInfo,
+  jsonToText,
+  tiptapExtensions,
+} from '../collaboration.util';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
+import { DocDatabaseRepo } from '@docmost/db/repos/doc-database/doc-database.repo';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
 import { executeTx } from '@docmost/db/utils';
@@ -32,6 +37,7 @@ export class PersistenceExtension implements Extension {
 
   constructor(
     private readonly pageRepo: PageRepo,
+    private readonly docDatabaseRepo: DocDatabaseRepo,
     @InjectKysely() private readonly db: KyselyDB,
     private eventEmitter: EventEmitter2,
     @InjectQueue(QueueName.GENERAL_QUEUE) private generalQueue: Queue,
@@ -40,13 +46,34 @@ export class PersistenceExtension implements Extension {
 
   async onLoadDocument(data: onLoadDocumentPayload) {
     const { documentName, document } = data;
-    const pageId = getPageId(documentName);
+    const info = getCollabDocumentInfo(documentName);
 
     if (!document.isEmpty('default')) {
       return;
     }
 
-    const page = await this.pageRepo.findById(pageId, {
+    if (info.type === 'database') {
+      const dbEntity = await this.docDatabaseRepo.findById(info.id, {
+      });
+
+      if (!dbEntity) {
+        this.logger.warn('database not found');
+        return;
+      }
+
+      if (dbEntity.ydoc) {
+        this.logger.debug(`database ydoc loaded from db: ${info.id}`);
+        const doc = new Y.Doc();
+        const dbState = new Uint8Array(dbEntity.ydoc);
+        Y.applyUpdate(doc, dbState);
+        return doc;
+      }
+
+      this.logger.debug(`creating fresh database ydoc: ${info.id}`);
+      return new Y.Doc();
+    }
+
+    const page = await this.pageRepo.findById(info.id, {
       includeContent: true,
       includeYdoc: true,
     });
@@ -57,7 +84,7 @@ export class PersistenceExtension implements Extension {
     }
 
     if (page.ydoc) {
-      this.logger.debug(`ydoc loaded from db: ${pageId}`);
+      this.logger.debug(`ydoc loaded from db: ${info.id}`);
 
       const doc = new Y.Doc();
       const dbState = new Uint8Array(page.ydoc);
@@ -68,7 +95,7 @@ export class PersistenceExtension implements Extension {
 
     // if no ydoc state in db convert json in page.content to Ydoc.
     if (page.content) {
-      this.logger.debug(`converting json to ydoc: ${pageId}`);
+      this.logger.debug(`converting json to ydoc: ${info.id}`);
 
       const ydoc = TiptapTransformer.toYdoc(
         page.content,
@@ -80,14 +107,47 @@ export class PersistenceExtension implements Extension {
       return ydoc;
     }
 
-    this.logger.debug(`creating fresh ydoc: ${pageId}`);
+    this.logger.debug(`creating fresh ydoc: ${info.id}`);
     return new Y.Doc();
   }
 
   async onStoreDocument(data: onStoreDocumentPayload) {
     const { documentName, document, context } = data;
 
-    const pageId = getPageId(documentName);
+    const info = getCollabDocumentInfo(documentName);
+
+    if (info.type === 'database') {
+      const ydocState = Buffer.from(Y.encodeStateAsUpdate(document));
+
+      try {
+        await executeTx(this.db, async (trx) => {
+          const dbEntity = await this.docDatabaseRepo.findById(info.id, {
+            withLock: true,
+            trx,
+          });
+
+          if (!dbEntity) {
+            this.logger.error(`Database with id ${info.id} not found`);
+            return;
+          }
+
+          await this.docDatabaseRepo.updateDatabase(
+            {
+              ydoc: ydocState,
+              lastUpdatedById: context.user.id,
+            } as any,
+            info.id,
+            trx,
+          );
+        });
+      } catch (err) {
+        this.logger.error(`Failed to update database ${info.id}`, err);
+      }
+
+      return;
+    }
+
+    const pageId = info.id;
 
     const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
     const ydocState = Buffer.from(Y.encodeStateAsUpdate(document));

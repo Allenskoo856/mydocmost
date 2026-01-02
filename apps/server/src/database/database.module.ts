@@ -26,6 +26,8 @@ import { UserTokenRepo } from './repos/user-token/user-token.repo';
 import { BacklinkRepo } from '@docmost/db/repos/backlink/backlink.repo';
 import { ShareRepo } from '@docmost/db/repos/share/share.repo';
 import { PageListener } from '@docmost/db/listeners/page.listener';
+import { DocDatabaseRepo } from './repos/doc-database/doc-database.repo';
+import { DocDatabaseViewRepo } from './repos/doc-database/doc-database-view.repo';
 
 // https://github.com/brianc/node-postgres/issues/811
 types.setTypeParser(types.builtins.INT8, (val) => Number(val));
@@ -71,6 +73,8 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     SpaceRepo,
     SpaceMemberRepo,
     PageRepo,
+    DocDatabaseRepo,
+    DocDatabaseViewRepo,
     PageHistoryRepo,
     CommentRepo,
     AttachmentRepo,
@@ -87,6 +91,8 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     SpaceRepo,
     SpaceMemberRepo,
     PageRepo,
+    DocDatabaseRepo,
+    DocDatabaseViewRepo,
     PageHistoryRepo,
     CommentRepo,
     AttachmentRepo,

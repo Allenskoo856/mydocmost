@@ -60,12 +60,14 @@ import { useEditorScroll } from "./hooks/use-editor-scroll";
 
 interface PageEditorProps {
   pageId: string;
+  spaceId: string;
   editable: boolean;
   content: any;
 }
 
 export default function PageEditor({
   pageId,
+  spaceId,
   editable,
   content,
 }: PageEditorProps) {
@@ -351,6 +353,7 @@ export default function PageEditor({
             // @ts-ignore
             setEditor(editor);
             editor.storage.pageId = pageId;
+            editor.storage.spaceId = spaceId;
             handleScrollTo(editor);
             editorCreated.current = true;
           });

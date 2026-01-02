@@ -14,6 +14,7 @@ import {
   Callout,
   Comment,
   CustomCodeBlock,
+  DatabaseRef,
   Details,
   DetailsContent,
   DetailsSummary,
@@ -83,6 +84,7 @@ export const tiptapExtensions = [
   Callout,
   Attachment,
   CustomCodeBlock,
+  DatabaseRef,
   Drawio,
   Excalidraw,
   Embed,
@@ -115,4 +117,20 @@ export function jsonToNode(tiptapJson: JSONContent) {
 
 export function getPageId(documentName: string) {
   return documentName.split('.')[1];
+}
+
+export type CollabDocumentType = 'page' | 'database';
+
+export function getCollabDocumentInfo(documentName: string): {
+  type: CollabDocumentType;
+  id: string;
+} {
+  const [type, id] = documentName.split('.', 2);
+
+  if (type === 'page' || type === 'database') {
+    return { type, id };
+  }
+
+  // Backward-compat: treat unknown prefix as page.
+  return { type: 'page', id: id ?? documentName.split('.')[1] };
 }

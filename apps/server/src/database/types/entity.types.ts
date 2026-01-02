@@ -20,6 +20,8 @@ import {
   FileTasks,
   UserMfa as _UserMFA,
   ApiKeys,
+  DocDatabases,
+  DocDatabaseViews,
 } from './db';
 import { PageEmbeddings } from '@docmost/db/types/embeddings.types';
 
@@ -66,6 +68,18 @@ export type UpdatableGroupUser = Updateable<Omit<GroupUsers, 'id'>>;
 export type Page = Selectable<Pages>;
 export type InsertablePage = Insertable<Pages>;
 export type UpdatablePage = Updateable<Omit<Pages, 'id'>>;
+
+// DocDatabase
+export type DocDatabase = Selectable<DocDatabases>;
+export type InsertableDocDatabase = Insertable<DocDatabases>;
+export type UpdatableDocDatabase = Updateable<Omit<DocDatabases, 'id'>>;
+
+// DocDatabaseView
+export type DocDatabaseView = Selectable<DocDatabaseViews>;
+export type InsertableDocDatabaseView = Insertable<DocDatabaseViews>;
+export type UpdatableDocDatabaseView = Updateable<
+  Omit<DocDatabaseViews, 'id'>
+>;
 
 // PageHistory
 export type PageHistory = Selectable<History>;

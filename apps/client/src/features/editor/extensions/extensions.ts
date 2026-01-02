@@ -39,6 +39,7 @@ import {
   Drawio,
   Excalidraw,
   Embed,
+  DatabaseRef,
   SearchAndReplace,
   Mention,
   Subpages,
@@ -63,6 +64,7 @@ import DrawioView from "../components/drawio/drawio-view";
 import ExcalidrawView from "@/features/editor/components/excalidraw/excalidraw-view.tsx";
 import EmbedView from "@/features/editor/components/embed/embed-view.tsx";
 import SubpagesView from "@/features/editor/components/subpages/subpages-view.tsx";
+import DatabaseRefView from "@/features/editor/components/doc-database/database-ref-view.tsx";
 import { common, createLowlight } from "lowlight";
 import plaintext from "highlight.js/lib/languages/plaintext";
 import powershell from "highlight.js/lib/languages/powershell";
@@ -225,6 +227,9 @@ export const mainExtensions = [
   }),
   Embed.configure({
     view: EmbedView,
+  }),
+  DatabaseRef.configure({
+    view: DatabaseRefView,
   }),
   Subpages.configure({
     view: SubpagesView,

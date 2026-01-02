@@ -68,6 +68,7 @@ export default function Page() {
           title={page.title}
           content={page.content}
           slugId={page.slugId}
+          spaceId={page.spaceId}
           spaceSlug={page?.space?.slug}
           editable={spaceAbility.can(
             SpaceCaslAction.Manage,
