@@ -164,31 +164,35 @@ export default function PageEditor({
         connect: true,
         preserveConnection: false,
         onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-          const token = auth?.token ?? collabQuery?.token;
+          const token = collabQuery?.token;
           if (!token) return;
 
-          const payload = jwtDecode(token);
-          const now = Date.now().valueOf() / 1000;
-          const isTokenExpired = now >= payload.exp;
-          if (isTokenExpired) {
-            refetchCollabToken().then((result) => {
-              if (!isComponentMounted.current) return;
-              if (providersRef.current?.remote !== remote) return;
-
-              if (result.data?.token) {
-                remote.disconnect();
-                if (authReconnectTimeoutRef.current) {
-                  window.clearTimeout(authReconnectTimeoutRef.current);
-                }
-                authReconnectTimeoutRef.current = window.setTimeout(() => {
-                  if (!isComponentMounted.current) return;
-                  if (providersRef.current?.remote !== remote) return;
-                  remote.configuration.token = result.data.token;
-                  remote.connect();
-                }, 100);
-              }
-            });
+          try {
+            const payload = jwtDecode<{ exp: number }>(token);
+            const now = Date.now().valueOf() / 1000;
+            const isTokenExpired = now >= payload.exp;
+            if (!isTokenExpired) return;
+          } catch {
+            // If token is malformed, attempt refresh below.
           }
+
+          refetchCollabToken().then((result) => {
+            if (!isComponentMounted.current) return;
+            if (providersRef.current?.remote !== remote) return;
+
+            if (result.data?.token) {
+              remote.disconnect();
+              if (authReconnectTimeoutRef.current) {
+                window.clearTimeout(authReconnectTimeoutRef.current);
+              }
+              authReconnectTimeoutRef.current = window.setTimeout(() => {
+                if (!isComponentMounted.current) return;
+                if (providersRef.current?.remote !== remote) return;
+                remote.configuration.token = result.data.token;
+                remote.connect();
+              }, 100);
+            }
+          });
         },
         onStatus: (status) => {
           if (status.status === "connected") {
