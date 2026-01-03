@@ -20,6 +20,9 @@ import {
   Button,
   Tabs,
   rem,
+  Modal,
+  Box,
+  ScrollArea,
 } from "@mantine/core";
 import { DatePicker, TimeInput } from "@mantine/dates";
 import {
@@ -488,7 +491,12 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
 
   // Handle loading children when node is toggled
   const handleToggle = useCallback(async (node: NodeApi<SpaceTreeNode>) => {
-    // If already has children loaded, just toggle
+    // Only load if node is being opened and doesn't have children yet
+    if (!node.isOpen) {
+      return; // Node is being closed, skip
+    }
+
+    // If already has children loaded, skip
     if (node.children && node.children.length > 0) {
       return;
     }
@@ -519,7 +527,11 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
       console.log("[PagePicker] Loaded children:", children.length);
 
       // Update local tree with new children
-      setLocalTreeData(prev => appendNodeChildren(prev, node.id, children));
+      setLocalTreeData(prev => {
+        const updated = appendNodeChildren(prev, node.id, children);
+        console.log("[PagePicker] Updated tree:", updated);
+        return updated;
+      });
     } catch (error) {
       console.error("[PagePicker] Error loading children:", error);
     } finally {
@@ -564,27 +576,27 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
   }
 
   return (
-    <Stack gap="xs" h={300}>
+    <Stack gap="xs" style={{ height: '100%' }}>
       <TextInput 
         placeholder="搜索页面..." 
-        size="xs" 
+        size="sm" 
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.currentTarget.value)}
       />
       {localTreeData.length === 0 ? (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 300 }}>
           <Text size="sm" c="dimmed">暂无页面数据</Text>
         </div>
       ) : (
-        <div style={{ flex: 1, overflow: "hidden" }}>
+        <div style={{ flex: 1, overflow: "hidden", minHeight: 350 }}>
           <Tree
             data={searchFilteredData}
-            width={280}
-            height={260}
-            indent={12}
-            rowHeight={28}
-            paddingTop={4}
-            paddingBottom={4}
+            width="100%"
+            height={350}
+            indent={20}
+            rowHeight={32}
+            paddingTop={8}
+            paddingBottom={8}
             disableDrag
             disableDrop
             disableEdit
@@ -598,43 +610,53 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: 4, 
-                    paddingLeft: props.node.level * 12,
-                    paddingRight: 8,
+                    gap: 6, 
+                    paddingLeft: props.node.level * 20 + 8,
+                    paddingRight: 12,
                     height: '100%',
                     cursor: 'pointer',
-                    backgroundColor: props.node.isSelected ? 'var(--mantine-color-blue-light)' : 'transparent',
+                    backgroundColor: props.node.isSelected ? 'var(--mantine-color-blue-1)' : 'transparent',
                     borderRadius: 4
                   }}
                   className={styles.treeNodeHover}
                 >
                   <ActionIcon
-                    size={16}
+                    size={20}
                     variant="subtle"
                     c="gray"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      const willOpen = !props.node.isOpen;
                       props.node.toggle();
-                      handleToggle(props.node);
+                      if (willOpen) {
+                        // Use setTimeout to ensure toggle completes first
+                        setTimeout(() => handleToggle(props.node), 0);
+                      }
                     }}
                   >
                     {loadingChildren.has(props.node.id) ? (
-                      <Loader size={10} />
+                      <Loader size={12} />
                     ) : props.node.isInternal ? (
                       props.node.children && (props.node.children.length > 0 || props.node.data.hasChildren) ? (
                         props.node.isOpen ? (
-                          <IconChevronDown stroke={2} size={14} />
+                          <IconChevronDown stroke={2} size={16} />
                         ) : (
-                          <IconChevronRight stroke={2} size={14} />
+                          <IconChevronRight stroke={2} size={16} />
                         )
                       ) : (
-                        <IconCircleDot size={6} />
+                        <IconCircleDot size={8} />
                       )
                     ) : null}
                   </ActionIcon>
-                  <span style={{ fontSize: 14, marginLeft: 4 }}>{props.node.data.icon || "📄"}</span>
-                  <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 4 }}>
+                  <Box style={{ marginLeft: "4px", display: "flex", alignItems: "center" }}>
+                    {props.node.data.icon ? (
+                      <span style={{ fontSize: 16 }}>{props.node.data.icon}</span>
+                    ) : (
+                      <IconFileDescription size={16} />
+                    )}
+                  </Box>
+                  <span style={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 4 }}>
                     {props.node.data.name}
                   </span>
                 </div>
@@ -685,76 +707,97 @@ function PageCell({ value, onChange, editable, pageId }: CellProps) {
   };
 
   return (
-    <Popover
-      opened={isEditing}
-      onChange={setIsEditing}
-      position="bottom-start"
-      withinPortal
-      width={300}
-      trapFocus
-    >
-      <Popover.Target>
-        <div
-          onClick={() => editable && setIsEditing(true)}
-          style={{
-            cursor: editable ? "pointer" : "default",
-            minHeight: 24,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            width: "100%"
-          }}
-        >
-          {pageValue ? (
-            <div 
+    <>
+      <div
+        onClick={() => editable && setIsEditing(true)}
+        style={{
+          cursor: editable ? "pointer" : "default",
+          minHeight: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          width: "100%"
+        }}
+      >
+        {pageValue ? (
+          <div 
+            style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: 4,
+              padding: "2px 6px",
+              borderRadius: 4,
+              backgroundColor: "var(--mantine-color-gray-1)",
+              maxWidth: "100%"
+            }}
+          >
+            <span style={{ fontSize: 14 }}>{pageValue.icon || <IconFileDescription size={14} />}</span>
+            <span 
+              onClick={handleNavigate}
               style={{ 
-                display: "flex", 
-                alignItems: "center", 
-                gap: 4,
-                padding: "2px 6px",
-                borderRadius: 4,
-                backgroundColor: "var(--mantine-color-gray-1)",
-                maxWidth: "100%"
+                fontSize: 13, 
+                cursor: "pointer",
+                textDecoration: "underline",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: 150
               }}
             >
-              <span style={{ fontSize: 14 }}>{pageValue.icon || <IconFileDescription size={14} />}</span>
-              <span 
-                onClick={handleNavigate}
-                style={{ 
-                  fontSize: 13, 
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: 150
+              {pageValue.title}
+            </span>
+            {editable && (
+              <ActionIcon
+                size="xs"
+                variant="transparent"
+                color="gray"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(null);
                 }}
               >
-                {pageValue.title}
-              </span>
-              {editable && (
-                <ActionIcon
-                  size="xs"
-                  variant="transparent"
-                  color="gray"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onChange(null);
-                  }}
-                >
-                  <IconX size={10} />
-                </ActionIcon>
-              )}
-            </div>
-          ) : (
-            editable && <span className={styles.selectPlaceholder}>选择页面...</span>
-          )}
-        </div>
-      </Popover.Target>
-      <Popover.Dropdown p="xs">
-        <PagePicker onSelect={handleSelect} pageId={pageId} />
-      </Popover.Dropdown>
-    </Popover>
+                <IconX size={10} />
+              </ActionIcon>
+            )}
+          </div>
+        ) : (
+          editable && <span className={styles.selectPlaceholder}>选择页面...</span>
+        )}
+      </div>
+
+      <Modal.Root
+        opened={isEditing}
+        onClose={() => setIsEditing(false)}
+        size={600}
+        padding="xl"
+        yOffset="10vh"
+        xOffset={0}
+      >
+        <Modal.Overlay />
+        <Modal.Content>
+          <Modal.Header py={0}>
+            <Modal.Title fw={500}>选择页面</Modal.Title>
+            <Modal.CloseButton />
+          </Modal.Header>
+          <Modal.Body>
+            <Text mb="md" c="dimmed" size="sm">
+              选择一个页面进行链接
+            </Text>
+
+            <Box 
+              style={{ 
+                border: "1px solid var(--mantine-color-gray-3)",
+                borderRadius: "4px",
+                minHeight: "400px",
+                maxHeight: "500px",
+              }}
+            >
+              <PagePicker onSelect={handleSelect} pageId={pageId} />
+            </Box>
+          </Modal.Body>
+        </Modal.Content>
+      </Modal.Root>
+    </>
   );
 }
 
@@ -2238,48 +2281,116 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 }
 
 // ============================================================
-function DatabaseTitle({ title, onChange, editable }: { title: string, onChange: (val: string) => void, editable: boolean }) {
+function DatabaseTitle({ title, onChange, editable, onDelete }: { 
+  title: string, 
+  onChange: (val: string) => void, 
+  editable: boolean,
+  onDelete?: () => void 
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(title);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     setValue(title);
   }, [title]);
 
   return (
-    <div 
-      className={styles.databaseTitleWrapper}
-      onClick={() => !isEditing && editable && setIsEditing(true)}
-    >
-      <IconDatabase size={18} className={styles.databaseIcon} />
-      {isEditing ? (
-        <TextInput
-          value={value}
-          onChange={(e) => setValue(e.currentTarget.value)}
-          onBlur={() => {
-            setIsEditing(false);
-            if (value !== title) onChange(value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+    <>
+      <div 
+        className={styles.databaseTitleWrapper}
+        onClick={() => !isEditing && editable && setIsEditing(true)}
+      >
+        <IconDatabase size={18} className={styles.databaseIcon} />
+        {isEditing ? (
+          <TextInput
+            value={value}
+            onChange={(e) => setValue(e.currentTarget.value)}
+            onBlur={() => {
               setIsEditing(false);
               if (value !== title) onChange(value);
-            }
-            if (e.key === 'Escape') {
-              setIsEditing(false);
-              setValue(title);
-            }
-          }}
-          autoFocus
-          size="xs"
-          variant="unstyled"
-          classNames={{ input: styles.databaseTitleInput }}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <span className={styles.databaseTitleText}>{title}</span>
-      )}
-    </div>
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setIsEditing(false);
+                if (value !== title) onChange(value);
+              }
+              if (e.key === 'Escape') {
+                setIsEditing(false);
+                setValue(title);
+              }
+            }}
+            autoFocus
+            size="xs"
+            variant="unstyled"
+            classNames={{ input: styles.databaseTitleInput }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className={styles.databaseTitleText}>{title}</span>
+        )}
+        {editable && onDelete && (
+          <Menu shadow="md" width={200} position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="gray"
+                onClick={(e) => e.stopPropagation()}
+                style={{ marginLeft: 8 }}
+              >
+                <IconDots size={16} />
+              </ActionIcon>
+            </Menu.Target>
+
+            <Menu.Dropdown>
+              <Menu.Label>操作</Menu.Label>
+              <Menu.Item
+                color="red"
+                leftSection={<IconTrash size={14} />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteModalOpen(true);
+                }}
+              >
+                删除数据库
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
+      </div>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="删除数据库？"
+        centered
+        size="sm"
+        styles={{
+          title: { fontWeight: 600 },
+          body: { paddingBottom: 20 }
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Text size="sm" c="dimmed" mb="lg">
+          确定要永久删除此数据库吗？此操作无法撤销。
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setDeleteModalOpen(false)}>
+            取消
+          </Button>
+          <Button 
+            color="red" 
+            onClick={() => {
+              onDelete?.();
+              setDeleteModalOpen(false);
+            }}
+          >
+            删除
+          </Button>
+        </Group>
+      </Modal>
+    </>
   );
 }
 
@@ -2287,7 +2398,7 @@ function DatabaseTitle({ title, onChange, editable }: { title: string, onChange:
 // Main Component
 // ============================================================
 export default function DatabaseRefView(props: NodeViewProps) {
-  const { node, editor } = props;
+  const { node, editor, deleteNode } = props;
   const databaseId = node.attrs.databaseId as string | undefined;
   const viewId = node.attrs.viewId as string | undefined;
   const { pageId: routePageId } = useParams();
@@ -2324,11 +2435,18 @@ export default function DatabaseRefView(props: NodeViewProps) {
     updateDatabaseMutation.mutate({ databaseId, title: newTitle });
   };
 
+  const handleDeleteDatabase = useCallback(() => {
+    if (!editor) return;
+    // 删除当前节点
+    deleteNode();
+  }, [editor, deleteNode]);
+
   // Yjs Document
   const ydocRef = useRef<Y.Doc | null>(null);
+  const hasInitialized = useRef(false);
+  
   if (!ydocRef.current) {
     ydocRef.current = new Y.Doc();
-    ensureInitialized(ydocRef.current);
   }
   const ydoc = ydocRef.current;
 
@@ -2392,6 +2510,17 @@ export default function DatabaseRefView(props: NodeViewProps) {
             provider.connect();
           }
         });
+      },
+      onSynced: () => {
+        // Initialize only once when synced and if empty
+        if (!hasInitialized.current) {
+          const columns = ydoc.getArray<Y.Map<any>>("columns");
+          if (columns.length === 0) {
+            console.log('[DatabaseRefView] Initializing empty database');
+            ensureInitialized(ydoc);
+          }
+          hasInitialized.current = true;
+        }
       },
       onStatus: (s) => {
         Promise.resolve().then(() => {
@@ -2676,7 +2805,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
             <DatabaseTitle 
               title={title} 
               onChange={handleTitleChange} 
-              editable={isEditable} 
+              editable={isEditable}
+              onDelete={handleDeleteDatabase}
             />
             {status !== WebSocketStatus.Connected && (
               <Group gap={4}>
