@@ -15,7 +15,10 @@ import {
   Text,
   Textarea,
   TextInput,
+  Switch,
+  Button,
 } from "@mantine/core";
+import { DatePicker, TimeInput } from "@mantine/dates";
 import {
   IconChevronDown,
   IconChevronRight,
@@ -398,22 +401,247 @@ function NumberCell({ value, onChange, editable }: CellProps) {
 }
 
 function DateCell({ value, onChange, editable }: CellProps) {
-  // 将 ISO 日期字符串转换为 YYYY-MM-DD 格式
-  const dateStr = value ? String(value).slice(0, 10) : "";
+  const [opened, setOpened] = useState(false);
+  
+  // Parse value
+  const dateValue = useMemo(() => {
+    if (!value) return null;
+    if (typeof value === 'string' && value.length === 10) {
+       // YYYY-MM-DD -> Local Date
+       const [y, m, d] = value.split('-').map(Number);
+       return new Date(y, m - 1, d);
+    }
+    return new Date(value);
+  }, [value]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.currentTarget.value;
-    onChange(val ? `${val}T00:00:00.000Z` : null);
+  const hasTime = useMemo(() => {
+    if (!value) return false;
+    return typeof value === 'string' && value.length > 10;
+  }, [value]);
+
+  // Local state for editing
+  const [tempDate, setTempDate] = useState<Date | null>(dateValue);
+  const [includeTime, setIncludeTime] = useState(hasTime);
+  const [timeStr, setTimeStr] = useState("");
+
+  // Sync local state when opening
+  useEffect(() => {
+    if (opened) {
+      setTempDate(dateValue);
+      setIncludeTime(hasTime);
+      if (dateValue && hasTime) {
+        const h = String(dateValue.getHours()).padStart(2, '0');
+        const m = String(dateValue.getMinutes()).padStart(2, '0');
+        setTimeStr(`${h}:${m}`);
+      } else {
+        setTimeStr("00:00");
+      }
+    }
+  }, [opened, dateValue, hasTime]);
+
+  const handleSave = (d: Date | null, withTime: boolean) => {
+    if (!d) {
+      onChange(null);
+      return;
+    }
+    
+    if (!withTime) {
+      // Save as YYYY-MM-DD
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      onChange(`${year}-${month}-${day}`);
+    } else {
+      // Save as ISO string
+      onChange(d.toISOString());
+    }
   };
 
+  const onDateSelect = (d: Date | null) => {
+    if (!d) return;
+    
+    if (!tempDate) {
+      const newDate = new Date(d);
+      if (includeTime) {
+         // Use current timeStr if valid
+         const [h, m] = timeStr.split(':').map(Number);
+         if (!isNaN(h) && !isNaN(m)) {
+           newDate.setHours(h, m);
+         } else {
+           newDate.setHours(0, 0, 0, 0);
+         }
+      }
+      setTempDate(newDate);
+      handleSave(newDate, includeTime);
+    } else {
+      // Preserve time from tempDate
+      const newDate = new Date(d);
+      newDate.setHours(tempDate.getHours(), tempDate.getMinutes(), tempDate.getSeconds(), tempDate.getMilliseconds());
+      setTempDate(newDate);
+      handleSave(newDate, includeTime);
+    }
+  };
+
+  const onTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTimeStr(e.currentTarget.value);
+  };
+
+  const onTimeBlur = () => {
+    if (!timeStr || !tempDate) return;
+    const [h, m] = timeStr.split(':').map(Number);
+    if (!isNaN(h) && !isNaN(m)) {
+       const newDate = new Date(tempDate);
+       newDate.setHours(h, m);
+       setTempDate(newDate);
+       handleSave(newDate, true);
+    }
+  };
+
+  const onTimeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
+  };
+
+  const toggleIncludeTime = (checked: boolean) => {
+    setIncludeTime(checked);
+    if (tempDate) {
+      handleSave(tempDate, checked);
+    }
+  };
+
+  const handleClear = () => {
+    setTempDate(null);
+    onChange(null);
+    setOpened(false);
+  };
+
+  // Format for display
+  const displayValue = useMemo(() => {
+    if (!dateValue) return "";
+    const dateStr = dateValue.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    if (hasTime) {
+      const timeStr = dateValue.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+      return `${dateStr} ${timeStr}`;
+    }
+    return dateStr;
+  }, [dateValue, hasTime]);
+
+  // Format for input display in popover
+  const inputDisplayValue = useMemo(() => {
+    if (!tempDate) return "";
+    const dateStr = tempDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    if (includeTime) {
+      const timeStr = tempDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+      return `${dateStr} ${timeStr}`;
+    }
+    return dateStr;
+  }, [tempDate, includeTime]);
+
+  if (!editable) {
+    return (
+      <div 
+        style={{
+          minHeight: 24,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {displayValue}
+      </div>
+    );
+  }
+
   return (
-    <input
-      type="date"
-      className={styles.cellInput}
-      value={dateStr}
-      onChange={handleChange}
-      disabled={!editable}
-    />
+    <Popover 
+      opened={opened} 
+      onChange={setOpened} 
+      position="bottom-start" 
+      withinPortal
+      trapFocus
+    >
+      <Popover.Target>
+        <div
+          onClick={() => setOpened(true)}
+          style={{ 
+            cursor: "pointer", 
+            minHeight: 24, 
+            display: "flex", 
+            alignItems: "center",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }}
+        >
+          {displayValue || <span className={styles.selectPlaceholder}>选择日期...</span>}
+        </div>
+      </Popover.Target>
+      <Popover.Dropdown p="xs">
+        <Stack gap="sm">
+          {/* Input Display */}
+          <div 
+            style={{
+              border: "1px solid var(--mantine-color-blue-5)",
+              borderRadius: 4,
+              padding: "6px 10px",
+              fontSize: 14,
+              fontWeight: 500,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              minWidth: 240
+            }}
+          >
+            <span>{inputDisplayValue || "Empty"}</span>
+            {tempDate && (
+               <IconX 
+                 size={14} 
+                 style={{ cursor: "pointer", opacity: 0.5 }} 
+                 onClick={(e) => {
+                   e.stopPropagation();
+                   handleClear();
+                 }}
+               />
+            )}
+          </div>
+
+          {/* Calendar */}
+          <DatePicker
+            value={tempDate}
+            onChange={onDateSelect}
+            size="sm"
+            styles={{
+              calendarHeader: { maxWidth: "100%" }
+            }}
+          />
+
+          {/* Options */}
+          <Stack gap="xs">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Text size="sm">包含时间</Text>
+              <Switch 
+                checked={includeTime} 
+                onChange={(e) => toggleIncludeTime(e.currentTarget.checked)} 
+                size="sm"
+              />
+            </div>
+            
+            {includeTime && (
+              <TimeInput
+                value={timeStr}
+                onChange={onTimeChange}
+                onBlur={onTimeBlur}
+                onKeyDown={onTimeKeyDown}
+                size="sm"
+              />
+            )}
+          </Stack>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
@@ -636,35 +864,95 @@ function OptionsManager({ options, onUpdateOptions, showAddButton = true }: Opti
 
 function SelectCell({ value, onChange, editable, column, onUpdateOptions }: CellProps) {
   const [opened, setOpened] = useState(false);
-  const [isManaging, setIsManaging] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
+
   const options = column.options ?? [];
   const selectedOption = options.find((o) => o.id === value);
 
+  // Filter options based on search
+  const filteredOptions = options.filter(o => 
+    o.label.toLowerCase().includes(search.toLowerCase())
+  );
+  
+  const exactMatch = options.find(o => o.label.toLowerCase() === search.trim().toLowerCase());
+
   const handleSelect = (optionId: string) => {
-    onChange(optionId);
+    // Toggle logic: if clicking the already selected one, clear it? 
+    // Usually single select allows clearing by clicking 'x' or selecting another.
+    // Let's allow clearing if clicking the same one.
+    if (value === optionId) {
+      onChange(null);
+    } else {
+      onChange(optionId);
+    }
     setOpened(false);
-    setIsManaging(false);
+    setSearch("");
   };
 
-  const handleUpdateOptions = (newOptions: SelectOption[]) => {
+  const handleCreate = () => {
+    if (!search.trim()) return;
+    if (exactMatch) {
+      handleSelect(exactMatch.id);
+      return;
+    }
+    
+    const newOption: SelectOption = {
+      id: uuid7(),
+      label: search.trim(),
+      color: getRandomOptionColor(),
+    };
+    onUpdateOptions?.([...options, newOption]);
+    onChange(newOption.id);
+    setOpened(false);
+    setSearch("");
+  };
+
+  const handleUpdateOptionLabel = (id: string, newLabel: string) => {
+    const newOptions = options.map(o => o.id === id ? { ...o, label: newLabel } : o);
     onUpdateOptions?.(newOptions);
+    setEditingOptionId(null);
+  };
+
+  const handleUpdateOptionColor = (id: string, newColor: string) => {
+    const newOptions = options.map(o => o.id === id ? { ...o, color: newColor } : o);
+    onUpdateOptions?.(newOptions);
+  };
+
+  const handleDeleteOption = (id: string) => {
+    const newOptions = options.filter(o => o.id !== id);
+    onUpdateOptions?.(newOptions);
+    if (value === id) {
+      onChange(null);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreate();
+    }
+    if (e.key === "Backspace" && search === "" && value) {
+      // Remove selected value
+      onChange(null);
+    }
   };
 
   return (
     <Popover 
       opened={opened && editable} 
-      onChange={(o) => {
-        setOpened(o);
-        if (!o) setIsManaging(false);
-      }} 
+      onChange={setOpened} 
       position="bottom-start" 
       withinPortal
-      closeOnClickOutside={!isManaging}
+      width={260}
+      trapFocus
     >
       <Popover.Target>
         <div
           className={styles.selectTags}
           onClick={() => editable && setOpened(true)}
+          style={{ minHeight: 28, cursor: editable ? "pointer" : "default" }}
         >
           {selectedOption ? (
             <span
@@ -679,48 +967,149 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
         </div>
       </Popover.Target>
       <Popover.Dropdown p="xs">
-        {isManaging ? (
-          <Stack gap={4}>
-            <div className={styles.optionSectionHeader}>
-              <span>管理选项</span>
-              <ActionIcon
-                size="xs"
-                variant="subtle"
-                onClick={() => setIsManaging(false)}
-              >
-                <IconCheck size={12} />
-              </ActionIcon>
-            </div>
-            <OptionsManager
-              options={options}
-              onUpdateOptions={handleUpdateOptions}
+        <Stack gap="xs">
+          {/* Search Input Area */}
+          <div 
+            style={{
+              display: "flex",
+              gap: 4,
+              padding: "4px 8px",
+              border: "1px solid var(--mantine-color-blue-5)",
+              borderRadius: 4,
+              minHeight: 32,
+              alignItems: "center"
+            }}
+          >
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="搜索或创建..."
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: 13,
+                flex: 1,
+                color: "var(--mantine-color-text)"
+              }}
             />
-          </Stack>
-        ) : (
-          <Stack gap={4}>
-            {options.map((opt) => (
-              <div
-                key={opt.id}
-                className={styles.optionItem}
-                onClick={() => handleSelect(opt.id)}
-              >
-                <span
-                  className={styles.optionColor}
-                  style={{ backgroundColor: opt.color }}
-                />
-                <span>{opt.label}</span>
-              </div>
-            ))}
-            <div
-              className={styles.optionItem}
-              onClick={() => setIsManaging(true)}
-              style={{ color: "var(--mantine-color-blue-6)" }}
-            >
-              <IconPencil size={14} />
-              <span>管理选项</span>
-            </div>
-          </Stack>
-        )}
+          </div>
+
+          <Text size="xs" c="dimmed" fw={500}>选择或新建一个标签</Text>
+
+          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            <Stack gap={2}>
+              {filteredOptions.map((opt) => {
+                const isSelected = value === opt.id;
+                const isEditing = editingOptionId === opt.id;
+
+                if (isEditing) {
+                  return (
+                    <div key={opt.id} className={styles.optionEditRow}>
+                      <TextInput
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        size="xs"
+                        autoFocus
+                        onBlur={() => handleUpdateOptionLabel(opt.id, editingLabel)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleUpdateOptionLabel(opt.id, editingLabel);
+                          if (e.key === "Escape") setEditingOptionId(null);
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div 
+                    key={opt.id} 
+                    className={styles.optionItem}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 4 }}
+                  >
+                    <div 
+                      style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, overflow: "hidden" }}
+                      onClick={() => handleSelect(opt.id)}
+                    >
+                      <div style={{ width: 16, display: "flex", justifyContent: "center" }}>
+                        {isSelected && <IconCheck size={14} />} 
+                      </div>
+                      <span
+                        className={styles.selectTag}
+                        style={{ backgroundColor: opt.color, margin: 0 }}
+                      >
+                        {opt.label}
+                      </span>
+                    </div>
+
+                    <Menu position="right" withinPortal>
+                      <Menu.Target>
+                        <ActionIcon size="xs" variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
+                          <IconDots size={14} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Label>编辑标签</Menu.Label>
+                        <Menu.Item 
+                          leftSection={<IconPencil size={14} />}
+                          onClick={() => {
+                            setEditingOptionId(opt.id);
+                            setEditingLabel(opt.label);
+                          }}
+                        >
+                          重命名
+                        </Menu.Item>
+                        <Menu.Item 
+                          leftSection={<IconTrash size={14} />}
+                          color="red"
+                          onClick={() => handleDeleteOption(opt.id)}
+                        >
+                          删除
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Label>颜色</Menu.Label>
+                        <div style={{ padding: "4px 12px", display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {OPTION_COLORS.map(c => (
+                            <div
+                              key={c}
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: 4,
+                                backgroundColor: c,
+                                cursor: "pointer",
+                                border: opt.color === c ? "1px solid var(--mantine-color-text)" : "1px solid transparent"
+                              }}
+                              onClick={() => handleUpdateOptionColor(opt.id, c)}
+                            />
+                          ))}
+                        </div>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </div>
+                );
+              })}
+
+              {search && !exactMatch && (
+                <div 
+                  className={styles.optionItem} 
+                  onClick={handleCreate}
+                  style={{ color: "var(--mantine-color-blue-6)" }}
+                >
+                  <IconPlus size={14} />
+                  <span style={{ marginLeft: 8 }}>创建 "{search}"</span>
+                </div>
+              )}
+              
+              {filteredOptions.length === 0 && !search && (
+                <Text size="xs" c="dimmed" ta="center" py="xs">无标签</Text>
+              )}
+            </Stack>
+          </div>
+        </Stack>
       </Popover.Dropdown>
     </Popover>
   );
