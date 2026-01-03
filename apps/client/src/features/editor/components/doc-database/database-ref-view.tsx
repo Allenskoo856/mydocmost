@@ -40,6 +40,7 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconEyeOff,
+  IconEye,
   IconClearAll,
   IconTextWrap,
   IconAlignLeft,
@@ -63,10 +64,12 @@ import {
   IconUpload,
   IconEraser,
   IconFileDescription,
+  IconFile,
   IconLayoutSidebarRight,
   IconFilter,
   IconSearch,
   IconArrowsSort,
+  IconSettings,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -77,6 +80,23 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Tree, NodeRendererProps, NodeApi } from "react-arborist";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAtomValue } from "jotai";
 import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom";
 import { SpaceTreeNode } from "@/features/page/tree/types";
@@ -119,6 +139,7 @@ interface ColumnData {
   type: FieldType;
   width: number;
   options?: SelectOption[];
+  hidden?: boolean;
   ymap: Y.Map<any>;
 }
 
@@ -187,6 +208,19 @@ function readRows(doc: Y.Doc): RowData[] {
   });
 }
 
+function readAllColumns(doc: Y.Doc): ColumnData[] {
+  const columns = doc.getArray<Y.Map<any>>("columns");
+  return columns.toArray().map((c) => ({
+    id: String(c.get("id")),
+    name: String(c.get("name") ?? ""),
+    type: (c.get("type") as FieldType) ?? "text",
+    width: Number(c.get("width")) || GridSize.defaultColumnWidth,
+    options: c.get("options") as SelectOption[] | undefined,
+    hidden: Boolean(c.get("hidden")),
+    ymap: c,
+  }));
+}
+
 // ============================================================
 // Cell Components
 // ============================================================
@@ -226,10 +260,10 @@ function UrlCell({ value, onChange, editable }: CellProps) {
         {localValue ? (
           <>
             <IconLink size={14} style={{ flexShrink: 0, opacity: 0.5, marginTop: 3 }} />
-            <a 
-              href={localValue} 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href={localValue}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               style={{ color: "var(--mantine-color-blue-6)", textDecoration: "underline" }}
             >
@@ -298,9 +332,9 @@ function FileCell({ value, onChange, editable, pageId }: CellProps) {
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     console.log("[FileCell] handleUpload triggered", { file, pageId });
-    
+
     if (!file) return;
-    
+
     if (!pageId) {
       console.error("[FileCell] Missing pageId, cannot upload");
       return;
@@ -525,7 +559,7 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
 
     // Start loading
     setLoadingChildren(prev => new Set(prev).add(node.id));
-    
+
     try {
       console.log("[PagePicker] Loading children for node:", node.id);
       const params = {
@@ -535,7 +569,7 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
 
       const result = await getSidebarPages(params);
       const children = buildTree(result.items);
-      
+
       console.log("[PagePicker] Loaded children:", children.length);
 
       // Update local tree with new children
@@ -559,13 +593,13 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
   const searchFilteredData = useMemo(() => {
     if (!searchTerm) return localTreeData;
     const lowerTerm = searchTerm.toLowerCase();
-    
+
     // Helper to filter tree
     const filterNodes = (nodes: SpaceTreeNode[]): SpaceTreeNode[] => {
       return nodes.reduce((acc, node) => {
         const matches = node.name.toLowerCase().includes(lowerTerm);
         const children = node.children ? filterNodes(node.children) : [];
-        
+
         if (matches || children.length > 0) {
           acc.push({
             ...node,
@@ -589,9 +623,9 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
 
   return (
     <Stack gap="xs" style={{ height: '100%' }}>
-      <TextInput 
-        placeholder="搜索页面..." 
-        size="sm" 
+      <TextInput
+        placeholder="搜索页面..."
+        size="sm"
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.currentTarget.value)}
       />
@@ -618,11 +652,11 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
                 style={props.style}
                 onClick={() => onSelect(props.node.data)}
               >
-                <div 
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 6, 
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
                     paddingLeft: props.node.level * 20 + 8,
                     paddingRight: 12,
                     height: '100%',
@@ -730,10 +764,10 @@ function PageCell({ value, onChange, editable, pageId, onPreview }: CellProps) {
         }}
       >
         {pageValue ? (
-          <div 
-            style={{ 
-              display: "flex", 
-              alignItems: "center", 
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
               gap: 4,
               padding: "2px 6px",
               borderRadius: 4,
@@ -742,10 +776,10 @@ function PageCell({ value, onChange, editable, pageId, onPreview }: CellProps) {
             }}
           >
             <span style={{ fontSize: 14 }}>{pageValue.icon || <IconFileDescription size={14} />}</span>
-            <span 
+            <span
               onClick={handleNavigate}
-              style={{ 
-                fontSize: 13, 
+              style={{
+                fontSize: 13,
                 cursor: "pointer",
                 textDecoration: "underline",
                 whiteSpace: "nowrap",
@@ -794,8 +828,8 @@ function PageCell({ value, onChange, editable, pageId, onPreview }: CellProps) {
               选择一个页面进行链接
             </Text>
 
-            <Box 
-              style={{ 
+            <Box
+              style={{
                 border: "1px solid var(--mantine-color-gray-3)",
                 borderRadius: "4px",
                 minHeight: "400px",
@@ -883,14 +917,14 @@ function NumberCell({ value, onChange, editable }: CellProps) {
 
 function DateCell({ value, onChange, editable }: CellProps) {
   const [opened, setOpened] = useState(false);
-  
+
   // Parse value
   const dateValue = useMemo(() => {
     if (!value) return null;
     if (typeof value === 'string' && value.length === 10) {
-       // YYYY-MM-DD -> Local Date
-       const [y, m, d] = value.split('-').map(Number);
-       return new Date(y, m - 1, d);
+      // YYYY-MM-DD -> Local Date
+      const [y, m, d] = value.split('-').map(Number);
+      return new Date(y, m - 1, d);
     }
     return new Date(value);
   }, [value]);
@@ -925,7 +959,7 @@ function DateCell({ value, onChange, editable }: CellProps) {
       onChange(null);
       return;
     }
-    
+
     if (!withTime) {
       // Save as YYYY-MM-DD
       const year = d.getFullYear();
@@ -940,17 +974,17 @@ function DateCell({ value, onChange, editable }: CellProps) {
 
   const onDateSelect = (d: Date | null) => {
     if (!d) return;
-    
+
     if (!tempDate) {
       const newDate = new Date(d);
       if (includeTime) {
-         // Use current timeStr if valid
-         const [h, m] = timeStr.split(':').map(Number);
-         if (!isNaN(h) && !isNaN(m)) {
-           newDate.setHours(h, m);
-         } else {
-           newDate.setHours(0, 0, 0, 0);
-         }
+        // Use current timeStr if valid
+        const [h, m] = timeStr.split(':').map(Number);
+        if (!isNaN(h) && !isNaN(m)) {
+          newDate.setHours(h, m);
+        } else {
+          newDate.setHours(0, 0, 0, 0);
+        }
       }
       setTempDate(newDate);
       handleSave(newDate, includeTime);
@@ -971,10 +1005,10 @@ function DateCell({ value, onChange, editable }: CellProps) {
     if (!timeStr || !tempDate) return;
     const [h, m] = timeStr.split(':').map(Number);
     if (!isNaN(h) && !isNaN(m)) {
-       const newDate = new Date(tempDate);
-       newDate.setHours(h, m);
-       setTempDate(newDate);
-       handleSave(newDate, true);
+      const newDate = new Date(tempDate);
+      newDate.setHours(h, m);
+      setTempDate(newDate);
+      handleSave(newDate, true);
     }
   };
 
@@ -1021,7 +1055,7 @@ function DateCell({ value, onChange, editable }: CellProps) {
 
   if (!editable) {
     return (
-      <div 
+      <div
         style={{
           minHeight: 24,
           whiteSpace: "nowrap",
@@ -1037,20 +1071,20 @@ function DateCell({ value, onChange, editable }: CellProps) {
   }
 
   return (
-    <Popover 
-      opened={opened} 
-      onChange={setOpened} 
-      position="bottom-start" 
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      position="bottom-start"
       withinPortal
       trapFocus
     >
       <Popover.Target>
         <div
           onClick={() => setOpened(true)}
-          style={{ 
-            cursor: "pointer", 
-            minHeight: 24, 
-            display: "flex", 
+          style={{
+            cursor: "pointer",
+            minHeight: 24,
+            display: "flex",
             alignItems: "center",
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -1063,7 +1097,7 @@ function DateCell({ value, onChange, editable }: CellProps) {
       <Popover.Dropdown p="xs">
         <Stack gap="sm">
           {/* Input Display */}
-          <div 
+          <div
             style={{
               border: "1px solid var(--mantine-color-blue-5)",
               borderRadius: 4,
@@ -1078,14 +1112,14 @@ function DateCell({ value, onChange, editable }: CellProps) {
           >
             <span>{inputDisplayValue || "Empty"}</span>
             {tempDate && (
-               <IconX 
-                 size={14} 
-                 style={{ cursor: "pointer", opacity: 0.5 }} 
-                 onClick={(e) => {
-                   e.stopPropagation();
-                   handleClear();
-                 }}
-               />
+              <IconX
+                size={14}
+                style={{ cursor: "pointer", opacity: 0.5 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClear();
+                }}
+              />
             )}
           </div>
 
@@ -1103,13 +1137,13 @@ function DateCell({ value, onChange, editable }: CellProps) {
           <Stack gap="xs">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <Text size="sm">包含时间</Text>
-              <Switch 
-                checked={includeTime} 
-                onChange={(e) => toggleIncludeTime(e.currentTarget.checked)} 
+              <Switch
+                checked={includeTime}
+                onChange={(e) => toggleIncludeTime(e.currentTarget.checked)}
                 size="sm"
               />
             </div>
-            
+
             {includeTime && (
               <TimeInput
                 value={timeStr}
@@ -1353,10 +1387,10 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
   const selectedOption = options.find((o) => o.id === value);
 
   // Filter options based on search
-  const filteredOptions = options.filter(o => 
+  const filteredOptions = options.filter(o =>
     o.label.toLowerCase().includes(search.toLowerCase())
   );
-  
+
   const exactMatch = options.find(o => o.label.toLowerCase() === search.trim().toLowerCase());
 
   const handleSelect = (optionId: string) => {
@@ -1378,7 +1412,7 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
       handleSelect(exactMatch.id);
       return;
     }
-    
+
     const newOption: SelectOption = {
       id: uuid7(),
       label: search.trim(),
@@ -1421,10 +1455,10 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
   };
 
   return (
-    <Popover 
-      opened={opened && editable} 
-      onChange={setOpened} 
-      position="bottom-start" 
+    <Popover
+      opened={opened && editable}
+      onChange={setOpened}
+      position="bottom-start"
       withinPortal
       width={260}
       trapFocus
@@ -1450,7 +1484,7 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
       <Popover.Dropdown p="xs">
         <Stack gap="xs">
           {/* Search Input Area */}
-          <div 
+          <div
             style={{
               display: "flex",
               gap: 4,
@@ -1506,17 +1540,17 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
                 }
 
                 return (
-                  <div 
-                    key={opt.id} 
+                  <div
+                    key={opt.id}
                     className={styles.optionItem}
                     style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 4 }}
                   >
-                    <div 
+                    <div
                       style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, overflow: "hidden" }}
                       onClick={() => handleSelect(opt.id)}
                     >
                       <div style={{ width: 16, display: "flex", justifyContent: "center" }}>
-                        {isSelected && <IconCheck size={14} />} 
+                        {isSelected && <IconCheck size={14} />}
                       </div>
                       <span
                         className={styles.selectTag}
@@ -1534,7 +1568,7 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
                       </Menu.Target>
                       <Menu.Dropdown>
                         <Menu.Label>编辑标签</Menu.Label>
-                        <Menu.Item 
+                        <Menu.Item
                           leftSection={<IconPencil size={14} />}
                           onClick={() => {
                             setEditingOptionId(opt.id);
@@ -1543,7 +1577,7 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
                         >
                           重命名
                         </Menu.Item>
-                        <Menu.Item 
+                        <Menu.Item
                           leftSection={<IconTrash size={14} />}
                           color="red"
                           onClick={() => handleDeleteOption(opt.id)}
@@ -1575,8 +1609,8 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
               })}
 
               {search && !exactMatch && (
-                <div 
-                  className={styles.optionItem} 
+                <div
+                  className={styles.optionItem}
                   onClick={handleCreate}
                   style={{ color: "var(--mantine-color-blue-6)" }}
                 >
@@ -1584,7 +1618,7 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
                   <span style={{ marginLeft: 8 }}>创建 "{search}"</span>
                 </div>
               )}
-              
+
               {filteredOptions.length === 0 && !search && (
                 <Text size="xs" c="dimmed" ta="center" py="xs">无标签</Text>
               )}
@@ -1601,16 +1635,16 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
   const [search, setSearch] = useState("");
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
-  
+
   const options = column.options ?? [];
   const selectedIds: string[] = Array.isArray(value) ? value : [];
   const selectedOptions = options.filter((o) => selectedIds.includes(o.id));
 
   // Filter options based on search
-  const filteredOptions = options.filter(o => 
+  const filteredOptions = options.filter(o =>
     o.label.toLowerCase().includes(search.toLowerCase())
   );
-  
+
   const exactMatch = options.find(o => o.label.toLowerCase() === search.trim().toLowerCase());
 
   const handleToggle = (optionId: string) => {
@@ -1631,7 +1665,7 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
       setSearch("");
       return;
     }
-    
+
     const newOption: SelectOption = {
       id: uuid7(),
       label: search.trim(),
@@ -1674,10 +1708,10 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
   };
 
   return (
-    <Popover 
-      opened={opened && editable} 
-      onChange={setOpened} 
-      position="bottom-start" 
+    <Popover
+      opened={opened && editable}
+      onChange={setOpened}
+      position="bottom-start"
       withinPortal
       width={260}
       trapFocus
@@ -1706,7 +1740,7 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
       <Popover.Dropdown p="xs">
         <Stack gap="xs">
           {/* Search & Selected Tags Input Area */}
-          <div 
+          <div
             style={{
               display: "flex",
               flexWrap: "wrap",
@@ -1719,16 +1753,16 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
             }}
           >
             {selectedOptions.map(opt => (
-              <Badge 
-                key={opt.id} 
-                variant="filled" 
+              <Badge
+                key={opt.id}
+                variant="filled"
                 color={opt.color}
                 size="sm"
                 radius="sm"
                 rightSection={
-                  <IconX 
-                    size={10} 
-                    style={{ cursor: "pointer", marginTop: 2 }} 
+                  <IconX
+                    size={10}
+                    style={{ cursor: "pointer", marginTop: 2 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggle(opt.id);
@@ -1736,8 +1770,8 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
                   />
                 }
                 styles={{
-                  root: { 
-                    backgroundColor: opt.color, 
+                  root: {
+                    backgroundColor: opt.color,
                     color: "var(--mantine-color-text)",
                     textTransform: "none",
                     fontWeight: 500,
@@ -1794,17 +1828,17 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
                 }
 
                 return (
-                  <div 
-                    key={opt.id} 
+                  <div
+                    key={opt.id}
                     className={styles.optionItem}
                     style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 4 }}
                   >
-                    <div 
+                    <div
                       style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, overflow: "hidden" }}
                       onClick={() => handleToggle(opt.id)}
                     >
                       <div style={{ width: 16, display: "flex", justifyContent: "center" }}>
-                        {isSelected ? <IconCheck size={14} /> : <IconDots size={14} style={{ opacity: 0 }} />} 
+                        {isSelected ? <IconCheck size={14} /> : <IconDots size={14} style={{ opacity: 0 }} />}
                         {/* Placeholder for alignment if needed, or just IconCheck */}
                       </div>
                       <span
@@ -1823,7 +1857,7 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
                       </Menu.Target>
                       <Menu.Dropdown>
                         <Menu.Label>编辑标签</Menu.Label>
-                        <Menu.Item 
+                        <Menu.Item
                           leftSection={<IconPencil size={14} />}
                           onClick={() => {
                             setEditingOptionId(opt.id);
@@ -1832,7 +1866,7 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
                         >
                           重命名
                         </Menu.Item>
-                        <Menu.Item 
+                        <Menu.Item
                           leftSection={<IconTrash size={14} />}
                           color="red"
                           onClick={() => handleDeleteOption(opt.id)}
@@ -1864,8 +1898,8 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
               })}
 
               {search && !exactMatch && (
-                <div 
-                  className={styles.optionItem} 
+                <div
+                  className={styles.optionItem}
                   onClick={handleCreate}
                   style={{ color: "var(--mantine-color-blue-6)" }}
                 >
@@ -1873,7 +1907,7 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
                   <span style={{ marginLeft: 8 }}>创建 "{search}"</span>
                 </div>
               )}
-              
+
               {filteredOptions.length === 0 && !search && (
                 <Text size="xs" c="dimmed" ta="center" py="xs">无标签</Text>
               )}
@@ -2045,7 +2079,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
     const colsArray = ydoc.getArray<Y.Map<any>>("columns");
     const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
     const newColId = uuid7();
-    
+
     ydoc.transact(() => {
       // 1. Create new column
       const newCol = new Y.Map<any>();
@@ -2056,7 +2090,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       if (column.options) {
         newCol.set("options", JSON.parse(JSON.stringify(column.options)));
       }
-      
+
       // Insert after current column
       const index = colsArray.toArray().findIndex(c => c.get("id") === column.id);
       if (index !== -1) {
@@ -2070,11 +2104,11 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
         const cells = row.get("cells") as Y.Map<any>;
         if (cells && cells.has(column.id)) {
           const val = cells.get(column.id);
-          cells.set(newColId, val); 
+          cells.set(newColId, val);
         }
       });
     });
-    
+
     onClose();
   };
 
@@ -2115,7 +2149,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 
   // 主菜单
   return (
-    <div 
+    <div
       className={styles.fieldEditorModern}
       onClick={(e) => {
         console.log('[FieldEditor] main container clicked');
@@ -2135,11 +2169,11 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       </div>
 
       {/* 类型选择 */}
-      <Popover 
+      <Popover
         opened={typeMenuOpened}
         onChange={setTypeMenuOpened}
-        position="right-start" 
-        withinPortal 
+        position="right-start"
+        withinPortal
         offset={4}
         closeOnClickOutside={true}
       >
@@ -2155,77 +2189,77 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
         </Popover.Target>
         <Popover.Dropdown p={0}>
           <div className={styles.fieldEditorModern}>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "text" ? styles.active : ""}`}
               onClick={() => handleTypeChange("text")}
             >
               <IconAlignLeft size={18} stroke={1.5} className={styles.menuIcon} />
               <span>文本</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "number" ? styles.active : ""}`}
               onClick={() => handleTypeChange("number")}
             >
               <IconHash size={18} stroke={1.5} className={styles.menuIcon} />
               <span>数字</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "select" ? styles.active : ""}`}
               onClick={() => handleTypeChange("select")}
             >
               <IconCircleDot size={18} stroke={1.5} className={styles.menuIcon} />
               <span>单项选择器</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "multiSelect" ? styles.active : ""}`}
               onClick={() => handleTypeChange("multiSelect")}
             >
               <IconList size={18} stroke={1.5} className={styles.menuIcon} />
               <span>多项选择器</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "date" ? styles.active : ""}`}
               onClick={() => handleTypeChange("date")}
             >
               <IconCalendar size={18} stroke={1.5} className={styles.menuIcon} />
               <span>日期</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "file" ? styles.active : ""}`}
               onClick={() => handleTypeChange("file")}
             >
               <IconPaperclip size={18} stroke={1.5} className={styles.menuIcon} />
               <span>Files & media</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "page" ? styles.active : ""}`}
               onClick={() => handleTypeChange("page")}
             >
               <IconFileDescription size={18} stroke={1.5} className={styles.menuIcon} />
               <span>页面</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "url" ? styles.active : ""}`}
               onClick={() => handleTypeChange("url")}
             >
               <IconLink size={18} stroke={1.5} className={styles.menuIcon} />
               <span>链接</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "checkbox" ? styles.active : ""}`}
               onClick={() => handleTypeChange("checkbox")}
             >
               <IconSquareCheck size={18} stroke={1.5} className={styles.menuIcon} />
               <span>勾选框</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "updatedTime" ? styles.active : ""}`}
               onClick={() => handleTypeChange("updatedTime")}
             >
               <IconClock size={18} stroke={1.5} className={styles.menuIcon} />
               <span>修改时间</span>
             </div>
-            <div 
+            <div
               className={`${styles.menuItem} ${type === "createdTime" ? styles.active : ""}`}
               onClick={() => handleTypeChange("createdTime")}
             >
@@ -2240,8 +2274,8 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       {(type === "select" || type === "multiSelect") && (
         <div className={styles.optionsSection}>
           <div className={styles.optionsSectionTitle}>标签</div>
-          <OptionsManager 
-            options={options} 
+          <OptionsManager
+            options={options}
             onUpdateOptions={handleUpdateOptions}
             showAddButton={true}
           />
@@ -2279,7 +2313,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       </div>
 
       {/* 删除 */}
-      <div 
+      <div
         className={`${styles.menuItem} ${styles.danger}`}
         onClick={() => { onDelete(); onClose(); }}
       >
@@ -2293,12 +2327,12 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 // ============================================================
 // FilterBar Component - 筛选条件栏
 // ============================================================
-function FilterBar({ 
-  filters, 
-  onFiltersChange, 
+function FilterBar({
+  filters,
+  onFiltersChange,
   columns,
-  onClose 
-}: { 
+  onClose
+}: {
   filters: FilterCondition[];
   onFiltersChange: (filters: FilterCondition[]) => void;
   columns: ColumnData[];
@@ -2310,17 +2344,17 @@ function FilterBar({
   const addFilter = (columnId: string) => {
     const column = columns.find((c) => c.id === columnId);
     if (!column) return;
-    
+
     const operators = getOperatorsForFieldType(column.type);
     const defaultOperator = operators[0];
-    
+
     const newFilter: FilterCondition = {
       id: uuid7(),
       columnId,
       operator: defaultOperator.value,
       value: "",
     };
-    
+
     onFiltersChange([...filters, newFilter]);
     setAddFilterOpen(false);
     setEditingFilterId(newFilter.id);
@@ -2340,7 +2374,7 @@ function FilterBar({
   };
 
   const getColumnById = (columnId: string) => columns.find((c) => c.id === columnId);
-  
+
   const getOperatorLabel = (operator: FilterOperator, fieldType: FieldType) => {
     const operators = getOperatorsForFieldType(fieldType);
     return operators.find((o) => o.value === operator)?.label || operator;
@@ -2355,7 +2389,7 @@ function FilterBar({
       case "date": return <IconCalendar size={14} />;
       case "checkbox": return <IconSquareCheck size={14} />;
       case "url": return <IconLink size={14} />;
-      case "createdTime": 
+      case "createdTime":
       case "updatedTime": return <IconClock size={14} />;
       default: return <IconAlignLeft size={14} />;
     }
@@ -2367,10 +2401,10 @@ function FilterBar({
       {filters.map((filter) => {
         const column = getColumnById(filter.columnId);
         if (!column) return null;
-        
+
         const operators = getOperatorsForFieldType(column.type);
         const currentOperator = operators.find((o) => o.value === filter.operator);
-        
+
         return (
           <Popover
             key={filter.id}
@@ -2404,14 +2438,14 @@ function FilterBar({
                   {getFieldIcon(column.type)}
                 </span>
                 <span style={{ fontWeight: 500 }}>{column.name}</span>
-                
+
                 {/* 显示操作符或值 */}
                 <span style={{ color: "var(--mantine-color-gray-6)" }}>
-                  {currentOperator?.needsValue && filter.value 
-                    ? `: ${filter.value}` 
+                  {currentOperator?.needsValue && filter.value
+                    ? `: ${filter.value}`
                     : ` ${getOperatorLabel(filter.operator, column.type)}`}
                 </span>
-                
+
                 <IconChevronDown size={12} style={{ opacity: 0.5, marginLeft: 2 }} />
               </div>
             </Popover.Target>
@@ -2427,7 +2461,7 @@ function FilterBar({
                         const newColumn = columns.find((c) => c.id === value);
                         if (newColumn) {
                           const newOperators = getOperatorsForFieldType(newColumn.type);
-                          updateFilter(filter.id, { 
+                          updateFilter(filter.id, {
                             columnId: value,
                             operator: newOperators[0].value,
                             value: ""
@@ -2435,8 +2469,8 @@ function FilterBar({
                         }
                       }
                     }}
-                    data={columns.map((c) => ({ 
-                      value: c.id, 
+                    data={columns.map((c) => ({
+                      value: c.id,
                       label: c.name,
                     }))}
                     leftSection={getFieldIcon(column.type)}
@@ -2444,7 +2478,7 @@ function FilterBar({
                     allowDeselect={false}
                     style={{ flex: 1 }}
                   />
-                  
+
                   <Select
                     size="xs"
                     value={filter.operator}
@@ -2457,7 +2491,7 @@ function FilterBar({
                     allowDeselect={false}
                     style={{ width: 100 }}
                   />
-                  
+
                   <ActionIcon
                     size="sm"
                     variant="subtle"
@@ -2467,7 +2501,7 @@ function FilterBar({
                     <IconTrash size={14} />
                   </ActionIcon>
                 </Group>
-                
+
                 {/* 第二行：值输入 */}
                 {currentOperator?.needsValue && (
                   <TextInput
@@ -2490,8 +2524,8 @@ function FilterBar({
       })}
 
       {/* 添加筛选按钮 */}
-      <Popover 
-        opened={addFilterOpen} 
+      <Popover
+        opened={addFilterOpen}
         onChange={setAddFilterOpen}
         position="bottom-start"
         withinPortal
@@ -2505,15 +2539,15 @@ function FilterBar({
             size="xs"
             leftSection={<IconPlus size={14} />}
             onClick={() => setAddFilterOpen(true)}
-            styles={{ 
-              root: { 
+            styles={{
+              root: {
                 fontWeight: 400,
                 color: "var(--mantine-color-gray-6)",
                 "&:hover": {
                   backgroundColor: "var(--mantine-color-gray-1)",
                   color: "var(--mantine-color-gray-8)"
                 }
-              } 
+              }
             }}
           >
             添加筛选
@@ -2556,12 +2590,12 @@ function FilterBar({
 
 // SortBar Component - 排序条件栏
 // ============================================================
-function SortBar({ 
-  sorts, 
-  onSortsChange, 
+function SortBar({
+  sorts,
+  onSortsChange,
   columns,
-  onClose 
-}: { 
+  onClose
+}: {
   sorts: SortCondition[];
   onSortsChange: (sorts: SortCondition[]) => void;
   columns: ColumnData[];
@@ -2576,7 +2610,7 @@ function SortBar({
       columnId,
       direction: "asc",
     };
-    
+
     onSortsChange([...sorts, newSort]);
     setAddSortOpen(false);
     setEditingSortId(newSort.id);
@@ -2596,7 +2630,7 @@ function SortBar({
   };
 
   const getColumnById = (columnId: string) => columns.find((c) => c.id === columnId);
-  
+
   const getFieldIcon = (type: FieldType) => {
     switch (type) {
       case "text": return <IconAlignLeft size={14} />;
@@ -2606,7 +2640,7 @@ function SortBar({
       case "date": return <IconCalendar size={14} />;
       case "checkbox": return <IconSquareCheck size={14} />;
       case "url": return <IconLink size={14} />;
-      case "createdTime": 
+      case "createdTime":
       case "updatedTime": return <IconClock size={14} />;
       default: return <IconAlignLeft size={14} />;
     }
@@ -2618,7 +2652,7 @@ function SortBar({
       {sorts.map((sort) => {
         const column = getColumnById(sort.columnId);
         if (!column) return null;
-        
+
         return (
           <Popover
             key={sort.id}
@@ -2652,11 +2686,11 @@ function SortBar({
                   {getFieldIcon(column.type)}
                 </span>
                 <span style={{ fontWeight: 500 }}>{column.name}</span>
-                
+
                 <span style={{ color: "var(--mantine-color-gray-6)" }}>
                   : {sort.direction === "asc" ? "升序" : "降序"}
                 </span>
-                
+
                 <IconChevronDown size={12} style={{ opacity: 0.5, marginLeft: 2 }} />
               </div>
             </Popover.Target>
@@ -2671,8 +2705,8 @@ function SortBar({
                         updateSort(sort.id, { columnId: value });
                       }
                     }}
-                    data={columns.map((c) => ({ 
-                      value: c.id, 
+                    data={columns.map((c) => ({
+                      value: c.id,
                       label: c.name,
                     }))}
                     leftSection={getFieldIcon(column.type)}
@@ -2680,7 +2714,7 @@ function SortBar({
                     allowDeselect={false}
                     style={{ flex: 1 }}
                   />
-                  
+
                   <Select
                     size="xs"
                     value={sort.direction}
@@ -2693,7 +2727,7 @@ function SortBar({
                     allowDeselect={false}
                     style={{ width: 100 }}
                   />
-                  
+
                   <ActionIcon
                     size="sm"
                     variant="subtle"
@@ -2710,8 +2744,8 @@ function SortBar({
       })}
 
       {/* 添加排序按钮 */}
-      <Popover 
-        opened={addSortOpen} 
+      <Popover
+        opened={addSortOpen}
         onChange={setAddSortOpen}
         position="bottom-start"
         withinPortal
@@ -2725,15 +2759,15 @@ function SortBar({
             size="xs"
             leftSection={<IconPlus size={14} />}
             onClick={() => setAddSortOpen(true)}
-            styles={{ 
-              root: { 
+            styles={{
+              root: {
                 fontWeight: 400,
                 color: "var(--mantine-color-gray-6)",
                 "&:hover": {
                   backgroundColor: "var(--mantine-color-gray-1)",
                   color: "var(--mantine-color-gray-8)"
                 }
-              } 
+              }
             }}
           >
             添加排序
@@ -2776,11 +2810,215 @@ function SortBar({
 
 
 // ============================================================
-function DatabaseTitle({ title, onChange, editable, onDelete }: { 
-  title: string, 
-  onChange: (val: string) => void, 
+// Column Settings Components
+// ============================================================
+
+interface SortableColumnItemProps {
+  column: ColumnData;
+  onToggleVisibility: (columnId: string) => void;
+}
+
+function SortableColumnItem({ column, onToggleVisibility }: SortableColumnItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const getFieldIcon = (type: FieldType) => {
+    switch (type) {
+      case "text": return <IconAlignLeft size={16} />;
+      case "number": return <IconHash size={16} />;
+      case "select": return <IconList size={16} />;
+      case "multiSelect": return <IconListCheck size={16} />;
+      case "date": return <IconCalendar size={16} />;
+      case "checkbox": return <IconSquareCheck size={16} />;
+      case "url": return <IconLink size={16} />;
+      case "file": return <IconPaperclip size={16} />;
+      case "page": return <IconFile size={16} />;
+      case "createdTime":
+      case "updatedTime": return <IconClock size={16} />;
+      default: return <IconAlignLeft size={16} />;
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={styles.columnSettingItem}
+    >
+      <div className={styles.columnSettingLeft}>
+        <div
+          className={styles.dragHandle}
+          {...attributes}
+          {...listeners}
+        >
+          <IconGripVertical size={16} />
+        </div>
+        <div className={styles.columnIcon}>
+          {getFieldIcon(column.type)}
+        </div>
+        <Text size="sm" fw={500}>{column.name}</Text>
+      </div>
+      <ActionIcon
+        variant="subtle"
+        color={column.hidden ? "gray" : "blue"}
+        size="sm"
+        onClick={() => onToggleVisibility(column.id)}
+      >
+        {column.hidden ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+      </ActionIcon>
+    </div>
+  );
+}
+
+interface ColumnSettingsModalProps {
+  opened: boolean;
+  onClose: () => void;
+  columns: ColumnData[];
+  ydoc: Y.Doc;
+}
+
+function ColumnSettingsModal({
+  opened,
+  onClose,
+  columns: allColumns,
+  ydoc
+}: ColumnSettingsModalProps) {
+  const [localColumns, setLocalColumns] = useState(allColumns);
+
+  useEffect(() => {
+    setLocalColumns(allColumns);
+  }, [allColumns]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localColumns.findIndex((c) => c.id === active.id);
+    const newIndex = localColumns.findIndex((c) => c.id === over.id);
+
+    const newOrder = arrayMove(localColumns, oldIndex, newIndex);
+    setLocalColumns(newOrder);
+
+    // 更新 Yjs - 使用单步移动
+    const columnsArray = ydoc.getArray<Y.Map<any>>("columns");
+    ydoc.transact(() => {
+      // 获取当前要移动的元素并在删除前读取所有数据
+      const itemToMove = columnsArray.get(oldIndex);
+      const columnData = {
+        id: itemToMove.get("id"),
+        name: itemToMove.get("name"),
+        type: itemToMove.get("type"),
+        width: itemToMove.get("width"),
+        options: itemToMove.get("options"),
+        hidden: itemToMove.get("hidden"),
+      };
+
+      // 先删除原位置
+      columnsArray.delete(oldIndex, 1);
+
+      // 计算新位置（删除后数组长度减1，如果oldIndex < newIndex，新位置需要减1）
+      const adjustedNewIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
+
+      // 创建新的 YMap 并复制数据
+      const newMap = new Y.Map<any>();
+      newMap.set("id", columnData.id);
+      newMap.set("name", columnData.name);
+      newMap.set("type", columnData.type);
+      newMap.set("width", columnData.width);
+      if (columnData.options) {
+        newMap.set("options", columnData.options);
+      }
+      if (columnData.hidden) {
+        newMap.set("hidden", columnData.hidden);
+      }
+
+      columnsArray.insert(adjustedNewIndex, [newMap]);
+    });
+  };
+
+  const handleToggleVisibility = (columnId: string) => {
+    const columnsArray = ydoc.getArray<Y.Map<any>>("columns");
+    const col = columnsArray.toArray().find((c) => c.get("id") === columnId);
+
+    if (col) {
+      ydoc.transact(() => {
+        const currentHidden = Boolean(col.get("hidden"));
+        col.set("hidden", !currentHidden);
+      });
+    }
+  };
+
+  const visibleCount = localColumns.filter(c => !c.hidden).length;
+  const totalCount = localColumns.length;
+
+  return (
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="属性"
+      centered
+      size="sm"
+      styles={{
+        title: { fontWeight: 600 },
+      }}
+    >
+      <Stack gap="sm">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={localColumns.map(c => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <Stack gap={4}>
+              {localColumns.map((column) => (
+                <SortableColumnItem
+                  key={column.id}
+                  column={column}
+                  onToggleVisibility={handleToggleVisibility}
+                />
+              ))}
+            </Stack>
+          </SortableContext>
+        </DndContext>
+
+        <Text size="xs" c="dimmed" ta="center">
+          COUNT {visibleCount}
+        </Text>
+      </Stack>
+    </Modal>
+  );
+}
+
+
+// ============================================================
+function DatabaseTitle({ title, onChange, editable, onDelete }: {
+  title: string,
+  onChange: (val: string) => void,
   editable: boolean,
-  onDelete?: () => void 
+  onDelete?: () => void
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(title);
@@ -2792,7 +3030,7 @@ function DatabaseTitle({ title, onChange, editable, onDelete }: {
 
   return (
     <>
-      <div 
+      <div
         className={styles.databaseTitleWrapper}
         onClick={() => !isEditing && editable && setIsEditing(true)}
       >
@@ -2874,8 +3112,8 @@ function DatabaseTitle({ title, onChange, editable, onDelete }: {
           <Button variant="default" onClick={() => setDeleteModalOpen(false)}>
             取消
           </Button>
-          <Button 
-            color="red" 
+          <Button
+            color="red"
             onClick={() => {
               onDelete?.();
               setDeleteModalOpen(false);
@@ -2939,7 +3177,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
   // Yjs Document
   const ydocRef = useRef<Y.Doc | null>(null);
   const hasInitialized = useRef(false);
-  
+
   if (!ydocRef.current) {
     ydocRef.current = new Y.Doc();
   }
@@ -2951,15 +3189,18 @@ export default function DatabaseRefView(props: NodeViewProps) {
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [resizingColumnId, setResizingColumnId] = useState<string | null>(null);
   const [previewPageId, setPreviewPageId] = useState<string | null>(null);
-  
+
   // 筛选状态
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [filters, setFilters] = useState<FilterCondition[]>([]);
-  
+
   // 排序状态
   const [showSortBar, setShowSortBar] = useState(false);
   const [sorts, setSorts] = useState<SortCondition[]>([]);
-  
+
+  // 列设置状态
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
@@ -3044,6 +3285,11 @@ export default function DatabaseRefView(props: NodeViewProps) {
   }, [databaseId, collabUrl, collabQuery?.token, refetchCollabToken, ydoc]);
 
   // Read data from Yjs
+  const allColumns = useMemo(() => {
+    void version;
+    return readAllColumns(ydoc);
+  }, [ydoc, version]);
+
   const columns = useMemo(() => {
     void version;
     return readColumns(ydoc);
@@ -3065,10 +3311,10 @@ export default function DatabaseRefView(props: NodeViewProps) {
         return filters.every((filter) => {
           const column = columns.find((c) => c.id === filter.columnId);
           if (!column) return true; // 如果列不存在，跳过该筛选条件
-          
+
           const cellValue = row.cells.get(filter.columnId);
           const filterValue = filter.value;
-          
+
           // 根据列类型和操作符进行筛选
           switch (filter.operator) {
             case "isEmpty":
@@ -3425,9 +3671,9 @@ export default function DatabaseRefView(props: NodeViewProps) {
         {/* Title Bar */}
         <Group justify="space-between">
           <Group gap="xs">
-            <DatabaseTitle 
-              title={title} 
-              onChange={handleTitleChange} 
+            <DatabaseTitle
+              title={title}
+              onChange={handleTitleChange}
               editable={isEditable}
               onDelete={handleDeleteDatabase}
             />
@@ -3438,7 +3684,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
               </Group>
             )}
           </Group>
-          
+
           {/* 工具栏 */}
           <Group gap="xs">
             <ActionIcon
@@ -3458,6 +3704,15 @@ export default function DatabaseRefView(props: NodeViewProps) {
               title="排序"
             >
               <IconArrowsSort size={16} />
+            </ActionIcon>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              onClick={() => setShowColumnSettings(true)}
+              title="设置"
+            >
+              <IconSettings size={16} />
             </ActionIcon>
           </Group>
         </Group>
@@ -3497,141 +3752,141 @@ export default function DatabaseRefView(props: NodeViewProps) {
                         style={{ width: col.width }}
                       >
                         <Popover
-                        opened={editingColumnId === col.id}
-                        onClose={() => {
-                          console.log('[Popover] onClose triggered for column:', col.id);
-                          setEditingColumnId(null);
-                        }}
-                        onChange={(opened) => {
-                          console.log('[Popover] onChange:', { opened, colId: col.id, editingColumnId });
-                          // 关键修复：当 opened 为 false 时，更新状态关闭弹框
-                          if (!opened) {
+                          opened={editingColumnId === col.id}
+                          onClose={() => {
+                            console.log('[Popover] onClose triggered for column:', col.id);
                             setEditingColumnId(null);
-                          }
-                        }}
-                        position="bottom-start"
-                        withinPortal
-                        closeOnClickOutside={true}
-                        trapFocus={false}
-                    >
-                      <Popover.Target>
+                          }}
+                          onChange={(opened) => {
+                            console.log('[Popover] onChange:', { opened, colId: col.id, editingColumnId });
+                            // 关键修复：当 opened 为 false 时，更新状态关闭弹框
+                            if (!opened) {
+                              setEditingColumnId(null);
+                            }
+                          }}
+                          position="bottom-start"
+                          withinPortal
+                          closeOnClickOutside={true}
+                          trapFocus={false}
+                        >
+                          <Popover.Target>
+                            <div
+                              className={styles.headerCellContent}
+                              onClick={() => {
+                                console.log('[Popover.Target] clicked, isEditable:', isEditable, 'colId:', col.id);
+                                isEditable && setEditingColumnId(col.id);
+                              }}
+                            >
+                              <span>{col.name}</span>
+                              <IconChevronDown size={14} />
+                            </div>
+                          </Popover.Target>
+                          <Popover.Dropdown p="sm">
+                            <FieldEditor
+                              column={col}
+                              ydoc={ydoc}
+                              onClose={() => {
+                                console.log('[FieldEditor] onClose called');
+                                setEditingColumnId(null);
+                              }}
+                              onDelete={() => deleteColumn(col.id)}
+                            />
+                          </Popover.Dropdown>
+                        </Popover>
+                        {/* Resize Handle */}
                         <div
-                          className={styles.headerCellContent}
-                          onClick={() => {
-                            console.log('[Popover.Target] clicked, isEditable:', isEditable, 'colId:', col.id);
-                            isEditable && setEditingColumnId(col.id);
+                          className={`${styles.resizeHandle} ${resizingColumnId === col.id ? styles.resizing : ""}`}
+                          onPointerDown={(e) => handleResizeStart(e, col.id, col.width)}
+                          onPointerMove={handleResizeMove}
+                          onPointerUp={handleResizeEnd}
+                        />
+                      </th>
+                    ))}
+                    {/* Add Column Button */}
+                    {isEditable && (
+                      <th className={`${styles.headerCell} ${styles.addColumnCell}`}>
+                        <div className={styles.addColumnBtn} onClick={addColumn}>
+                          <IconPlus size={14} />
+                          <span>添加列</span>
+                        </div>
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className={styles.tbody}>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className={styles.row}>
+                      {row.getVisibleCells().map((cell, cellIndex) => (
+                        <td
+                          key={cell.id}
+                          className={styles.cell}
+                          style={{
+                            width: cell.column.getSize(),
+                            position: cellIndex === 0 ? 'relative' : undefined,
                           }}
                         >
-                          <span>{col.name}</span>
-                          <IconChevronDown size={14} />
-                        </div>
-                      </Popover.Target>
-                      <Popover.Dropdown p="sm">
-                        <FieldEditor
-                          column={col}
-                          ydoc={ydoc}
-                          onClose={() => {
-                            console.log('[FieldEditor] onClose called');
-                            setEditingColumnId(null);
-                          }}
-                          onDelete={() => deleteColumn(col.id)}
-                        />
-                      </Popover.Dropdown>
-                    </Popover>
-                    {/* Resize Handle */}
-                    <div
-                      className={`${styles.resizeHandle} ${resizingColumnId === col.id ? styles.resizing : ""}`}
-                      onPointerDown={(e) => handleResizeStart(e, col.id, col.width)}
-                      onPointerMove={handleResizeMove}
-                      onPointerUp={handleResizeEnd}
-                    />
-                  </th>
-                ))}
-                {/* Add Column Button */}
-                {isEditable && (
-                  <th className={`${styles.headerCell} ${styles.addColumnCell}`}>
-                    <div className={styles.addColumnBtn} onClick={addColumn}>
-                      <IconPlus size={14} />
-                      <span>添加列</span>
-                    </div>
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody className={styles.tbody}>
-              {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className={styles.row}>
-                  {row.getVisibleCells().map((cell, cellIndex) => (
-                    <td
-                      key={cell.id}
-                      className={styles.cell}
-                      style={{ 
-                        width: cell.column.getSize(),
-                        position: cellIndex === 0 ? 'relative' : undefined,
-                      }}
-                    >
-                      {/* Row Actions - 只在第一个单元格显示 */}
-                      {cellIndex === 0 && isEditable && (
-                        <div className={styles.rowActions}>
-                          {/* 快捷添加行按钮 */}
-                          <div 
-                            className={styles.rowActionBtn}
-                            onClick={() => insertRowBelow(row.original.id)}
-                            title="点击添加到下方"
-                          >
-                            <IconPlus size={14} />
-                          </div>
-                          {/* 行操作菜单 */}
-                          <Menu position="bottom-start" withinPortal>
-                            <Menu.Target>
-                              <div className={styles.rowActionBtn} title="更多操作">
-                                <IconGripVertical size={14} />
-                              </div>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                leftSection={<IconArrowUp size={14} />}
-                                onClick={() => insertRowAbove(row.original.id)}
-                              >
-                                在上方插入记录
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<IconRowInsertBottom size={14} />}
+                          {/* Row Actions - 只在第一个单元格显示 */}
+                          {cellIndex === 0 && isEditable && (
+                            <div className={styles.rowActions}>
+                              {/* 快捷添加行按钮 */}
+                              <div
+                                className={styles.rowActionBtn}
                                 onClick={() => insertRowBelow(row.original.id)}
+                                title="点击添加到下方"
                               >
-                                点击添加到下方
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<IconCopy size={14} />}
-                                onClick={() => duplicateRow(row.original.id)}
-                              >
-                                复制
-                              </Menu.Item>
-                              <Menu.Divider />
-                              <Menu.Item
-                                leftSection={<IconTrash size={14} />}
-                                color="red"
-                                onClick={() => deleteRow(row.original.id)}
-                              >
-                                删除
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </div>
-                      )}
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
+                                <IconPlus size={14} />
+                              </div>
+                              {/* 行操作菜单 */}
+                              <Menu position="bottom-start" withinPortal>
+                                <Menu.Target>
+                                  <div className={styles.rowActionBtn} title="更多操作">
+                                    <IconGripVertical size={14} />
+                                  </div>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  <Menu.Item
+                                    leftSection={<IconArrowUp size={14} />}
+                                    onClick={() => insertRowAbove(row.original.id)}
+                                  >
+                                    在上方插入记录
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={<IconRowInsertBottom size={14} />}
+                                    onClick={() => insertRowBelow(row.original.id)}
+                                  >
+                                    点击添加到下方
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={<IconCopy size={14} />}
+                                    onClick={() => duplicateRow(row.original.id)}
+                                  >
+                                    复制
+                                  </Menu.Item>
+                                  <Menu.Divider />
+                                  <Menu.Item
+                                    leftSection={<IconTrash size={14} />}
+                                    color="red"
+                                    onClick={() => deleteRow(row.original.id)}
+                                  >
+                                    删除
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
+                            </div>
+                          )}
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                      {/* Empty cell for add column */}
+                      {isEditable && <td className={styles.cell} style={{ width: GridSize.newColumnBtnWidth }} />}
+                    </tr>
                   ))}
-                  {/* Empty cell for add column */}
-                  {isEditable && <td className={styles.cell} style={{ width: GridSize.newColumnBtnWidth }} />}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-        
+
         {/* 底部统计 */}
         <Group justify="center" py="xs">
           <Text size="xs" c="dimmed">
@@ -3640,9 +3895,15 @@ export default function DatabaseRefView(props: NodeViewProps) {
           </Text>
         </Group>
       </Stack>
-      <PagePreviewDrawer 
-        pageId={previewPageId} 
-        onClose={() => setPreviewPageId(null)} 
+      <PagePreviewDrawer
+        pageId={previewPageId}
+        onClose={() => setPreviewPageId(null)}
+      />
+      <ColumnSettingsModal
+        opened={showColumnSettings}
+        onClose={() => setShowColumnSettings(false)}
+        columns={allColumns}
+        ydoc={ydoc}
       />
     </NodeViewWrapper>
   );
