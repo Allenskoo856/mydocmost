@@ -13,8 +13,9 @@
   border: 1px solid var(--mantine-color-gray-3);
   border-radius: 4px;
   background: var(--mantine-color-body);
-  display: inline-block;
-  min-width: 100%;
+  display: block;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 [data-mantine-color-scheme="dark"] .tableWrapper {
@@ -23,7 +24,6 @@
 
 .table {
   width: max-content;
-  min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -67,7 +67,7 @@
 .headerCellContent {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 2px;
   height: 100%;
   padding: 6px 0;
