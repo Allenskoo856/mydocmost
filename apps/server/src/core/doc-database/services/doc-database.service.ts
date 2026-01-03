@@ -83,6 +83,26 @@ export class DocDatabaseService {
     return { database, views };
   }
 
+  async updateDatabase(user: User, databaseId: string, input: { title?: string }) {
+    const database = await this.docDatabaseRepo.findById(databaseId);
+    if (!database) {
+      throw new NotFoundException('Database not found');
+    }
+
+    const ability = await this.spaceAbility.createForUser(user, database.spaceId);
+    if (ability.cannot(SpaceCaslAction.Edit, SpaceCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.docDatabaseRepo.updateDatabase(
+      {
+        title: input.title,
+        lastUpdatedById: user.id,
+      },
+      databaseId,
+    );
+  }
+
   async createView(user: User, workspaceId: string, databaseId: string, input: { name?: string; type?: 'table'; config?: any; isDefault?: boolean }) {
     const database = await this.docDatabaseRepo.findById(databaseId);
     if (!database) {

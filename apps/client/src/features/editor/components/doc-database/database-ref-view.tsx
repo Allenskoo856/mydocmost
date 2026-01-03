@@ -48,6 +48,7 @@ import {
   IconTableColumn,
   IconSparkles,
   IconSelect,
+  IconDatabase,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -61,9 +62,10 @@ import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { useCollabToken } from "@/features/auth/queries/auth-query";
 import {
   getDocDatabaseInfo,
+  updateDocDatabase,
   type DocDatabaseInfoResponse,
 } from "@/features/editor/services/doc-database-service";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FieldType,
   FIELD_TYPE_OPTIONS,
@@ -839,7 +841,19 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
         e.stopPropagation();
       }}
     >
-      {/* 当前类型 + 列名 - 使用嵌套 Popover 显示类型选择 */}
+      {/* 列名输入框 */}
+      <div className={styles.fieldInputContainer}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          className={styles.fieldInput}
+          placeholder="列名称"
+        />
+      </div>
+
+      {/* 类型选择 */}
       <Popover 
         position="right-start" 
         withinPortal 
@@ -849,20 +863,13 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
         onClose={() => console.log('[Nested Popover] closed')}
       >
         <Popover.Target>
-          <div className={styles.fieldHeaderClickable}>
-            <div className={styles.fieldTypeIconWrapper}>
+          <div className={styles.menuItem}>
+            <div className={styles.menuIconWrapper}>
               {getFieldTypeIcon(type)}
             </div>
-            <input
-              ref={inputRef}
-              type="text"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className={styles.fieldNameInput}
-              placeholder="列名称"
-            />
-            <IconChevronRight size={16} stroke={1.5} className={styles.menuChevron} />
+            <span className={styles.menuLabel}>类型</span>
+            <span className={styles.menuValue}>{getFieldTypeName(type)}</span>
+            <IconChevronRight size={14} className={styles.menuChevron} />
           </div>
         </Popover.Target>
         <Popover.Dropdown p={0}>
@@ -909,6 +916,52 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 }
 
 // ============================================================
+function DatabaseTitle({ title, onChange, editable }: { title: string, onChange: (val: string) => void, editable: boolean }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(title);
+
+  useEffect(() => {
+    setValue(title);
+  }, [title]);
+
+  return (
+    <div 
+      className={styles.databaseTitleWrapper}
+      onClick={() => !isEditing && editable && setIsEditing(true)}
+    >
+      <IconDatabase size={18} className={styles.databaseIcon} />
+      {isEditing ? (
+        <TextInput
+          value={value}
+          onChange={(e) => setValue(e.currentTarget.value)}
+          onBlur={() => {
+            setIsEditing(false);
+            if (value !== title) onChange(value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setIsEditing(false);
+              if (value !== title) onChange(value);
+            }
+            if (e.key === 'Escape') {
+              setIsEditing(false);
+              setValue(title);
+            }
+          }}
+          autoFocus
+          size="xs"
+          variant="unstyled"
+          classNames={{ input: styles.databaseTitleInput }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className={styles.databaseTitleText}>{title}</span>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // Main Component
 // ============================================================
 export default function DatabaseRefView(props: NodeViewProps) {
@@ -933,6 +986,19 @@ export default function DatabaseRefView(props: NodeViewProps) {
     enabled: !!databaseId,
     staleTime: 30_000,
   });
+
+  const queryClient = useQueryClient();
+  const updateDatabaseMutation = useMutation({
+    mutationFn: updateDocDatabase,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["doc-database", databaseId] });
+    },
+  });
+
+  const handleTitleChange = (newTitle: string) => {
+    if (!databaseId) return;
+    updateDatabaseMutation.mutate({ databaseId, title: newTitle });
+  };
 
   // Yjs Document
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -1256,7 +1322,11 @@ export default function DatabaseRefView(props: NodeViewProps) {
         {/* Title Bar */}
         <Group justify="space-between">
           <Group gap="xs">
-            <Text fw={600} size="lg">{title}</Text>
+            <DatabaseTitle 
+              title={title} 
+              onChange={handleTitleChange} 
+              editable={isEditable} 
+            />
             {status !== WebSocketStatus.Connected && (
               <Group gap={4}>
                 <Loader size="xs" />

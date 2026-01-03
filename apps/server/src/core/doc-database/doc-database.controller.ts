@@ -16,6 +16,7 @@ import {
   CreateDocDatabaseViewDto,
   DocDatabaseInfoDto,
   SetDefaultDocDatabaseViewDto,
+  UpdateDocDatabaseDto,
 } from './dto/doc-database.dto';
 import { DocDatabaseService } from './services/doc-database.service';
 import { SpaceRole } from '../../common/helpers/types/permission';
@@ -44,6 +45,17 @@ export class DocDatabaseController {
   @Post('info')
   async info(@Body() dto: DocDatabaseInfoDto, @AuthUser() user: User) {
     return this.docDatabaseService.getInfo(user, dto.databaseId);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('update')
+  async update(
+    @Body() dto: UpdateDocDatabaseDto,
+    @AuthUser() user: User,
+  ) {
+    return this.docDatabaseService.updateDatabase(user, dto.databaseId, {
+      title: dto.title,
+    });
   }
 
   @HttpCode(HttpStatus.OK)

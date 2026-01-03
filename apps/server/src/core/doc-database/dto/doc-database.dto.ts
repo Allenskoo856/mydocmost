@@ -51,3 +51,12 @@ export class SetDefaultDocDatabaseViewDto {
   @IsUUID()
   viewId: string;
 }
+
+export class UpdateDocDatabaseDto {
+  @IsUUID()
+  databaseId: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+}
