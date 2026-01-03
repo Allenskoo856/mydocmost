@@ -76,7 +76,7 @@ import { SpaceTreeNode } from "@/features/page/tree/types";
 import { buildPageUrl } from "@/features/page/page.utils";
 import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { usePageQuery } from "@/features/page/queries/page-query";
-import { getAllSidebarPages } from "@/features/page/services/page-service";
+import { getAllSidebarPages, getSidebarPages } from "@/features/page/services/page-service";
 import { buildTree, buildTreeWithChildren, appendNodeChildren } from "@/features/page/tree/utils/utils";
 import { useCollabToken } from "@/features/auth/queries/auth-query";
 import {
@@ -463,82 +463,77 @@ function FileCell({ value, onChange, editable, pageId }: CellProps) {
 
 interface PageValue {
   id: string;
+  slugId: string;
   title: string;
   icon?: string;
+  spaceId?: string;
 }
 
 function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => void; pageId?: string }) {
-  const [treeData, setTreeData] = useState<SpaceTreeNode[]>([]);
-  const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
+  const globalTreeData = useAtomValue(treeDataAtom);
   const [searchTerm, setSearchTerm] = useState("");
+  const [localTreeData, setLocalTreeData] = useState<SpaceTreeNode[]>([]);
+  const [loadingChildren, setLoadingChildren] = useState<Set<string>>(new Set());
 
-  // Fallback data fetching
+  // Get current page to filter by spaceId
   const { data: page } = usePageQuery({ pageId });
   const spaceId = page?.spaceId;
-  
-  // Fetch root pages
-  const { isLoading: isRootLoading } = useQuery({
-    queryKey: ["picker-root-pages", spaceId],
-    queryFn: async () => {
-      if (!spaceId) return [];
-      console.log("[PagePicker] Fetching root pages for spaceId:", spaceId);
-      const result = await getAllSidebarPages({ spaceId });
-      const allItems = result.pages.flatMap((p) => p.items);
-      const nodes = allItems.map(item => ({
-        id: item.id,
-        slugId: item.slugId,
-        name: item.title,
-        icon: item.icon,
-        position: item.position,
-        hasChildren: item.hasChildren,
-        spaceId: item.spaceId,
-        parentPageId: item.parentPageId,
-        children: [],
-      }));
-      setTreeData(nodes);
-      return nodes;
-    },
-    enabled: !!spaceId,
-    staleTime: 0,
-  });
 
-  const handleLoadChildren = async (node: NodeApi<SpaceTreeNode>) => {
-    if (loadingNodes.has(node.id)) return;
-    if (node.children && node.children.length > 0) return;
-    if (!node.data.hasChildren) return;
+  // Initialize local tree from global tree
+  useEffect(() => {
+    if (!spaceId) return;
+    const filtered = globalTreeData.filter((node) => node.spaceId === spaceId);
+    setLocalTreeData(filtered);
+  }, [spaceId, globalTreeData]);
 
-    setLoadingNodes(prev => new Set(prev).add(node.id));
+  // Handle loading children when node is toggled
+  const handleToggle = useCallback(async (node: NodeApi<SpaceTreeNode>) => {
+    // If already has children loaded, just toggle
+    if (node.children && node.children.length > 0) {
+      return;
+    }
+
+    // If doesn't have children flag, skip
+    if (!node.data.hasChildren) {
+      return;
+    }
+
+    // If already loading, skip
+    if (loadingChildren.has(node.id)) {
+      return;
+    }
+
+    // Start loading
+    setLoadingChildren(prev => new Set(prev).add(node.id));
+    
     try {
-      console.log("[PagePicker] Fetching children for:", node.id);
-      const result = await getAllSidebarPages({ spaceId: spaceId!, pageId: node.id });
-      const allItems = result.pages.flatMap((p) => p.items);
-      const children = allItems.map(item => ({
-        id: item.id,
-        slugId: item.slugId,
-        name: item.title,
-        icon: item.icon,
-        position: item.position,
-        hasChildren: item.hasChildren,
-        spaceId: item.spaceId,
-        parentPageId: item.parentPageId,
-        children: [],
-      }));
+      console.log("[PagePicker] Loading children for node:", node.id);
+      const params = {
+        pageId: node.id,
+        spaceId: node.data.spaceId,
+      };
+
+      const result = await getSidebarPages(params);
+      const children = buildTree(result.items);
       
-      setTreeData(prev => appendNodeChildren(prev, node.id, children));
-    } catch (e) {
-      console.error("[PagePicker] Error fetching children:", e);
+      console.log("[PagePicker] Loaded children:", children.length);
+
+      // Update local tree with new children
+      setLocalTreeData(prev => appendNodeChildren(prev, node.id, children));
+    } catch (error) {
+      console.error("[PagePicker] Error loading children:", error);
     } finally {
-      setLoadingNodes(prev => {
+      setLoadingChildren(prev => {
         const next = new Set(prev);
         next.delete(node.id);
         return next;
       });
     }
-  };
+  }, [loadingChildren, spaceId]);
 
   // Simple filter for search
-  const filteredData = useMemo(() => {
-    if (!searchTerm) return treeData;
+  const searchFilteredData = useMemo(() => {
+    if (!searchTerm) return localTreeData;
     const lowerTerm = searchTerm.toLowerCase();
     
     // Helper to filter tree
@@ -557,8 +552,16 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
       }, [] as SpaceTreeNode[]);
     };
 
-    return filterNodes(treeData);
-  }, [treeData, searchTerm]);
+    return filterNodes(localTreeData);
+  }, [localTreeData, searchTerm]);
+
+  console.log("[PagePicker] Global tree data:", globalTreeData.length, "items");
+  console.log("[PagePicker] Local tree data:", localTreeData.length, "items");
+  if (localTreeData[0]) {
+    console.log("[PagePicker] Sample tree node:", localTreeData[0]);
+    console.log("[PagePicker] Sample node has children:", localTreeData[0].children);
+    console.log("[PagePicker] Sample node hasChildren flag:", localTreeData[0].hasChildren);
+  }
 
   return (
     <Stack gap="xs" h={300}>
@@ -568,20 +571,23 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.currentTarget.value)}
       />
-      {isRootLoading ? (
+      {localTreeData.length === 0 ? (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
-          <Loader size="sm" />
+          <Text size="sm" c="dimmed">暂无页面数据</Text>
         </div>
       ) : (
         <div style={{ flex: 1, overflow: "hidden" }}>
           <Tree
-            data={filteredData}
+            data={searchFilteredData}
             width={280}
             height={260}
             indent={12}
             rowHeight={28}
             paddingTop={4}
             paddingBottom={4}
+            disableDrag
+            disableDrop
+            disableEdit
           >
             {(props: NodeRendererProps<SpaceTreeNode>) => (
               <div
@@ -602,36 +608,33 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
                   }}
                   className={styles.treeNodeHover}
                 >
-                  <div
+                  <ActionIcon
+                    size={16}
+                    variant="subtle"
+                    c="gray"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       props.node.toggle();
-                      handleLoadChildren(props.node);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 16,
-                      height: 16,
-                      visibility: props.node.isLeaf ? "hidden" : "visible",
-                      cursor: "pointer"
+                      handleToggle(props.node);
                     }}
                   >
-                    {loadingNodes.has(props.node.id) ? (
-                       <Loader size={10} />
-                    ) : (
-                      <IconChevronRight
-                        size={12}
-                        style={{
-                          transform: props.node.isOpen ? "rotate(90deg)" : "none",
-                          transition: "transform 0.2s"
-                        }}
-                      />
-                    )}
-                  </div>
-                  <span style={{ fontSize: 14 }}>{props.node.data.icon}</span>
-                  <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {loadingChildren.has(props.node.id) ? (
+                      <Loader size={10} />
+                    ) : props.node.isInternal ? (
+                      props.node.children && (props.node.children.length > 0 || props.node.data.hasChildren) ? (
+                        props.node.isOpen ? (
+                          <IconChevronDown stroke={2} size={14} />
+                        ) : (
+                          <IconChevronRight stroke={2} size={14} />
+                        )
+                      ) : (
+                        <IconCircleDot size={6} />
+                      )
+                    ) : null}
+                  </ActionIcon>
+                  <span style={{ fontSize: 14, marginLeft: 4 }}>{props.node.data.icon || "📄"}</span>
+                  <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 4 }}>
                     {props.node.data.name}
                   </span>
                 </div>
@@ -646,6 +649,7 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
 
 function PageCell({ value, onChange, editable, pageId }: CellProps) {
   const navigate = useNavigate();
+  const { spaceSlug } = useParams();
   const [isEditing, setIsEditing] = useState(false);
 
   const pageValue: PageValue | null = useMemo(() => {
@@ -658,10 +662,13 @@ function PageCell({ value, onChange, editable, pageId }: CellProps) {
   }, [value]);
 
   const handleSelect = (node: SpaceTreeNode) => {
+    console.log('[PageCell] Selected node:', node);
     const newValue: PageValue = {
       id: node.id,
+      slugId: node.slugId,
       title: node.name,
-      icon: node.icon
+      icon: node.icon,
+      spaceId: node.spaceId
     };
     onChange(JSON.stringify(newValue));
     setIsEditing(false);
@@ -669,8 +676,10 @@ function PageCell({ value, onChange, editable, pageId }: CellProps) {
 
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (pageValue) {
-      const url = buildPageUrl({ id: pageValue.id, title: pageValue.title });
+    if (pageValue && pageValue.slugId) {
+      console.log('[PageCell] Navigating to page:', pageValue);
+      const url = buildPageUrl(spaceSlug, pageValue.slugId, pageValue.title);
+      console.log('[PageCell] Navigation URL:', url);
       navigate(url);
     }
   };
