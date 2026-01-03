@@ -81,3 +81,93 @@ export const OPTION_COLORS = [
 export function getRandomOptionColor(): string {
   return OPTION_COLORS[Math.floor(Math.random() * OPTION_COLORS.length)];
 }
+
+// ============================================================
+// Filter Types (筛选类型)
+// ============================================================
+export type FilterOperator =
+  | "contains"      // 包含
+  | "notContains"   // 不包含
+  | "equals"        // 等于
+  | "notEquals"     // 不等于
+  | "isEmpty"       // 为空
+  | "isNotEmpty"    // 不为空
+  | "greaterThan"   // 大于
+  | "lessThan"      // 小于
+  | "isChecked"     // 已勾选
+  | "isUnchecked";  // 未勾选
+
+export interface FilterCondition {
+  id: string;
+  columnId: string;
+  operator: FilterOperator;
+  value: string;
+}
+
+export interface FilterOperatorOption {
+  value: FilterOperator;
+  label: string;
+  needsValue: boolean; // 是否需要输入值
+}
+
+// 根据字段类型获取可用的操作符
+export function getOperatorsForFieldType(fieldType: FieldType): FilterOperatorOption[] {
+  const textOperators: FilterOperatorOption[] = [
+    { value: "contains", label: "包含", needsValue: true },
+    { value: "notContains", label: "不包含", needsValue: true },
+    { value: "equals", label: "等于", needsValue: true },
+    { value: "notEquals", label: "不等于", needsValue: true },
+    { value: "isEmpty", label: "为空", needsValue: false },
+    { value: "isNotEmpty", label: "不为空", needsValue: false },
+  ];
+
+  const numberOperators: FilterOperatorOption[] = [
+    { value: "equals", label: "等于", needsValue: true },
+    { value: "notEquals", label: "不等于", needsValue: true },
+    { value: "greaterThan", label: "大于", needsValue: true },
+    { value: "lessThan", label: "小于", needsValue: true },
+    { value: "isEmpty", label: "为空", needsValue: false },
+    { value: "isNotEmpty", label: "不为空", needsValue: false },
+  ];
+
+  const dateOperators: FilterOperatorOption[] = [
+    { value: "equals", label: "等于", needsValue: true },
+    { value: "greaterThan", label: "晚于", needsValue: true },
+    { value: "lessThan", label: "早于", needsValue: true },
+    { value: "isEmpty", label: "为空", needsValue: false },
+    { value: "isNotEmpty", label: "不为空", needsValue: false },
+  ];
+
+  const checkboxOperators: FilterOperatorOption[] = [
+    { value: "isChecked", label: "已勾选", needsValue: false },
+    { value: "isUnchecked", label: "未勾选", needsValue: false },
+  ];
+
+  const selectOperators: FilterOperatorOption[] = [
+    { value: "equals", label: "等于", needsValue: true },
+    { value: "notEquals", label: "不等于", needsValue: true },
+    { value: "isEmpty", label: "为空", needsValue: false },
+    { value: "isNotEmpty", label: "不为空", needsValue: false },
+  ];
+
+  switch (fieldType) {
+    case "text":
+    case "url":
+    case "file":
+    case "page":
+      return textOperators;
+    case "number":
+      return numberOperators;
+    case "date":
+    case "createdTime":
+    case "updatedTime":
+      return dateOperators;
+    case "checkbox":
+      return checkboxOperators;
+    case "select":
+    case "multiSelect":
+      return selectOperators;
+    default:
+      return textOperators;
+  }
+}

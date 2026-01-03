@@ -64,6 +64,8 @@ import {
   IconEraser,
   IconFileDescription,
   IconLayoutSidebarRight,
+  IconFilter,
+  IconSearch,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -98,6 +100,9 @@ import {
   OPTION_COLORS,
   SelectOption,
   getRandomOptionColor,
+  FilterCondition,
+  FilterOperator,
+  getOperatorsForFieldType,
 } from "./constants";
 import styles from "./database-table.module.css";
 
@@ -2282,6 +2287,271 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 }
 
 // ============================================================
+// FilterBar Component - 筛选条件栏
+// ============================================================
+function FilterBar({ 
+  filters, 
+  onFiltersChange, 
+  columns,
+  onClose 
+}: { 
+  filters: FilterCondition[];
+  onFiltersChange: (filters: FilterCondition[]) => void;
+  columns: ColumnData[];
+  onClose: () => void;
+}) {
+  const [addFilterOpen, setAddFilterOpen] = useState(false);
+  const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
+
+  const addFilter = (columnId: string) => {
+    const column = columns.find((c) => c.id === columnId);
+    if (!column) return;
+    
+    const operators = getOperatorsForFieldType(column.type);
+    const defaultOperator = operators[0];
+    
+    const newFilter: FilterCondition = {
+      id: uuid7(),
+      columnId,
+      operator: defaultOperator.value,
+      value: "",
+    };
+    
+    onFiltersChange([...filters, newFilter]);
+    setAddFilterOpen(false);
+    setEditingFilterId(newFilter.id);
+  };
+
+  const updateFilter = (filterId: string, updates: Partial<FilterCondition>) => {
+    onFiltersChange(
+      filters.map((f) => (f.id === filterId ? { ...f, ...updates } : f))
+    );
+  };
+
+  const removeFilter = (filterId: string) => {
+    onFiltersChange(filters.filter((f) => f.id !== filterId));
+    if (editingFilterId === filterId) {
+      setEditingFilterId(null);
+    }
+  };
+
+  const getColumnById = (columnId: string) => columns.find((c) => c.id === columnId);
+  
+  const getOperatorLabel = (operator: FilterOperator, fieldType: FieldType) => {
+    const operators = getOperatorsForFieldType(fieldType);
+    return operators.find((o) => o.value === operator)?.label || operator;
+  };
+
+  const getFieldIcon = (type: FieldType) => {
+    switch (type) {
+      case "text": return <IconAlignLeft size={14} />;
+      case "number": return <IconHash size={14} />;
+      case "select": return <IconList size={14} />;
+      case "multiSelect": return <IconListCheck size={14} />;
+      case "date": return <IconCalendar size={14} />;
+      case "checkbox": return <IconSquareCheck size={14} />;
+      case "url": return <IconLink size={14} />;
+      case "createdTime": 
+      case "updatedTime": return <IconClock size={14} />;
+      default: return <IconAlignLeft size={14} />;
+    }
+  };
+
+  return (
+    <Group gap="xs" wrap="wrap" mb="md" align="center">
+      {/* 已有筛选条件 */}
+      {filters.map((filter) => {
+        const column = getColumnById(filter.columnId);
+        if (!column) return null;
+        
+        const operators = getOperatorsForFieldType(column.type);
+        const currentOperator = operators.find((o) => o.value === filter.operator);
+        
+        return (
+          <Popover
+            key={filter.id}
+            opened={editingFilterId === filter.id}
+            onClose={() => setEditingFilterId(null)}
+            position="bottom-start"
+            withinPortal
+            width={320}
+            trapFocus
+            shadow="md"
+            radius="md"
+          >
+            <Popover.Target>
+              <div
+                onClick={() => setEditingFilterId(editingFilterId === filter.id ? null : filter.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  border: `1px solid ${editingFilterId === filter.id ? "var(--mantine-color-blue-5)" : "var(--mantine-color-gray-3)"}`,
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  transition: "all 0.2s ease",
+                  color: "var(--mantine-color-gray-7)",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", opacity: 0.7 }}>
+                  {getFieldIcon(column.type)}
+                </span>
+                <span style={{ fontWeight: 500 }}>{column.name}</span>
+                
+                {/* 显示操作符或值 */}
+                <span style={{ color: "var(--mantine-color-gray-6)" }}>
+                  {currentOperator?.needsValue && filter.value 
+                    ? `: ${filter.value}` 
+                    : ` ${getOperatorLabel(filter.operator, column.type)}`}
+                </span>
+                
+                <IconChevronDown size={12} style={{ opacity: 0.5, marginLeft: 2 }} />
+              </div>
+            </Popover.Target>
+            <Popover.Dropdown p="sm">
+              <Stack gap="sm">
+                {/* 第一行：列选择 + 操作符 + 删除 */}
+                <Group gap="xs" wrap="nowrap">
+                  <Select
+                    size="xs"
+                    value={filter.columnId}
+                    onChange={(value) => {
+                      if (value) {
+                        const newColumn = columns.find((c) => c.id === value);
+                        if (newColumn) {
+                          const newOperators = getOperatorsForFieldType(newColumn.type);
+                          updateFilter(filter.id, { 
+                            columnId: value,
+                            operator: newOperators[0].value,
+                            value: ""
+                          });
+                        }
+                      }
+                    }}
+                    data={columns.map((c) => ({ 
+                      value: c.id, 
+                      label: c.name,
+                    }))}
+                    leftSection={getFieldIcon(column.type)}
+                    styles={{ input: { fontWeight: 500 } }}
+                    allowDeselect={false}
+                    style={{ flex: 1 }}
+                  />
+                  
+                  <Select
+                    size="xs"
+                    value={filter.operator}
+                    onChange={(value) => {
+                      if (value) {
+                        updateFilter(filter.id, { operator: value as FilterOperator });
+                      }
+                    }}
+                    data={operators.map((o) => ({ value: o.value, label: o.label }))}
+                    allowDeselect={false}
+                    style={{ width: 100 }}
+                  />
+                  
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={() => removeFilter(filter.id)}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Group>
+                
+                {/* 第二行：值输入 */}
+                {currentOperator?.needsValue && (
+                  <TextInput
+                    size="sm"
+                    value={filter.value}
+                    onChange={(e) => updateFilter(filter.id, { value: e.currentTarget.value })}
+                    placeholder="输入值..."
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setEditingFilterId(null);
+                      }
+                    }}
+                  />
+                )}
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+        );
+      })}
+
+      {/* 添加筛选按钮 */}
+      <Popover 
+        opened={addFilterOpen} 
+        onChange={setAddFilterOpen}
+        position="bottom-start"
+        withinPortal
+        width={200}
+        shadow="sm"
+      >
+        <Popover.Target>
+          <Button
+            variant="subtle"
+            color="gray"
+            size="xs"
+            leftSection={<IconPlus size={14} />}
+            onClick={() => setAddFilterOpen(true)}
+            styles={{ 
+              root: { 
+                fontWeight: 400,
+                color: "var(--mantine-color-gray-6)",
+                "&:hover": {
+                  backgroundColor: "var(--mantine-color-gray-1)",
+                  color: "var(--mantine-color-gray-8)"
+                }
+              } 
+            }}
+          >
+            添加筛选
+          </Button>
+        </Popover.Target>
+        <Popover.Dropdown p={4}>
+          <Stack gap={2}>
+            <Text size="xs" c="dimmed" px="xs" py={4} fw={500}>选择列</Text>
+            <ScrollArea.Autosize mah={200}>
+              {columns.map((col) => (
+                <Button
+                  key={col.id}
+                  variant="subtle"
+                  color="gray"
+                  justify="flex-start"
+                  size="xs"
+                  fullWidth
+                  leftSection={getFieldIcon(col.type)}
+                  onClick={() => addFilter(col.id)}
+                  styles={{
+                    root: {
+                      fontWeight: 400,
+                      color: "var(--mantine-color-gray-7)"
+                    },
+                    inner: {
+                      justifyContent: "flex-start"
+                    }
+                  }}
+                >
+                  {col.name}
+                </Button>
+              ))}
+            </ScrollArea.Autosize>
+          </Stack>
+        </Popover.Dropdown>
+      </Popover>
+    </Group>
+  );
+}
+
+
+// ============================================================
 function DatabaseTitle({ title, onChange, editable, onDelete }: { 
   title: string, 
   onChange: (val: string) => void, 
@@ -2457,6 +2727,11 @@ export default function DatabaseRefView(props: NodeViewProps) {
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [resizingColumnId, setResizingColumnId] = useState<string | null>(null);
   const [previewPageId, setPreviewPageId] = useState<string | null>(null);
+  
+  // 筛选状态
+  const [showFilterBar, setShowFilterBar] = useState(false);
+  const [filters, setFilters] = useState<FilterCondition[]>([]);
+  
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
@@ -2550,6 +2825,72 @@ export default function DatabaseRefView(props: NodeViewProps) {
     void version;
     return readRows(ydoc);
   }, [ydoc, version]);
+
+  // 根据筛选条件过滤行
+  const filteredRows = useMemo(() => {
+    if (filters.length === 0) return rows;
+    
+    return rows.filter((row) => {
+      // AND 逻辑：所有条件都必须满足
+      return filters.every((filter) => {
+        const column = columns.find((c) => c.id === filter.columnId);
+        if (!column) return true; // 如果列不存在，跳过该筛选条件
+        
+        const cellValue = row.cells.get(filter.columnId);
+        const filterValue = filter.value;
+        
+        // 根据列类型和操作符进行筛选
+        switch (filter.operator) {
+          case "isEmpty":
+            return cellValue === undefined || cellValue === null || cellValue === "";
+          case "isNotEmpty":
+            return cellValue !== undefined && cellValue !== null && cellValue !== "";
+          case "isChecked":
+            return cellValue === true;
+          case "isUnchecked":
+            return cellValue !== true;
+          case "contains":
+            return String(cellValue || "").toLowerCase().includes(filterValue.toLowerCase());
+          case "notContains":
+            return !String(cellValue || "").toLowerCase().includes(filterValue.toLowerCase());
+          case "equals":
+            if (column.type === "number") {
+              return Number(cellValue) === Number(filterValue);
+            }
+            return String(cellValue || "").toLowerCase() === filterValue.toLowerCase();
+          case "notEquals":
+            if (column.type === "number") {
+              return Number(cellValue) !== Number(filterValue);
+            }
+            return String(cellValue || "").toLowerCase() !== filterValue.toLowerCase();
+          case "greaterThan":
+            if (column.type === "number") {
+              return Number(cellValue) > Number(filterValue);
+            }
+            // 日期比较
+            if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
+              const cellDate = column.type === "date" ? new Date(cellValue) : new Date(row.createdAt);
+              const filterDate = new Date(filterValue);
+              return cellDate > filterDate;
+            }
+            return false;
+          case "lessThan":
+            if (column.type === "number") {
+              return Number(cellValue) < Number(filterValue);
+            }
+            // 日期比较
+            if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
+              const cellDate = column.type === "date" ? new Date(cellValue) : new Date(row.updatedAt);
+              const filterDate = new Date(filterValue);
+              return cellDate < filterDate;
+            }
+            return false;
+          default:
+            return true;
+        }
+      });
+    });
+  }, [rows, filters, columns]);
 
   const title = infoQuery.data?.data?.database?.title ?? "未命名数据库";
   const isEditable = editor.isEditable;
@@ -2781,7 +3122,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
   }, [columns, columnHelper, setCellValue, isEditable, updateColumnOptions, pageId]);
 
   const table = useReactTable({
-    data: rows,
+    data: filteredRows,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
   });
@@ -2818,7 +3159,30 @@ export default function DatabaseRefView(props: NodeViewProps) {
               </Group>
             )}
           </Group>
+          
+          {/* 工具栏 */}
+          <Group gap="xs">
+            <ActionIcon
+              variant={showFilterBar || filters.length > 0 ? "filled" : "subtle"}
+              color={showFilterBar || filters.length > 0 ? "blue" : "gray"}
+              size="sm"
+              onClick={() => setShowFilterBar(!showFilterBar)}
+              title="筛选"
+            >
+              <IconFilter size={16} />
+            </ActionIcon>
+          </Group>
         </Group>
+
+        {/* Filter Bar */}
+        {showFilterBar && (
+          <FilterBar
+            filters={filters}
+            onFiltersChange={setFilters}
+            columns={columns}
+            onClose={() => setShowFilterBar(false)}
+          />
+        )}
 
         {/* Table */}
         <div className={styles.tableContainer}>
@@ -2969,6 +3333,14 @@ export default function DatabaseRefView(props: NodeViewProps) {
             </div>
           </div>
         </div>
+        
+        {/* 底部统计 */}
+        <Group justify="center" py="xs">
+          <Text size="xs" c="dimmed">
+            COUNT {filteredRows.length}
+            {filters.length > 0 && ` (共 ${rows.length} 条)`}
+          </Text>
+        </Group>
       </Stack>
       <PagePreviewDrawer 
         pageId={previewPageId} 
