@@ -171,3 +171,19 @@ export function getOperatorsForFieldType(fieldType: FieldType): FilterOperatorOp
       return textOperators;
   }
 }
+
+// ============================================================
+// Sort Types (排序类型)
+// ============================================================
+export type SortDirection = "asc" | "desc";
+
+export interface SortCondition {
+  id: string;
+  columnId: string;
+  direction: SortDirection;
+}
+
+export const SORT_DIRECTIONS: Array<{ value: SortDirection; label: string }> = [
+  { value: "asc", label: "升序" },
+  { value: "desc", label: "降序" },
+];

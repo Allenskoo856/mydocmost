@@ -66,6 +66,7 @@ import {
   IconLayoutSidebarRight,
   IconFilter,
   IconSearch,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -103,6 +104,9 @@ import {
   FilterCondition,
   FilterOperator,
   getOperatorsForFieldType,
+  SortCondition,
+  SortDirection,
+  SORT_DIRECTIONS,
 } from "./constants";
 import styles from "./database-table.module.css";
 
@@ -2550,6 +2554,226 @@ function FilterBar({
   );
 }
 
+// SortBar Component - 排序条件栏
+// ============================================================
+function SortBar({ 
+  sorts, 
+  onSortsChange, 
+  columns,
+  onClose 
+}: { 
+  sorts: SortCondition[];
+  onSortsChange: (sorts: SortCondition[]) => void;
+  columns: ColumnData[];
+  onClose: () => void;
+}) {
+  const [addSortOpen, setAddSortOpen] = useState(false);
+  const [editingSortId, setEditingSortId] = useState<string | null>(null);
+
+  const addSort = (columnId: string) => {
+    const newSort: SortCondition = {
+      id: uuid7(),
+      columnId,
+      direction: "asc",
+    };
+    
+    onSortsChange([...sorts, newSort]);
+    setAddSortOpen(false);
+    setEditingSortId(newSort.id);
+  };
+
+  const updateSort = (sortId: string, updates: Partial<SortCondition>) => {
+    onSortsChange(
+      sorts.map((s) => (s.id === sortId ? { ...s, ...updates } : s))
+    );
+  };
+
+  const removeSort = (sortId: string) => {
+    onSortsChange(sorts.filter((s) => s.id !== sortId));
+    if (editingSortId === sortId) {
+      setEditingSortId(null);
+    }
+  };
+
+  const getColumnById = (columnId: string) => columns.find((c) => c.id === columnId);
+  
+  const getFieldIcon = (type: FieldType) => {
+    switch (type) {
+      case "text": return <IconAlignLeft size={14} />;
+      case "number": return <IconHash size={14} />;
+      case "select": return <IconList size={14} />;
+      case "multiSelect": return <IconListCheck size={14} />;
+      case "date": return <IconCalendar size={14} />;
+      case "checkbox": return <IconSquareCheck size={14} />;
+      case "url": return <IconLink size={14} />;
+      case "createdTime": 
+      case "updatedTime": return <IconClock size={14} />;
+      default: return <IconAlignLeft size={14} />;
+    }
+  };
+
+  return (
+    <Group gap="xs" wrap="wrap" mb="md" align="center">
+      {/* 已有排序条件 */}
+      {sorts.map((sort) => {
+        const column = getColumnById(sort.columnId);
+        if (!column) return null;
+        
+        return (
+          <Popover
+            key={sort.id}
+            opened={editingSortId === sort.id}
+            onClose={() => setEditingSortId(null)}
+            position="bottom-start"
+            withinPortal
+            width={320}
+            trapFocus
+            shadow="md"
+            radius="md"
+          >
+            <Popover.Target>
+              <div
+                onClick={() => setEditingSortId(editingSortId === sort.id ? null : sort.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  border: `1px solid ${editingSortId === sort.id ? "var(--mantine-color-blue-5)" : "var(--mantine-color-gray-3)"}`,
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  transition: "all 0.2s ease",
+                  color: "var(--mantine-color-gray-7)",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", opacity: 0.7 }}>
+                  {getFieldIcon(column.type)}
+                </span>
+                <span style={{ fontWeight: 500 }}>{column.name}</span>
+                
+                <span style={{ color: "var(--mantine-color-gray-6)" }}>
+                  : {sort.direction === "asc" ? "升序" : "降序"}
+                </span>
+                
+                <IconChevronDown size={12} style={{ opacity: 0.5, marginLeft: 2 }} />
+              </div>
+            </Popover.Target>
+            <Popover.Dropdown p="sm">
+              <Stack gap="sm">
+                <Group gap="xs" wrap="nowrap">
+                  <Select
+                    size="xs"
+                    value={sort.columnId}
+                    onChange={(value) => {
+                      if (value) {
+                        updateSort(sort.id, { columnId: value });
+                      }
+                    }}
+                    data={columns.map((c) => ({ 
+                      value: c.id, 
+                      label: c.name,
+                    }))}
+                    leftSection={getFieldIcon(column.type)}
+                    styles={{ input: { fontWeight: 500 } }}
+                    allowDeselect={false}
+                    style={{ flex: 1 }}
+                  />
+                  
+                  <Select
+                    size="xs"
+                    value={sort.direction}
+                    onChange={(value) => {
+                      if (value) {
+                        updateSort(sort.id, { direction: value as SortDirection });
+                      }
+                    }}
+                    data={SORT_DIRECTIONS}
+                    allowDeselect={false}
+                    style={{ width: 100 }}
+                  />
+                  
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={() => removeSort(sort.id)}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Group>
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+        );
+      })}
+
+      {/* 添加排序按钮 */}
+      <Popover 
+        opened={addSortOpen} 
+        onChange={setAddSortOpen}
+        position="bottom-start"
+        withinPortal
+        width={200}
+        shadow="sm"
+      >
+        <Popover.Target>
+          <Button
+            variant="subtle"
+            color="gray"
+            size="xs"
+            leftSection={<IconPlus size={14} />}
+            onClick={() => setAddSortOpen(true)}
+            styles={{ 
+              root: { 
+                fontWeight: 400,
+                color: "var(--mantine-color-gray-6)",
+                "&:hover": {
+                  backgroundColor: "var(--mantine-color-gray-1)",
+                  color: "var(--mantine-color-gray-8)"
+                }
+              } 
+            }}
+          >
+            添加排序
+          </Button>
+        </Popover.Target>
+        <Popover.Dropdown p={4}>
+          <Stack gap={2}>
+            <Text size="xs" c="dimmed" px="xs" py={4} fw={500}>选择列</Text>
+            <ScrollArea.Autosize mah={200}>
+              {columns.map((col) => (
+                <Button
+                  key={col.id}
+                  variant="subtle"
+                  color="gray"
+                  justify="flex-start"
+                  size="xs"
+                  fullWidth
+                  leftSection={getFieldIcon(col.type)}
+                  onClick={() => addSort(col.id)}
+                  styles={{
+                    root: {
+                      fontWeight: 400,
+                      color: "var(--mantine-color-gray-7)"
+                    },
+                    inner: {
+                      justifyContent: "flex-start"
+                    }
+                  }}
+                >
+                  {col.name}
+                </Button>
+              ))}
+            </ScrollArea.Autosize>
+          </Stack>
+        </Popover.Dropdown>
+      </Popover>
+    </Group>
+  );
+}
+
 
 // ============================================================
 function DatabaseTitle({ title, onChange, editable, onDelete }: { 
@@ -2732,6 +2956,10 @@ export default function DatabaseRefView(props: NodeViewProps) {
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [filters, setFilters] = useState<FilterCondition[]>([]);
   
+  // 排序状态
+  const [showSortBar, setShowSortBar] = useState(false);
+  const [sorts, setSorts] = useState<SortCondition[]>([]);
+  
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
@@ -2826,71 +3054,122 @@ export default function DatabaseRefView(props: NodeViewProps) {
     return readRows(ydoc);
   }, [ydoc, version]);
 
-  // 根据筛选条件过滤行
-  const filteredRows = useMemo(() => {
-    if (filters.length === 0) return rows;
-    
-    return rows.filter((row) => {
-      // AND 逻辑：所有条件都必须满足
-      return filters.every((filter) => {
-        const column = columns.find((c) => c.id === filter.columnId);
-        if (!column) return true; // 如果列不存在，跳过该筛选条件
-        
-        const cellValue = row.cells.get(filter.columnId);
-        const filterValue = filter.value;
-        
-        // 根据列类型和操作符进行筛选
-        switch (filter.operator) {
-          case "isEmpty":
-            return cellValue === undefined || cellValue === null || cellValue === "";
-          case "isNotEmpty":
-            return cellValue !== undefined && cellValue !== null && cellValue !== "";
-          case "isChecked":
-            return cellValue === true;
-          case "isUnchecked":
-            return cellValue !== true;
-          case "contains":
-            return String(cellValue || "").toLowerCase().includes(filterValue.toLowerCase());
-          case "notContains":
-            return !String(cellValue || "").toLowerCase().includes(filterValue.toLowerCase());
-          case "equals":
-            if (column.type === "number") {
-              return Number(cellValue) === Number(filterValue);
-            }
-            return String(cellValue || "").toLowerCase() === filterValue.toLowerCase();
-          case "notEquals":
-            if (column.type === "number") {
-              return Number(cellValue) !== Number(filterValue);
-            }
-            return String(cellValue || "").toLowerCase() !== filterValue.toLowerCase();
-          case "greaterThan":
-            if (column.type === "number") {
-              return Number(cellValue) > Number(filterValue);
-            }
-            // 日期比较
-            if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
-              const cellDate = column.type === "date" ? new Date(cellValue) : new Date(row.createdAt);
-              const filterDate = new Date(filterValue);
-              return cellDate > filterDate;
-            }
-            return false;
-          case "lessThan":
-            if (column.type === "number") {
-              return Number(cellValue) < Number(filterValue);
-            }
-            // 日期比较
-            if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
-              const cellDate = column.type === "date" ? new Date(cellValue) : new Date(row.updatedAt);
-              const filterDate = new Date(filterValue);
-              return cellDate < filterDate;
-            }
-            return false;
-          default:
-            return true;
-        }
+  // 根据筛选和排序条件处理行
+  const processedRows = useMemo(() => {
+    let result = [...rows];
+
+    // 1. 筛选
+    if (filters.length > 0) {
+      result = result.filter((row) => {
+        // AND 逻辑：所有条件都必须满足
+        return filters.every((filter) => {
+          const column = columns.find((c) => c.id === filter.columnId);
+          if (!column) return true; // 如果列不存在，跳过该筛选条件
+          
+          const cellValue = row.cells.get(filter.columnId);
+          const filterValue = filter.value;
+          
+          // 根据列类型和操作符进行筛选
+          switch (filter.operator) {
+            case "isEmpty":
+              return cellValue === undefined || cellValue === null || cellValue === "";
+            case "isNotEmpty":
+              return cellValue !== undefined && cellValue !== null && cellValue !== "";
+            case "isChecked":
+              return cellValue === true;
+            case "isUnchecked":
+              return cellValue !== true;
+            case "contains":
+              return String(cellValue || "").toLowerCase().includes(filterValue.toLowerCase());
+            case "notContains":
+              return !String(cellValue || "").toLowerCase().includes(filterValue.toLowerCase());
+            case "equals":
+              if (column.type === "number") {
+                return Number(cellValue) === Number(filterValue);
+              }
+              return String(cellValue || "").toLowerCase() === filterValue.toLowerCase();
+            case "notEquals":
+              if (column.type === "number") {
+                return Number(cellValue) !== Number(filterValue);
+              }
+              return String(cellValue || "").toLowerCase() !== filterValue.toLowerCase();
+            case "greaterThan":
+              if (column.type === "number") {
+                return Number(cellValue) > Number(filterValue);
+              }
+              // 日期比较
+              if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
+                const cellDate = column.type === "date" ? new Date(cellValue) : new Date(row.createdAt);
+                const filterDate = new Date(filterValue);
+                return cellDate > filterDate;
+              }
+              return false;
+            case "lessThan":
+              if (column.type === "number") {
+                return Number(cellValue) < Number(filterValue);
+              }
+              // 日期比较
+              if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
+                const cellDate = column.type === "date" ? new Date(cellValue) : new Date(row.updatedAt);
+                const filterDate = new Date(filterValue);
+                return cellDate < filterDate;
+              }
+              return false;
+            default:
+              return true;
+          }
+        });
       });
-    });
-  }, [rows, filters, columns]);
+    }
+
+    // 2. 排序
+    if (sorts.length > 0) {
+      result.sort((a, b) => {
+        for (const sort of sorts) {
+          const column = columns.find((c) => c.id === sort.columnId);
+          if (!column) continue;
+
+          let valA = a.cells.get(sort.columnId);
+          let valB = b.cells.get(sort.columnId);
+
+          // 特殊字段处理
+          if (column.type === "createdTime") {
+            valA = a.createdAt;
+            valB = b.createdAt;
+          } else if (column.type === "updatedTime") {
+            valA = a.updatedAt;
+            valB = b.updatedAt;
+          }
+
+          // 空值处理：空值排在最后
+          if (valA === undefined || valA === null || valA === "") {
+            if (valB === undefined || valB === null || valB === "") continue;
+            return 1;
+          }
+          if (valB === undefined || valB === null || valB === "") return -1;
+
+          // 比较逻辑
+          let comparison = 0;
+          if (column.type === "number") {
+            comparison = Number(valA) - Number(valB);
+          } else if (column.type === "date" || column.type === "createdTime" || column.type === "updatedTime") {
+            comparison = new Date(valA).getTime() - new Date(valB).getTime();
+          } else if (column.type === "checkbox") {
+            comparison = (valA === true ? 1 : 0) - (valB === true ? 1 : 0);
+          } else {
+            comparison = String(valA).localeCompare(String(valB));
+          }
+
+          if (comparison !== 0) {
+            return sort.direction === "asc" ? comparison : -comparison;
+          }
+        }
+        return 0;
+      });
+    }
+
+    return result;
+  }, [rows, filters, sorts, columns]);
 
   const title = infoQuery.data?.data?.database?.title ?? "未命名数据库";
   const isEditable = editor.isEditable;
@@ -3122,7 +3401,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
   }, [columns, columnHelper, setCellValue, isEditable, updateColumnOptions, pageId]);
 
   const table = useReactTable({
-    data: filteredRows,
+    data: processedRows,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
   });
@@ -3171,6 +3450,15 @@ export default function DatabaseRefView(props: NodeViewProps) {
             >
               <IconFilter size={16} />
             </ActionIcon>
+            <ActionIcon
+              variant={showSortBar || sorts.length > 0 ? "filled" : "subtle"}
+              color={showSortBar || sorts.length > 0 ? "blue" : "gray"}
+              size="sm"
+              onClick={() => setShowSortBar(!showSortBar)}
+              title="排序"
+            >
+              <IconArrowsSort size={16} />
+            </ActionIcon>
           </Group>
         </Group>
 
@@ -3181,6 +3469,16 @@ export default function DatabaseRefView(props: NodeViewProps) {
             onFiltersChange={setFilters}
             columns={columns}
             onClose={() => setShowFilterBar(false)}
+          />
+        )}
+
+        {/* Sort Bar */}
+        {showSortBar && (
+          <SortBar
+            sorts={sorts}
+            onSortsChange={setSorts}
+            columns={columns}
+            onClose={() => setShowSortBar(false)}
           />
         )}
 
@@ -3337,8 +3635,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
         {/* 底部统计 */}
         <Group justify="center" py="xs">
           <Text size="xs" c="dimmed">
-            COUNT {filteredRows.length}
-            {filters.length > 0 && ` (共 ${rows.length} 条)`}
+            COUNT {processedRows.length}
+            {(filters.length > 0 || sorts.length > 0) && ` (共 ${rows.length} 条)`}
           </Text>
         </Group>
       </Stack>
