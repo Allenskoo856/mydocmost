@@ -34,7 +34,11 @@ export type FieldType =
   | "date"
   | "select"
   | "multiSelect"
-  | "checkbox";
+  | "checkbox"
+  | "url"
+  | "file"
+  | "createdTime"
+  | "updatedTime";
 
 export const FIELD_TYPE_OPTIONS: Array<{ value: FieldType; label: string }> = [
   { value: "text", label: "文本" },
@@ -43,6 +47,10 @@ export const FIELD_TYPE_OPTIONS: Array<{ value: FieldType; label: string }> = [
   { value: "select", label: "单选" },
   { value: "multiSelect", label: "多选" },
   { value: "checkbox", label: "复选" },
+  { value: "url", label: "链接" },
+  { value: "file", label: "文件" },
+  { value: "createdTime", label: "创建时间" },
+  { value: "updatedTime", label: "修改时间" },
 ];
 
 // ============================================================

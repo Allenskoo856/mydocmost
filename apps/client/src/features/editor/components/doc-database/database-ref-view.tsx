@@ -49,6 +49,8 @@ import {
   IconSparkles,
   IconSelect,
   IconDatabase,
+  IconDots,
+  IconX,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -91,6 +93,8 @@ interface ColumnData {
 interface RowData {
   id: string;
   cells: Y.Map<any>;
+  createdAt: number;
+  updatedAt: number;
   ymap: Y.Map<any>;
 }
 
@@ -117,6 +121,8 @@ function ensureInitialized(doc: Y.Doc) {
       const row = new Y.Map<any>();
       row.set("id", uuid7());
       row.set("cells", new Y.Map());
+      row.set("createdAt", Date.now());
+      row.set("updatedAt", Date.now());
       rows.push([row]);
     });
   }
@@ -130,8 +136,9 @@ function readColumns(doc: Y.Doc): ColumnData[] {
     type: (c.get("type") as FieldType) ?? "text",
     width: Number(c.get("width")) || GridSize.defaultColumnWidth,
     options: c.get("options") as SelectOption[] | undefined,
+    hidden: Boolean(c.get("hidden")),
     ymap: c,
-  }));
+  })).filter(c => !c.hidden);
 }
 
 function readRows(doc: Y.Doc): RowData[] {
@@ -141,6 +148,8 @@ function readRows(doc: Y.Doc): RowData[] {
     return {
       id: String(r.get("id")),
       cells: cells ?? new Y.Map<any>(),
+      createdAt: Number(r.get("createdAt")) || Date.now(),
+      updatedAt: Number(r.get("updatedAt")) || Date.now(),
       ymap: r,
     };
   });
@@ -155,6 +164,167 @@ interface CellProps {
   editable: boolean;
   column: ColumnData;
   onUpdateOptions?: (options: SelectOption[]) => void;
+  row?: RowData;
+}
+
+function UrlCell({ value, onChange, editable }: CellProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValue, setLocalValue] = useState(value ?? "");
+
+  useEffect(() => {
+    setLocalValue(value ?? "");
+  }, [value]);
+
+  if (!isEditing) {
+    return (
+      <div
+        onClick={() => editable && setIsEditing(true)}
+        style={{
+          cursor: editable ? "text" : "default",
+          minHeight: 24,
+          whiteSpace: "normal",
+          wordBreak: "break-all",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 4,
+        }}
+      >
+        {localValue ? (
+          <>
+            <IconLink size={14} style={{ flexShrink: 0, opacity: 0.5, marginTop: 3 }} />
+            <a 
+              href={localValue} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "var(--mantine-color-blue-6)", textDecoration: "underline" }}
+            >
+              {localValue}
+            </a>
+          </>
+        ) : (
+          editable && <span className={styles.selectPlaceholder}>点击添加链接</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <TextInput
+      value={localValue}
+      onChange={(e) => setLocalValue(e.currentTarget.value)}
+      onBlur={() => {
+        onChange(localValue);
+        setIsEditing(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          onChange(localValue);
+          setIsEditing(false);
+        }
+        if (e.key === "Escape") {
+          setLocalValue(value ?? "");
+          setIsEditing(false);
+        }
+      }}
+      autoFocus
+      size="xs"
+      variant="unstyled"
+      styles={{ input: { padding: 0, height: 24, minHeight: 24 } }}
+      placeholder="输入链接..."
+    />
+  );
+}
+
+function FileCell({ value, onChange, editable }: CellProps) {
+  // 简化实现：作为链接处理，但显示文件图标
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValue, setLocalValue] = useState(value ?? "");
+
+  useEffect(() => {
+    setLocalValue(value ?? "");
+  }, [value]);
+
+  if (!isEditing) {
+    return (
+      <div
+        onClick={() => editable && setIsEditing(true)}
+        style={{
+          cursor: editable ? "text" : "default",
+          minHeight: 24,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        {localValue ? (
+          <>
+            <IconPaperclip size={14} style={{ flexShrink: 0, opacity: 0.5 }} />
+            <a 
+              href={localValue} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "var(--mantine-color-text)", textDecoration: "none" }}
+            >
+              {localValue}
+            </a>
+          </>
+        ) : (
+          editable && <span className={styles.selectPlaceholder}>点击添加文件链接</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <TextInput
+      value={localValue}
+      onChange={(e) => setLocalValue(e.currentTarget.value)}
+      onBlur={() => {
+        onChange(localValue);
+        setIsEditing(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          onChange(localValue);
+          setIsEditing(false);
+        }
+        if (e.key === "Escape") {
+          setLocalValue(value ?? "");
+          setIsEditing(false);
+        }
+      }}
+      autoFocus
+      size="xs"
+      variant="unstyled"
+      styles={{ input: { padding: 0, height: 24, minHeight: 24 } }}
+      placeholder="输入文件链接..."
+    />
+  );
+}
+
+function CreatedTimeCell({ row }: CellProps) {
+  if (!row) return null;
+  const date = new Date(row.createdAt);
+  return (
+    <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
+      {date.toLocaleString()}
+    </div>
+  );
+}
+
+function UpdatedTimeCell({ row }: CellProps) {
+  if (!row) return null;
+  const date = new Date(row.updatedAt);
+  return (
+    <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
+      {date.toLocaleString()}
+    </div>
+  );
 }
 
 function TextCell({ value, onChange, editable }: CellProps) {
@@ -557,82 +727,291 @@ function SelectCell({ value, onChange, editable, column, onUpdateOptions }: Cell
 }
 
 function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }: CellProps) {
-  const [isManaging, setIsManaging] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
+  
   const options = column.options ?? [];
   const selectedIds: string[] = Array.isArray(value) ? value : [];
   const selectedOptions = options.filter((o) => selectedIds.includes(o.id));
 
-  const selectData = options.map((o) => ({ value: o.id, label: o.label }));
+  // Filter options based on search
+  const filteredOptions = options.filter(o => 
+    o.label.toLowerCase().includes(search.toLowerCase())
+  );
+  
+  const exactMatch = options.find(o => o.label.toLowerCase() === search.trim().toLowerCase());
 
-  const handleChange = (ids: string[]) => {
-    onChange(ids);
+  const handleToggle = (optionId: string) => {
+    const newIds = selectedIds.includes(optionId)
+      ? selectedIds.filter(id => id !== optionId)
+      : [...selectedIds, optionId];
+    onChange(newIds);
+    // Keep search focus and maybe clear search? Notion keeps search.
+    // setSearch(""); 
   };
 
-  const handleUpdateOptions = (newOptions: SelectOption[]) => {
+  const handleCreate = () => {
+    if (!search.trim()) return;
+    if (exactMatch) {
+      if (!selectedIds.includes(exactMatch.id)) {
+        handleToggle(exactMatch.id);
+      }
+      setSearch("");
+      return;
+    }
+    
+    const newOption: SelectOption = {
+      id: uuid7(),
+      label: search.trim(),
+      color: getRandomOptionColor(),
+    };
+    onUpdateOptions?.([...options, newOption]);
+    onChange([...selectedIds, newOption.id]);
+    setSearch("");
+  };
+
+  const handleUpdateOptionLabel = (id: string, newLabel: string) => {
+    const newOptions = options.map(o => o.id === id ? { ...o, label: newLabel } : o);
+    onUpdateOptions?.(newOptions);
+    setEditingOptionId(null);
+  };
+
+  const handleUpdateOptionColor = (id: string, newColor: string) => {
+    const newOptions = options.map(o => o.id === id ? { ...o, color: newColor } : o);
     onUpdateOptions?.(newOptions);
   };
 
-  if (!editable) {
-    return (
-      <div className={styles.selectTags}>
-        {selectedOptions.map((opt) => (
-          <span
-            key={opt.id}
-            className={styles.selectTag}
-            style={{ backgroundColor: opt.color }}
-          >
-            {opt.label}
-          </span>
-        ))}
-      </div>
-    );
-  }
+  const handleDeleteOption = (id: string) => {
+    const newOptions = options.filter(o => o.id !== id);
+    onUpdateOptions?.(newOptions);
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(sid => sid !== id));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreate();
+    }
+    if (e.key === "Backspace" && search === "" && selectedIds.length > 0) {
+      // Remove last selected tag
+      const newIds = selectedIds.slice(0, -1);
+      onChange(newIds);
+    }
+  };
 
   return (
-    <Stack gap={4}>
-      <MultiSelect
-        data={selectData}
-        value={selectedIds}
-        onChange={handleChange}
-        placeholder="选择..."
-        searchable
-        size="xs"
-        styles={{
-          input: {
-            border: "none",
-            background: "transparent",
-            minHeight: 28,
-          },
-        }}
-      />
-      {isManaging ? (
-        <Stack gap={4}>
-          <div className={styles.optionSectionHeader}>
-            <span style={{ fontSize: 12 }}>管理选项</span>
-            <ActionIcon
-              size="xs"
-              variant="subtle"
-              onClick={() => setIsManaging(false)}
-            >
-              <IconCheck size={12} />
-            </ActionIcon>
-          </div>
-          <OptionsManager
-            options={options}
-            onUpdateOptions={handleUpdateOptions}
-          />
-        </Stack>
-      ) : (
+    <Popover 
+      opened={opened && editable} 
+      onChange={setOpened} 
+      position="bottom-start" 
+      withinPortal
+      width={260}
+      trapFocus
+    >
+      <Popover.Target>
         <div
-          className={styles.optionItem}
-          onClick={() => setIsManaging(true)}
-          style={{ color: "var(--mantine-color-blue-6)", fontSize: 12 }}
+          className={styles.selectTags}
+          onClick={() => editable && setOpened(true)}
+          style={{ minHeight: 28, cursor: editable ? "pointer" : "default" }}
         >
-          <IconPencil size={12} />
-          <span>管理选项</span>
+          {selectedOptions.length > 0 ? (
+            selectedOptions.map((opt) => (
+              <span
+                key={opt.id}
+                className={styles.selectTag}
+                style={{ backgroundColor: opt.color }}
+              >
+                {opt.label}
+              </span>
+            ))
+          ) : (
+            editable && <span className={styles.selectPlaceholder}>选择...</span>
+          )}
         </div>
-      )}
-    </Stack>
+      </Popover.Target>
+      <Popover.Dropdown p="xs">
+        <Stack gap="xs">
+          {/* Search & Selected Tags Input Area */}
+          <div 
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 4,
+              padding: 4,
+              border: "1px solid var(--mantine-color-blue-5)",
+              borderRadius: 4,
+              minHeight: 32,
+              alignItems: "center"
+            }}
+          >
+            {selectedOptions.map(opt => (
+              <Badge 
+                key={opt.id} 
+                variant="filled" 
+                color={opt.color}
+                size="sm"
+                radius="sm"
+                rightSection={
+                  <IconX 
+                    size={10} 
+                    style={{ cursor: "pointer", marginTop: 2 }} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggle(opt.id);
+                    }}
+                  />
+                }
+                styles={{
+                  root: { 
+                    backgroundColor: opt.color, 
+                    color: "var(--mantine-color-text)",
+                    textTransform: "none",
+                    fontWeight: 500,
+                    height: 22
+                  }
+                }}
+              >
+                {opt.label}
+              </Badge>
+            ))}
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={selectedOptions.length === 0 ? "搜索或创建..." : ""}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: 13,
+                flex: 1,
+                minWidth: 60,
+                color: "var(--mantine-color-text)"
+              }}
+            />
+          </div>
+
+          <Text size="xs" c="dimmed" fw={500}>选择或新建一个标签</Text>
+
+          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            <Stack gap={2}>
+              {filteredOptions.map((opt) => {
+                const isSelected = selectedIds.includes(opt.id);
+                const isEditing = editingOptionId === opt.id;
+
+                if (isEditing) {
+                  return (
+                    <div key={opt.id} className={styles.optionEditRow}>
+                      <TextInput
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        size="xs"
+                        autoFocus
+                        onBlur={() => handleUpdateOptionLabel(opt.id, editingLabel)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleUpdateOptionLabel(opt.id, editingLabel);
+                          if (e.key === "Escape") setEditingOptionId(null);
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div 
+                    key={opt.id} 
+                    className={styles.optionItem}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 4 }}
+                  >
+                    <div 
+                      style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, overflow: "hidden" }}
+                      onClick={() => handleToggle(opt.id)}
+                    >
+                      <div style={{ width: 16, display: "flex", justifyContent: "center" }}>
+                        {isSelected ? <IconCheck size={14} /> : <IconDots size={14} style={{ opacity: 0 }} />} 
+                        {/* Placeholder for alignment if needed, or just IconCheck */}
+                      </div>
+                      <span
+                        className={styles.selectTag}
+                        style={{ backgroundColor: opt.color, margin: 0 }}
+                      >
+                        {opt.label}
+                      </span>
+                    </div>
+
+                    <Menu position="right" withinPortal>
+                      <Menu.Target>
+                        <ActionIcon size="xs" variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
+                          <IconDots size={14} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Label>编辑标签</Menu.Label>
+                        <Menu.Item 
+                          leftSection={<IconPencil size={14} />}
+                          onClick={() => {
+                            setEditingOptionId(opt.id);
+                            setEditingLabel(opt.label);
+                          }}
+                        >
+                          重命名
+                        </Menu.Item>
+                        <Menu.Item 
+                          leftSection={<IconTrash size={14} />}
+                          color="red"
+                          onClick={() => handleDeleteOption(opt.id)}
+                        >
+                          删除
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Label>颜色</Menu.Label>
+                        <div style={{ padding: "4px 12px", display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {OPTION_COLORS.map(c => (
+                            <div
+                              key={c}
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: 4,
+                                backgroundColor: c,
+                                cursor: "pointer",
+                                border: opt.color === c ? "1px solid var(--mantine-color-text)" : "1px solid transparent"
+                              }}
+                              onClick={() => handleUpdateOptionColor(opt.id, c)}
+                            />
+                          ))}
+                        </div>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </div>
+                );
+              })}
+
+              {search && !exactMatch && (
+                <div 
+                  className={styles.optionItem} 
+                  onClick={handleCreate}
+                  style={{ color: "var(--mantine-color-blue-6)" }}
+                >
+                  <IconPlus size={14} />
+                  <span style={{ marginLeft: 8 }}>创建 "{search}"</span>
+                </div>
+              )}
+              
+              {filteredOptions.length === 0 && !search && (
+                <Text size="xs" c="dimmed" ta="center" py="xs">无标签</Text>
+              )}
+            </Stack>
+          </div>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
@@ -652,6 +1031,14 @@ function CellRenderer(props: CellProps) {
       return <SelectCell {...props} />;
     case "multiSelect":
       return <MultiSelectCell {...props} />;
+    case "url":
+      return <UrlCell {...props} />;
+    case "file":
+      return <FileCell {...props} />;
+    case "createdTime":
+      return <CreatedTimeCell {...props} />;
+    case "updatedTime":
+      return <UpdatedTimeCell {...props} />;
     default:
       return <TextCell {...props} />;
   }
@@ -671,8 +1058,15 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
   const [name, setName] = useState(column.name);
   const [type, setType] = useState<FieldType>(column.type);
   const [options, setOptions] = useState<SelectOption[]>(column.options ?? []);
-  const [wrapText, setWrapText] = useState(false);
+  const [typeMenuOpened, setTypeMenuOpened] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync state with props
+  useEffect(() => {
+    setName(column.name);
+    setType(column.type);
+    setOptions(column.options ?? []);
+  }, [column]);
 
   // 自动选中输入框内容
   useEffect(() => {
@@ -693,6 +1087,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
     ydoc.transact(() => {
       column.ymap.set("type", newType);
     });
+    setTypeMenuOpened(false);
   };
 
   const handleUpdateOptions = (newOptions: SelectOption[]) => {
@@ -702,28 +1097,47 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
     });
   };
 
-  const handleInsertLeft = () => {
-    // TODO: 实现左侧插入列
-    onClose();
-  };
-
-  const handleInsertRight = () => {
-    // TODO: 实现右侧插入列
-    onClose();
-  };
-
   const handleHide = () => {
-    // TODO: 实现隐藏列
+    ydoc.transact(() => {
+      column.ymap.set("hidden", true);
+    });
     onClose();
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(column.id);
-    onClose();
-  };
+    const colsArray = ydoc.getArray<Y.Map<any>>("columns");
+    const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
+    const newColId = uuid7();
+    
+    ydoc.transact(() => {
+      // 1. Create new column
+      const newCol = new Y.Map<any>();
+      newCol.set("id", newColId);
+      newCol.set("name", column.name + " copy");
+      newCol.set("type", column.type);
+      newCol.set("width", column.width);
+      if (column.options) {
+        newCol.set("options", JSON.parse(JSON.stringify(column.options)));
+      }
+      
+      // Insert after current column
+      const index = colsArray.toArray().findIndex(c => c.get("id") === column.id);
+      if (index !== -1) {
+        colsArray.insert(index + 1, [newCol]);
+      } else {
+        colsArray.push([newCol]);
+      }
 
-  const handleClearCells = () => {
-    // TODO: 实现清空单元格
+      // 2. Copy cell values
+      rowsArray.forEach((row) => {
+        const cells = row.get("cells") as Y.Map<any>;
+        if (cells && cells.has(column.id)) {
+          const val = cells.get(column.id);
+          cells.set(newColId, val); 
+        }
+      });
+    });
+    
     onClose();
   };
 
@@ -736,6 +1150,10 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       select: <IconCircleDot {...iconProps} />,
       multiSelect: <IconList {...iconProps} />,
       checkbox: <IconSquareCheck {...iconProps} />,
+      url: <IconLink {...iconProps} />,
+      file: <IconPaperclip {...iconProps} />,
+      createdTime: <IconCalendarPlus {...iconProps} />,
+      updatedTime: <IconClock {...iconProps} />,
     };
     return iconMap[fieldType] || <IconAlignLeft {...iconProps} />;
   };
@@ -748,89 +1166,13 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       select: "单项选择器",
       multiSelect: "多项选择器",
       checkbox: "勾选框",
+      url: "链接",
+      file: "文件",
+      createdTime: "创建时间",
+      updatedTime: "修改时间",
     };
     return nameMap[fieldType] || "文本";
   };
-
-  // 二级菜单内容：字段类型选择
-  const TypeMenuContent = () => (
-    <div className={styles.fieldEditorModern}>
-      <div 
-        className={`${styles.menuItem} ${type === "text" ? styles.active : ""}`}
-        onClick={() => handleTypeChange("text")}
-      >
-        <IconAlignLeft size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>文本</span>
-      </div>
-      <div 
-        className={`${styles.menuItem} ${type === "number" ? styles.active : ""}`}
-        onClick={() => handleTypeChange("number")}
-      >
-        <IconHash size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>数字</span>
-      </div>
-      <div 
-        className={`${styles.menuItem} ${type === "select" ? styles.active : ""}`}
-        onClick={() => handleTypeChange("select")}
-      >
-        <IconCircleDot size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>单项选择器</span>
-      </div>
-      <div 
-        className={`${styles.menuItem} ${type === "multiSelect" ? styles.active : ""}`}
-        onClick={() => handleTypeChange("multiSelect")}
-      >
-        <IconList size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>多项选择器</span>
-      </div>
-      <div 
-        className={`${styles.menuItem} ${type === "date" ? styles.active : ""}`}
-        onClick={() => handleTypeChange("date")}
-      >
-        <IconCalendar size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>日期</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconPaperclip size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>Files & media</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconLink size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>链接</span>
-      </div>
-      <div 
-        className={`${styles.menuItem} ${type === "checkbox" ? styles.active : ""}`}
-        onClick={() => handleTypeChange("checkbox")}
-      >
-        <IconSquareCheck size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>勾选框</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconListCheck size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>清单</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconClock size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>修改时间</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconCalendarPlus size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>创建时间</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconArrowsLeftRight size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>Relation</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconTableColumn size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>Rollup</span>
-      </div>
-      <div className={styles.menuItem}>
-        <IconSparkles size={18} stroke={1.5} className={styles.menuIcon} />
-        <span>AI 总结</span>
-      </div>
-    </div>
-  );
 
   // 主菜单
   return (
@@ -855,15 +1197,15 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 
       {/* 类型选择 */}
       <Popover 
+        opened={typeMenuOpened}
+        onChange={setTypeMenuOpened}
         position="right-start" 
         withinPortal 
         offset={4}
         closeOnClickOutside={true}
-        onOpen={() => console.log('[Nested Popover] opened')}
-        onClose={() => console.log('[Nested Popover] closed')}
       >
         <Popover.Target>
-          <div className={styles.menuItem}>
+          <div className={styles.menuItem} onClick={() => setTypeMenuOpened((o) => !o)}>
             <div className={styles.menuIconWrapper}>
               {getFieldTypeIcon(type)}
             </div>
@@ -873,7 +1215,78 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
           </div>
         </Popover.Target>
         <Popover.Dropdown p={0}>
-          <TypeMenuContent />
+          <div className={styles.fieldEditorModern}>
+            <div 
+              className={`${styles.menuItem} ${type === "text" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("text")}
+            >
+              <IconAlignLeft size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>文本</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "number" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("number")}
+            >
+              <IconHash size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>数字</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "select" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("select")}
+            >
+              <IconCircleDot size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>单项选择器</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "multiSelect" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("multiSelect")}
+            >
+              <IconList size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>多项选择器</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "date" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("date")}
+            >
+              <IconCalendar size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>日期</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "file" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("file")}
+            >
+              <IconPaperclip size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>Files & media</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "url" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("url")}
+            >
+              <IconLink size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>链接</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "checkbox" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("checkbox")}
+            >
+              <IconSquareCheck size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>勾选框</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "updatedTime" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("updatedTime")}
+            >
+              <IconClock size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>修改时间</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "createdTime" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("createdTime")}
+            >
+              <IconCalendarPlus size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>创建时间</span>
+            </div>
+          </div>
         </Popover.Dropdown>
       </Popover>
 
@@ -1098,6 +1511,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
           row.set("cells", cells);
         }
         cells.set(columnId, value);
+        row.set("updatedAt", Date.now());
       });
     },
     [ydoc]
@@ -1124,6 +1538,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
       const row = new Y.Map<any>();
       row.set("id", uuid7());
       row.set("cells", new Y.Map());
+      row.set("createdAt", Date.now());
+      row.set("updatedAt", Date.now());
       rowsArray.push([row]);
     });
   }, [ydoc, isEditable]);
@@ -1184,6 +1600,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
       ydoc.transact(() => {
         const newRow = new Y.Map<any>();
         newRow.set("id", uuid7());
+        newRow.set("createdAt", Date.now());
+        newRow.set("updatedAt", Date.now());
         const newCells = new Y.Map<any>();
         const sourceCells = sourceRow.get("cells") as Y.Map<any>;
         if (sourceCells) {
@@ -1210,6 +1628,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
         const row = new Y.Map<any>();
         row.set("id", uuid7());
         row.set("cells", new Y.Map());
+        row.set("createdAt", Date.now());
+        row.set("updatedAt", Date.now());
         rowsArray.insert(index, [row]);
       });
     },
@@ -1228,6 +1648,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
         const row = new Y.Map<any>();
         row.set("id", uuid7());
         row.set("cells", new Y.Map());
+        row.set("createdAt", Date.now());
+        row.set("updatedAt", Date.now());
         rowsArray.insert(index + 1, [row]);
       });
     },
@@ -1283,11 +1705,13 @@ export default function DatabaseRefView(props: NodeViewProps) {
             const value = row.cells.get(col.id);
             return (
               <CellRenderer
+                key={`${col.id}-${col.type}`}
                 value={value}
                 onChange={(v) => setCellValue(row.id, col.id, v)}
                 editable={isEditable}
                 column={col}
                 onUpdateOptions={(opts) => updateColumnOptions(col.id, opts)}
+                row={row}
               />
             );
           },
