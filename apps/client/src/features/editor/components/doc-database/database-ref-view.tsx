@@ -3014,6 +3014,92 @@ function ColumnSettingsModal({
 
 
 // ============================================================
+// Sortable Table Row Component
+// ============================================================
+interface SortableRowProps {
+  row: any;
+  columns: ColumnData[];
+  isEditable: boolean;
+  styles: any;
+  insertRowBelow: (rowId: string) => void;
+  insertRowAbove: (rowId: string) => void;
+  duplicateRow: (rowId: string) => void;
+  deleteRow: (rowId: string) => void;
+  renderCell: (cell: any) => React.ReactNode;
+}
+
+function SortableTableRow({
+  row,
+  columns,
+  isEditable,
+  styles,
+  insertRowBelow,
+  insertRowAbove,
+  duplicateRow,
+  deleteRow,
+  renderCell,
+}: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: row.original.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative' as const,
+  };
+
+  return (
+    <tr ref={setNodeRef} style={style} className={styles.row}>
+      {row.getVisibleCells().map((cell: any, cellIndex: number) => (
+        <td
+          key={cell.id}
+          className={styles.cell}
+          style={{
+            width: cell.column.getSize(),
+            position: cellIndex === 0 ? 'relative' : undefined,
+          }}
+        >
+          {/* Row Actions - 只在第一个单元格显示 */}
+          {cellIndex === 0 && isEditable && (
+            <div className={styles.rowActions}>
+              {/* 快捷添加行按钮 */}
+              <div
+                className={styles.rowActionBtn}
+                onClick={() => insertRowBelow(row.original.id)}
+                title="点击添加到下方"
+              >
+                <IconPlus size={14} />
+              </div>
+              {/* 拖拽手柄 */}
+              <div
+                className={styles.rowActionBtn}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                title="拖拽排序"
+                {...attributes}
+                {...listeners}
+              >
+                <IconGripVertical size={14} />
+              </div>
+            </div>
+          )}
+          {renderCell(cell)}
+        </td>
+      ))}
+      {/* Empty cell for add column */}
+      {isEditable && <td className={styles.cell} style={{ width: GridSize.newColumnBtnWidth }} />}
+    </tr>
+  );
+}
+
+
+// ============================================================
 function DatabaseTitle({ title, onChange, editable, onDelete }: {
   title: string,
   onChange: (val: string) => void,
@@ -3579,6 +3665,50 @@ export default function DatabaseRefView(props: NodeViewProps) {
     [ydoc, isEditable]
   );
 
+  // Move row (for drag and drop)
+  const moveRow = useCallback(
+    (oldIndex: number, newIndex: number) => {
+      if (!isEditable) return;
+      if (oldIndex === newIndex) return;
+
+      const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
+      ydoc.transact(() => {
+        // 在删除前读取所有数据
+        const itemToMove = rowsArray.get(oldIndex);
+        const rowData = {
+          id: itemToMove.get("id"),
+          cells: new Y.Map<any>(),
+          createdAt: itemToMove.get("createdAt"),
+          updatedAt: itemToMove.get("updatedAt"),
+        };
+
+        // 复制 cells 数据
+        const oldCells = itemToMove.get("cells") as Y.Map<any>;
+        if (oldCells) {
+          oldCells.forEach((value, key) => {
+            rowData.cells.set(key, value);
+          });
+        }
+
+        // 删除原位置
+        rowsArray.delete(oldIndex, 1);
+
+        // 计算新位置
+        const adjustedNewIndex = oldIndex < newIndex ? newIndex - 1 : newIndex;
+
+        // 创建新的 YMap 并复制数据
+        const newMap = new Y.Map<any>();
+        newMap.set("id", rowData.id);
+        newMap.set("cells", rowData.cells);
+        newMap.set("createdAt", rowData.createdAt);
+        newMap.set("updatedAt", rowData.updatedAt);
+
+        rowsArray.insert(adjustedNewIndex, [newMap]);
+      });
+    },
+    [ydoc, isEditable]
+  );
+
   // Column resize handlers
   const handleResizeStart = useCallback(
     (e: React.PointerEvent, columnId: string, currentWidth: number) => {
@@ -3813,75 +3943,56 @@ export default function DatabaseRefView(props: NodeViewProps) {
                     )}
                   </tr>
                 </thead>
-                <tbody className={styles.tbody}>
-                  {table.getRowModel().rows.map((row) => (
-                    <tr key={row.id} className={styles.row}>
-                      {row.getVisibleCells().map((cell, cellIndex) => (
-                        <td
-                          key={cell.id}
-                          className={styles.cell}
-                          style={{
-                            width: cell.column.getSize(),
-                            position: cellIndex === 0 ? 'relative' : undefined,
-                          }}
-                        >
-                          {/* Row Actions - 只在第一个单元格显示 */}
-                          {cellIndex === 0 && isEditable && (
-                            <div className={styles.rowActions}>
-                              {/* 快捷添加行按钮 */}
-                              <div
-                                className={styles.rowActionBtn}
-                                onClick={() => insertRowBelow(row.original.id)}
-                                title="点击添加到下方"
-                              >
-                                <IconPlus size={14} />
-                              </div>
-                              {/* 行操作菜单 */}
-                              <Menu position="bottom-start" withinPortal>
-                                <Menu.Target>
-                                  <div className={styles.rowActionBtn} title="更多操作">
-                                    <IconGripVertical size={14} />
-                                  </div>
-                                </Menu.Target>
-                                <Menu.Dropdown>
-                                  <Menu.Item
-                                    leftSection={<IconArrowUp size={14} />}
-                                    onClick={() => insertRowAbove(row.original.id)}
-                                  >
-                                    在上方插入记录
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    leftSection={<IconRowInsertBottom size={14} />}
-                                    onClick={() => insertRowBelow(row.original.id)}
-                                  >
-                                    点击添加到下方
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    leftSection={<IconCopy size={14} />}
-                                    onClick={() => duplicateRow(row.original.id)}
-                                  >
-                                    复制
-                                  </Menu.Item>
-                                  <Menu.Divider />
-                                  <Menu.Item
-                                    leftSection={<IconTrash size={14} />}
-                                    color="red"
-                                    onClick={() => deleteRow(row.original.id)}
-                                  >
-                                    删除
-                                  </Menu.Item>
-                                </Menu.Dropdown>
-                              </Menu>
-                            </div>
-                          )}
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
+                <DndContext
+                  sensors={useSensors(
+                    useSensor(PointerSensor),
+                    useSensor(KeyboardSensor, {
+                      coordinateGetter: sortableKeyboardCoordinates,
+                    })
+                  )}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => {
+                    const { active, over } = event;
+                    if (!over || active.id === over.id) return;
+
+                    const oldIndex = processedRows.findIndex((r) => r.id === active.id);
+                    const newIndex = processedRows.findIndex((r) => r.id === over.id);
+
+                    if (oldIndex !== -1 && newIndex !== -1) {
+                      // 找到在原始rows数组中的索引
+                      const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
+                      const allRows = rowsArray.toArray();
+                      const actualOldIndex = allRows.findIndex((r) => r.get("id") === active.id);
+                      const actualNewIndex = allRows.findIndex((r) => r.get("id") === over.id);
+
+                      if (actualOldIndex !== -1 && actualNewIndex !== -1) {
+                        moveRow(actualOldIndex, actualNewIndex);
+                      }
+                    }
+                  }}
+                >
+                  <SortableContext
+                    items={processedRows.map(r => r.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <tbody className={styles.tbody}>
+                      {table.getRowModel().rows.map((row) => (
+                        <SortableTableRow
+                          key={row.original.id}
+                          row={row}
+                          columns={columns}
+                          isEditable={isEditable}
+                          styles={styles}
+                          insertRowBelow={insertRowBelow}
+                          insertRowAbove={insertRowAbove}
+                          duplicateRow={duplicateRow}
+                          deleteRow={deleteRow}
+                          renderCell={(cell) => flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        />
                       ))}
-                      {/* Empty cell for add column */}
-                      {isEditable && <td className={styles.cell} style={{ width: GridSize.newColumnBtnWidth }} />}
-                    </tr>
-                  ))}
-                </tbody>
+                    </tbody>
+                  </SortableContext>
+                </DndContext>
               </table>
             </div>
           </div>

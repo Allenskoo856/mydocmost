@@ -291,6 +291,19 @@
   color: var(--mantine-color-gray-4);
 }
 
+/* Row Dragging */
+.row.dragging {
+  opacity: 0.5;
+}
+
+.rowActionBtn.dragHandle {
+  cursor: grab;
+}
+
+.rowActionBtn.dragHandle:active {
+  cursor: grabbing;
+}
+
 /* Add Row */
 .addRowBtn {
   display: flex;
@@ -441,6 +454,7 @@
 .colorOption.selected {
   border-color: var(--mantine-color-text);
 }
+
 /* Options Manager */
 .optionEditRow {
   display: flex;
@@ -807,6 +821,7 @@
   align-items: center;
   justify-content: center;
 }
+
 .treeNodeHover {
   transition: background-color 0.2s;
 }
