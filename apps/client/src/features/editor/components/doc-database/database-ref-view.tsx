@@ -1,5 +1,6 @@
 import { NodeViewProps, NodeViewWrapper } from "@tiptap/react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import * as Y from "yjs";
 import {
   ActionIcon,
@@ -17,6 +18,8 @@ import {
   TextInput,
   Switch,
   Button,
+  Tabs,
+  rem,
 } from "@mantine/core";
 import { DatePicker, TimeInput } from "@mantine/dates";
 import {
@@ -54,6 +57,7 @@ import {
   IconDatabase,
   IconDots,
   IconX,
+  IconUpload,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -70,6 +74,7 @@ import {
   updateDocDatabase,
   type DocDatabaseInfoResponse,
 } from "@/features/editor/services/doc-database-service";
+import { uploadFile } from "@/features/page/services/page-service";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FieldType,
@@ -151,8 +156,8 @@ function readRows(doc: Y.Doc): RowData[] {
     return {
       id: String(r.get("id")),
       cells: cells ?? new Y.Map<any>(),
-      createdAt: Number(r.get("createdAt")) || Date.now(),
-      updatedAt: Number(r.get("updatedAt")) || Date.now(),
+      createdAt: Number(r.get("createdAt")) || 0,
+      updatedAt: Number(r.get("updatedAt")) || 0,
       ymap: r,
     };
   });
@@ -168,6 +173,7 @@ interface CellProps {
   column: ColumnData;
   onUpdateOptions?: (options: SelectOption[]) => void;
   row?: RowData;
+  pageId?: string;
 }
 
 function UrlCell({ value, onChange, editable }: CellProps) {
@@ -239,79 +245,214 @@ function UrlCell({ value, onChange, editable }: CellProps) {
   );
 }
 
-function FileCell({ value, onChange, editable }: CellProps) {
-  // 简化实现：作为链接处理，但显示文件图标
-  const [isEditing, setIsEditing] = useState(false);
-  const [localValue, setLocalValue] = useState(value ?? "");
+interface FileValue {
+  name: string;
+  url: string;
+  size?: number;
+  type?: string;
+}
 
-  useEffect(() => {
-    setLocalValue(value ?? "");
+function FileCell({ value, onChange, editable, pageId }: CellProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>("upload");
+  const [linkInput, setLinkInput] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const files: FileValue[] = useMemo(() => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+      return [parsed];
+    } catch {
+      return [{ name: value, url: value }];
+    }
   }, [value]);
 
-  if (!isEditing) {
-    return (
-      <div
-        onClick={() => editable && setIsEditing(true)}
-        style={{
-          cursor: editable ? "text" : "default",
-          minHeight: 24,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-        }}
-      >
-        {localValue ? (
-          <>
-            <IconPaperclip size={14} style={{ flexShrink: 0, opacity: 0.5 }} />
-            <a 
-              href={localValue} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              onClick={(e) => e.stopPropagation()}
-              style={{ color: "var(--mantine-color-text)", textDecoration: "none" }}
-            >
-              {localValue}
-            </a>
-          </>
-        ) : (
-          editable && <span className={styles.selectPlaceholder}>点击添加文件链接</span>
-        )}
-      </div>
-    );
-  }
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    console.log("[FileCell] handleUpload triggered", { file, pageId });
+    
+    if (!file) return;
+    
+    if (!pageId) {
+      console.error("[FileCell] Missing pageId, cannot upload");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const attachment = await uploadFile(file, pageId);
+      console.log("[FileCell] Upload success", attachment);
+      const url = `/api/files/${attachment.id}/${attachment.fileName}`;
+      const newFile: FileValue = {
+        name: file.name,
+        url: url,
+        size: file.size,
+        type: file.type
+      };
+      const newFiles = [...files, newFile];
+      onChange(JSON.stringify(newFiles));
+      setIsEditing(false);
+    } catch (error) {
+      console.error("[FileCell] Upload failed", error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleLinkSubmit = () => {
+    if (!linkInput) return;
+    const newFile: FileValue = {
+      name: linkInput,
+      url: linkInput
+    };
+    const newFiles = [...files, newFile];
+    onChange(JSON.stringify(newFiles));
+    setLinkInput("");
+    setIsEditing(false);
+  };
+
+  const removeFile = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newFiles = files.filter((_, i) => i !== index);
+    onChange(newFiles.length ? JSON.stringify(newFiles) : "");
+  };
 
   return (
-    <TextInput
-      value={localValue}
-      onChange={(e) => setLocalValue(e.currentTarget.value)}
-      onBlur={() => {
-        onChange(localValue);
-        setIsEditing(false);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          onChange(localValue);
-          setIsEditing(false);
-        }
-        if (e.key === "Escape") {
-          setLocalValue(value ?? "");
-          setIsEditing(false);
-        }
-      }}
-      autoFocus
-      size="xs"
-      variant="unstyled"
-      styles={{ input: { padding: 0, height: 24, minHeight: 24 } }}
-      placeholder="输入文件链接..."
-    />
+    <Popover
+      opened={isEditing}
+      onChange={setIsEditing}
+      position="bottom-start"
+      withinPortal
+      width={300}
+      trapFocus
+    >
+      <Popover.Target>
+        <div
+          onClick={() => editable && setIsEditing(true)}
+          style={{
+            cursor: editable ? "pointer" : "default",
+            minHeight: 24,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 4,
+            alignItems: "center",
+          }}
+        >
+          {files.length > 0 ? (
+            files.map((file, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  backgroundColor: "var(--mantine-color-gray-1)",
+                  fontSize: 12,
+                  maxWidth: "100%",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(file.url, "_blank");
+                }}
+              >
+                <IconPaperclip size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
+                <span
+                  style={{
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: 120,
+                  }}
+                >
+                  {file.name}
+                </span>
+                {editable && (
+                  <ActionIcon
+                    size="xs"
+                    variant="transparent"
+                    color="gray"
+                    onClick={(e) => removeFile(index, e)}
+                  >
+                    <IconX size={10} />
+                  </ActionIcon>
+                )}
+              </div>
+            ))
+          ) : (
+            editable && <span className={styles.selectPlaceholder}>点击添加文件</span>
+          )}
+        </div>
+      </Popover.Target>
+      <Popover.Dropdown p="xs">
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List grow>
+            <Tabs.Tab value="upload">上传</Tabs.Tab>
+            <Tabs.Tab value="embed">嵌入链接</Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="upload" pt="xs">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: "1px dashed var(--mantine-color-gray-4)",
+                borderRadius: 4,
+                padding: 16,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                backgroundColor: "var(--mantine-color-gray-0)",
+                minHeight: 100,
+              }}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                onChange={handleUpload}
+              />
+              {isUploading ? (
+                <Loader size="sm" />
+              ) : (
+                <>
+                  <IconUpload size={24} style={{ color: "var(--mantine-color-gray-5)", marginBottom: 8 }} />
+                  <Text size="sm" c="dimmed">点击上传文件</Text>
+                </>
+              )}
+            </div>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="embed" pt="xs">
+            <Stack gap="xs">
+              <TextInput
+                placeholder="输入链接..."
+                value={linkInput}
+                onChange={(e) => setLinkInput(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLinkSubmit();
+                }}
+                autoFocus
+              />
+              <Button fullWidth size="xs" onClick={handleLinkSubmit} disabled={!linkInput}>
+                嵌入链接
+              </Button>
+            </Stack>
+          </Tabs.Panel>
+        </Tabs>
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
 function CreatedTimeCell({ row }: CellProps) {
-  if (!row) return null;
+  if (!row || !row.createdAt) return null;
   const date = new Date(row.createdAt);
   return (
     <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
@@ -321,7 +462,7 @@ function CreatedTimeCell({ row }: CellProps) {
 }
 
 function UpdatedTimeCell({ row }: CellProps) {
-  if (!row) return null;
+  if (!row || !row.updatedAt) return null;
   const date = new Date(row.updatedAt);
   return (
     <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
@@ -1770,6 +1911,8 @@ export default function DatabaseRefView(props: NodeViewProps) {
   const { node, editor } = props;
   const databaseId = node.attrs.databaseId as string | undefined;
   const viewId = node.attrs.viewId as string | undefined;
+  const { pageId: routePageId } = useParams();
+  const pageId = routePageId || editor?.storage?.pageId;
 
   const collabUrl = useCollaborationUrl();
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
@@ -1831,6 +1974,21 @@ export default function DatabaseRefView(props: NodeViewProps) {
       ydoc.off("update", onUpdate);
     };
   }, [ydoc]);
+
+  // Backfill missing metadata for legacy rows
+  useEffect(() => {
+    const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
+    ydoc.transact(() => {
+      rowsArray.forEach((row) => {
+        if (!row.has("createdAt")) {
+          row.set("createdAt", Date.now());
+        }
+        if (!row.has("updatedAt")) {
+          row.set("updatedAt", Date.now());
+        }
+      });
+    });
+  }, [ydoc, version]);
 
   // Connect to Hocuspocus
   useEffect(() => {
@@ -2101,6 +2259,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
                 column={col}
                 onUpdateOptions={(opts) => updateColumnOptions(col.id, opts)}
                 row={row}
+                pageId={pageId}
               />
             );
           },
@@ -2108,7 +2267,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
         }
       )
     );
-  }, [columns, columnHelper, setCellValue, isEditable, updateColumnOptions]);
+  }, [columns, columnHelper, setCellValue, isEditable, updateColumnOptions, pageId]);
 
   const table = useReactTable({
     data: rows,
