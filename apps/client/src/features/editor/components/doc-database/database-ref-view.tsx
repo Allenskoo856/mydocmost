@@ -58,6 +58,7 @@ import {
   IconDots,
   IconX,
   IconUpload,
+  IconEraser,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -1627,6 +1628,51 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
     });
   };
 
+  const handleInsertLeft = () => {
+    const colsArray = ydoc.getArray<Y.Map<any>>("columns");
+    const index = colsArray.toArray().findIndex(c => c.get("id") === column.id);
+    if (index !== -1) {
+      ydoc.transact(() => {
+        const newCol = new Y.Map<any>();
+        newCol.set("id", uuid7());
+        newCol.set("name", "新列");
+        newCol.set("type", "text");
+        newCol.set("width", GridSize.defaultColumnWidth);
+        colsArray.insert(index, [newCol]);
+      });
+    }
+    onClose();
+  };
+
+  const handleInsertRight = () => {
+    const colsArray = ydoc.getArray<Y.Map<any>>("columns");
+    const index = colsArray.toArray().findIndex(c => c.get("id") === column.id);
+    if (index !== -1) {
+      ydoc.transact(() => {
+        const newCol = new Y.Map<any>();
+        newCol.set("id", uuid7());
+        newCol.set("name", "新列");
+        newCol.set("type", "text");
+        newCol.set("width", GridSize.defaultColumnWidth);
+        colsArray.insert(index + 1, [newCol]);
+      });
+    }
+    onClose();
+  };
+
+  const handleClearColumn = () => {
+    const rowsArray = ydoc.getArray<Y.Map<any>>("rows");
+    ydoc.transact(() => {
+      rowsArray.forEach((row) => {
+        const cells = row.get("cells") as Y.Map<any>;
+        if (cells && cells.has(column.id)) {
+          cells.delete(column.id);
+        }
+      });
+    });
+    onClose();
+  };
+
   const handleHide = () => {
     ydoc.transact(() => {
       column.ymap.set("hidden", true);
@@ -1834,6 +1880,16 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
 
       <div className={styles.menuDivider} />
 
+      {/* 插入列 */}
+      <div className={styles.menuItem} onClick={handleInsertLeft}>
+        <IconArrowLeft size={18} stroke={1.5} className={styles.menuIcon} />
+        <span className={styles.menuLabel}>左侧插入</span>
+      </div>
+      <div className={styles.menuItem} onClick={handleInsertRight}>
+        <IconArrowRight size={18} stroke={1.5} className={styles.menuIcon} />
+        <span className={styles.menuLabel}>右侧插入</span>
+      </div>
+
       {/* 隐藏 */}
       <div className={styles.menuItem} onClick={handleHide}>
         <IconEyeOff size={18} stroke={1.5} className={styles.menuIcon} />
@@ -1844,6 +1900,12 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       <div className={styles.menuItem} onClick={handleCopy}>
         <IconCopy size={18} stroke={1.5} className={styles.menuIcon} />
         <span className={styles.menuLabel}>复制</span>
+      </div>
+
+      {/* 清空 */}
+      <div className={styles.menuItem} onClick={handleClearColumn}>
+        <IconEraser size={18} stroke={1.5} className={styles.menuIcon} />
+        <span className={styles.menuLabel}>清空单元格</span>
       </div>
 
       {/* 删除 */}
