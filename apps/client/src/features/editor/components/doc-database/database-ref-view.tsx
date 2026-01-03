@@ -63,6 +63,7 @@ import {
   IconUpload,
   IconEraser,
   IconFileDescription,
+  IconLayoutSidebarRight,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -89,6 +90,7 @@ import {
 } from "@/features/editor/services/doc-database-service";
 import { uploadFile } from "@/features/page/services/page-service";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { PagePreviewDrawer } from "./page-preview-drawer";
 import {
   FieldType,
   FIELD_TYPE_OPTIONS,
@@ -187,6 +189,7 @@ interface CellProps {
   onUpdateOptions?: (options: SelectOption[]) => void;
   row?: RowData;
   pageId?: string;
+  onPreview?: (pageId: string) => void;
 }
 
 function UrlCell({ value, onChange, editable }: CellProps) {
@@ -669,7 +672,7 @@ function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => v
   );
 }
 
-function PageCell({ value, onChange, editable, pageId }: CellProps) {
+function PageCell({ value, onChange, editable, pageId, onPreview }: CellProps) {
   const navigate = useNavigate();
   const { spaceSlug } = useParams();
   const [isEditing, setIsEditing] = useState(false);
@@ -692,17 +695,15 @@ function PageCell({ value, onChange, editable, pageId }: CellProps) {
       icon: node.icon,
       spaceId: node.spaceId
     };
+    // @ts-ignore
     onChange(JSON.stringify(newValue));
     setIsEditing(false);
   };
 
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (pageValue && pageValue.slugId) {
-      console.log('[PageCell] Navigating to page:', pageValue);
-      const url = buildPageUrl(spaceSlug, pageValue.slugId, pageValue.title);
-      console.log('[PageCell] Navigation URL:', url);
-      navigate(url);
+    if (pageValue && pageValue.id && onPreview) {
+      onPreview(pageValue.id);
     }
   };
 
@@ -1082,7 +1083,7 @@ function DateCell({ value, onChange, editable }: CellProps) {
           {/* Calendar */}
           <DatePicker
             value={tempDate}
-            onChange={onDateSelect}
+            onChange={onDateSelect as any}
             size="sm"
             styles={{
               calendarHeader: { maxWidth: "100%" }
@@ -2455,6 +2456,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
   const [version, setVersion] = useState(0);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [resizingColumnId, setResizingColumnId] = useState<string | null>(null);
+  const [previewPageId, setPreviewPageId] = useState<string | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
@@ -2768,6 +2770,7 @@ export default function DatabaseRefView(props: NodeViewProps) {
                 onUpdateOptions={(opts) => updateColumnOptions(col.id, opts)}
                 row={row}
                 pageId={pageId}
+                onPreview={setPreviewPageId}
               />
             );
           },
@@ -2967,6 +2970,10 @@ export default function DatabaseRefView(props: NodeViewProps) {
           </div>
         </div>
       </Stack>
+      <PagePreviewDrawer 
+        pageId={previewPageId} 
+        onClose={() => setPreviewPageId(null)} 
+      />
     </NodeViewWrapper>
   );
 }
