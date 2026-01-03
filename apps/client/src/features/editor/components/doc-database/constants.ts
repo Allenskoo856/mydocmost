@@ -37,6 +37,7 @@ export type FieldType =
   | "checkbox"
   | "url"
   | "file"
+  | "page"
   | "createdTime"
   | "updatedTime";
 
@@ -49,6 +50,7 @@ export const FIELD_TYPE_OPTIONS: Array<{ value: FieldType; label: string }> = [
   { value: "checkbox", label: "复选" },
   { value: "url", label: "链接" },
   { value: "file", label: "文件" },
+  { value: "page", label: "页面" },
   { value: "createdTime", label: "创建时间" },
   { value: "updatedTime", label: "修改时间" },
 ];

@@ -807,3 +807,14 @@
   align-items: center;
   justify-content: center;
 }
+.treeNodeHover {
+  transition: background-color 0.2s;
+}
+
+.treeNodeHover:hover {
+  background-color: var(--mantine-color-gray-1);
+}
+
+[data-mantine-color-scheme="dark"] .treeNodeHover:hover {
+  background-color: var(--mantine-color-dark-6);
+}

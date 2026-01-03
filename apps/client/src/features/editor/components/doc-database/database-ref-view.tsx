@@ -1,6 +1,6 @@
 import { NodeViewProps, NodeViewWrapper } from "@tiptap/react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import * as Y from "yjs";
 import {
   ActionIcon,
@@ -59,6 +59,7 @@ import {
   IconX,
   IconUpload,
   IconEraser,
+  IconFileDescription,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -68,7 +69,15 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { Tree, NodeRendererProps, NodeApi } from "react-arborist";
+import { useAtomValue } from "jotai";
+import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom";
+import { SpaceTreeNode } from "@/features/page/tree/types";
+import { buildPageUrl } from "@/features/page/page.utils";
 import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
+import { usePageQuery } from "@/features/page/queries/page-query";
+import { getAllSidebarPages } from "@/features/page/services/page-service";
+import { buildTree, buildTreeWithChildren, appendNodeChildren } from "@/features/page/tree/utils/utils";
 import { useCollabToken } from "@/features/auth/queries/auth-query";
 import {
   getDocDatabaseInfo,
@@ -452,23 +461,291 @@ function FileCell({ value, onChange, editable, pageId }: CellProps) {
   );
 }
 
-function CreatedTimeCell({ row }: CellProps) {
-  if (!row || !row.createdAt) return null;
-  const date = new Date(row.createdAt);
+interface PageValue {
+  id: string;
+  title: string;
+  icon?: string;
+}
+
+function PagePicker({ onSelect, pageId }: { onSelect: (node: SpaceTreeNode) => void; pageId?: string }) {
+  const [treeData, setTreeData] = useState<SpaceTreeNode[]>([]);
+  const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Fallback data fetching
+  const { data: page } = usePageQuery({ pageId });
+  const spaceId = page?.spaceId;
+  
+  // Fetch root pages
+  const { isLoading: isRootLoading } = useQuery({
+    queryKey: ["picker-root-pages", spaceId],
+    queryFn: async () => {
+      if (!spaceId) return [];
+      console.log("[PagePicker] Fetching root pages for spaceId:", spaceId);
+      const result = await getAllSidebarPages({ spaceId });
+      const allItems = result.pages.flatMap((p) => p.items);
+      const nodes = allItems.map(item => ({
+        id: item.id,
+        slugId: item.slugId,
+        name: item.title,
+        icon: item.icon,
+        position: item.position,
+        hasChildren: item.hasChildren,
+        spaceId: item.spaceId,
+        parentPageId: item.parentPageId,
+        children: [],
+      }));
+      setTreeData(nodes);
+      return nodes;
+    },
+    enabled: !!spaceId,
+    staleTime: 0,
+  });
+
+  const handleLoadChildren = async (node: NodeApi<SpaceTreeNode>) => {
+    if (loadingNodes.has(node.id)) return;
+    if (node.children && node.children.length > 0) return;
+    if (!node.data.hasChildren) return;
+
+    setLoadingNodes(prev => new Set(prev).add(node.id));
+    try {
+      console.log("[PagePicker] Fetching children for:", node.id);
+      const result = await getAllSidebarPages({ spaceId: spaceId!, pageId: node.id });
+      const allItems = result.pages.flatMap((p) => p.items);
+      const children = allItems.map(item => ({
+        id: item.id,
+        slugId: item.slugId,
+        name: item.title,
+        icon: item.icon,
+        position: item.position,
+        hasChildren: item.hasChildren,
+        spaceId: item.spaceId,
+        parentPageId: item.parentPageId,
+        children: [],
+      }));
+      
+      setTreeData(prev => appendNodeChildren(prev, node.id, children));
+    } catch (e) {
+      console.error("[PagePicker] Error fetching children:", e);
+    } finally {
+      setLoadingNodes(prev => {
+        const next = new Set(prev);
+        next.delete(node.id);
+        return next;
+      });
+    }
+  };
+
+  // Simple filter for search
+  const filteredData = useMemo(() => {
+    if (!searchTerm) return treeData;
+    const lowerTerm = searchTerm.toLowerCase();
+    
+    // Helper to filter tree
+    const filterNodes = (nodes: SpaceTreeNode[]): SpaceTreeNode[] => {
+      return nodes.reduce((acc, node) => {
+        const matches = node.name.toLowerCase().includes(lowerTerm);
+        const children = node.children ? filterNodes(node.children) : [];
+        
+        if (matches || children.length > 0) {
+          acc.push({
+            ...node,
+            children: children.length > 0 ? children : node.children
+          });
+        }
+        return acc;
+      }, [] as SpaceTreeNode[]);
+    };
+
+    return filterNodes(treeData);
+  }, [treeData, searchTerm]);
+
   return (
-    <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
-      {date.toLocaleString()}
-    </div>
+    <Stack gap="xs" h={300}>
+      <TextInput 
+        placeholder="搜索页面..." 
+        size="xs" 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.currentTarget.value)}
+      />
+      {isRootLoading ? (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
+          <Loader size="sm" />
+        </div>
+      ) : (
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <Tree
+            data={filteredData}
+            width={280}
+            height={260}
+            indent={12}
+            rowHeight={28}
+            paddingTop={4}
+            paddingBottom={4}
+          >
+            {(props: NodeRendererProps<SpaceTreeNode>) => (
+              <div
+                style={props.style}
+                onClick={() => onSelect(props.node.data)}
+              >
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 4, 
+                    paddingLeft: props.node.level * 12,
+                    paddingRight: 8,
+                    height: '100%',
+                    cursor: 'pointer',
+                    backgroundColor: props.node.isSelected ? 'var(--mantine-color-blue-light)' : 'transparent',
+                    borderRadius: 4
+                  }}
+                  className={styles.treeNodeHover}
+                >
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.node.toggle();
+                      handleLoadChildren(props.node);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 16,
+                      height: 16,
+                      visibility: props.node.isLeaf ? "hidden" : "visible",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {loadingNodes.has(props.node.id) ? (
+                       <Loader size={10} />
+                    ) : (
+                      <IconChevronRight
+                        size={12}
+                        style={{
+                          transform: props.node.isOpen ? "rotate(90deg)" : "none",
+                          transition: "transform 0.2s"
+                        }}
+                      />
+                    )}
+                  </div>
+                  <span style={{ fontSize: 14 }}>{props.node.data.icon}</span>
+                  <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {props.node.data.name}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Tree>
+        </div>
+      )}
+    </Stack>
   );
 }
 
-function UpdatedTimeCell({ row }: CellProps) {
-  if (!row || !row.updatedAt) return null;
-  const date = new Date(row.updatedAt);
+function PageCell({ value, onChange, editable, pageId }: CellProps) {
+  const navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+
+  const pageValue: PageValue | null = useMemo(() => {
+    if (!value) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }, [value]);
+
+  const handleSelect = (node: SpaceTreeNode) => {
+    const newValue: PageValue = {
+      id: node.id,
+      title: node.name,
+      icon: node.icon
+    };
+    onChange(JSON.stringify(newValue));
+    setIsEditing(false);
+  };
+
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pageValue) {
+      const url = buildPageUrl({ id: pageValue.id, title: pageValue.title });
+      navigate(url);
+    }
+  };
+
   return (
-    <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
-      {date.toLocaleString()}
-    </div>
+    <Popover
+      opened={isEditing}
+      onChange={setIsEditing}
+      position="bottom-start"
+      withinPortal
+      width={300}
+      trapFocus
+    >
+      <Popover.Target>
+        <div
+          onClick={() => editable && setIsEditing(true)}
+          style={{
+            cursor: editable ? "pointer" : "default",
+            minHeight: 24,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            width: "100%"
+          }}
+        >
+          {pageValue ? (
+            <div 
+              style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: 4,
+                padding: "2px 6px",
+                borderRadius: 4,
+                backgroundColor: "var(--mantine-color-gray-1)",
+                maxWidth: "100%"
+              }}
+            >
+              <span style={{ fontSize: 14 }}>{pageValue.icon || <IconFileDescription size={14} />}</span>
+              <span 
+                onClick={handleNavigate}
+                style={{ 
+                  fontSize: 13, 
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: 150
+                }}
+              >
+                {pageValue.title}
+              </span>
+              {editable && (
+                <ActionIcon
+                  size="xs"
+                  variant="transparent"
+                  color="gray"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(null);
+                  }}
+                >
+                  <IconX size={10} />
+                </ActionIcon>
+              )}
+            </div>
+          ) : (
+            editable && <span className={styles.selectPlaceholder}>选择页面...</span>
+          )}
+        </div>
+      </Popover.Target>
+      <Popover.Dropdown p="xs">
+        <PagePicker onSelect={handleSelect} pageId={pageId} />
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
@@ -491,7 +768,7 @@ function TextCell({ value, onChange, editable }: CellProps) {
           wordBreak: "break-word",
         }}
       >
-        {localValue || (editable ? <span className={styles.selectPlaceholder}>点击编辑</span> : null)}
+        {localValue || (editable && <span className={styles.selectPlaceholder}>输入文本...</span>)}
       </div>
     );
   }
@@ -1546,6 +1823,26 @@ function MultiSelectCell({ value, onChange, editable, column, onUpdateOptions }:
   );
 }
 
+function CreatedTimeCell({ row }: CellProps) {
+  if (!row || !row.createdAt) return null;
+  const date = new Date(row.createdAt);
+  return (
+    <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
+      {date.toLocaleString()}
+    </div>
+  );
+}
+
+function UpdatedTimeCell({ row }: CellProps) {
+  if (!row || !row.updatedAt) return null;
+  const date = new Date(row.updatedAt);
+  return (
+    <div style={{ fontSize: 13, color: "var(--mantine-color-dimmed)" }}>
+      {date.toLocaleString()}
+    </div>
+  );
+}
+
 function CellRenderer(props: CellProps) {
   const { column } = props;
 
@@ -1566,6 +1863,8 @@ function CellRenderer(props: CellProps) {
       return <UrlCell {...props} />;
     case "file":
       return <FileCell {...props} />;
+    case "page":
+      return <PageCell {...props} />;
     case "createdTime":
       return <CreatedTimeCell {...props} />;
     case "updatedTime":
@@ -1728,6 +2027,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       checkbox: <IconSquareCheck {...iconProps} />,
       url: <IconLink {...iconProps} />,
       file: <IconPaperclip {...iconProps} />,
+      page: <IconFileDescription {...iconProps} />,
       createdTime: <IconCalendarPlus {...iconProps} />,
       updatedTime: <IconClock {...iconProps} />,
     };
@@ -1744,6 +2044,7 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
       checkbox: "勾选框",
       url: "链接",
       file: "文件",
+      page: "页面",
       createdTime: "创建时间",
       updatedTime: "修改时间",
     };
@@ -1833,6 +2134,13 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
             >
               <IconPaperclip size={18} stroke={1.5} className={styles.menuIcon} />
               <span>Files & media</span>
+            </div>
+            <div 
+              className={`${styles.menuItem} ${type === "page" ? styles.active : ""}`}
+              onClick={() => handleTypeChange("page")}
+            >
+              <IconFileDescription size={18} stroke={1.5} className={styles.menuIcon} />
+              <span>页面</span>
             </div>
             <div 
               className={`${styles.menuItem} ${type === "url" ? styles.active : ""}`}
