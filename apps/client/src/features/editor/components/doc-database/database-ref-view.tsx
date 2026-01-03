@@ -18,6 +18,7 @@ import {
 } from "@mantine/core";
 import {
   IconChevronDown,
+  IconChevronRight,
   IconCopy,
   IconGripVertical,
   IconPencil,
@@ -26,6 +27,27 @@ import {
   IconCheck,
   IconArrowUp,
   IconRowInsertBottom,
+  IconAdjustments,
+  IconArrowLeft,
+  IconArrowRight,
+  IconEyeOff,
+  IconClearAll,
+  IconTextWrap,
+  IconAlignLeft,
+  IconHash,
+  IconCircleDot,
+  IconList,
+  IconCalendar,
+  IconPaperclip,
+  IconLink,
+  IconSquareCheck,
+  IconListCheck,
+  IconClock,
+  IconCalendarPlus,
+  IconArrowsLeftRight,
+  IconTableColumn,
+  IconSparkles,
+  IconSelect,
 } from "@tabler/icons-react";
 import { v7 as uuid7 } from "uuid";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
@@ -647,118 +669,242 @@ function FieldEditor({ column, ydoc, onClose, onDelete }: FieldEditorProps) {
   const [name, setName] = useState(column.name);
   const [type, setType] = useState<FieldType>(column.type);
   const [options, setOptions] = useState<SelectOption[]>(column.options ?? []);
+  const [wrapText, setWrapText] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSave = () => {
+  // 自动选中输入框内容
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.select();
+    }
+  }, []);
+
+  const handleNameChange = (newName: string) => {
+    setName(newName);
     ydoc.transact(() => {
-      column.ymap.set("name", name);
-      column.ymap.set("type", type);
-      if (type === "select" || type === "multiSelect") {
-        column.ymap.set("options", options);
-      }
+      column.ymap.set("name", newName);
     });
+  };
+
+  const handleTypeChange = (newType: FieldType) => {
+    setType(newType);
+    ydoc.transact(() => {
+      column.ymap.set("type", newType);
+    });
+  };
+
+  const handleUpdateOptions = (newOptions: SelectOption[]) => {
+    setOptions(newOptions);
+    ydoc.transact(() => {
+      column.ymap.set("options", newOptions);
+    });
+  };
+
+  const handleInsertLeft = () => {
+    // TODO: 实现左侧插入列
     onClose();
   };
 
-  const handleAddOption = () => {
-    const newOption: SelectOption = {
-      id: uuid7(),
-      label: `选项 ${options.length + 1}`,
-      color: getRandomOptionColor(),
+  const handleInsertRight = () => {
+    // TODO: 实现右侧插入列
+    onClose();
+  };
+
+  const handleHide = () => {
+    // TODO: 实现隐藏列
+    onClose();
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(column.id);
+    onClose();
+  };
+
+  const handleClearCells = () => {
+    // TODO: 实现清空单元格
+    onClose();
+  };
+
+  const getFieldTypeIcon = (fieldType: FieldType, size = 18) => {
+    const iconProps = { size, stroke: 1.5 };
+    const iconMap: Record<FieldType, React.ReactNode> = {
+      text: <IconAlignLeft {...iconProps} />,
+      number: <IconHash {...iconProps} />,
+      date: <IconCalendar {...iconProps} />,
+      select: <IconCircleDot {...iconProps} />,
+      multiSelect: <IconList {...iconProps} />,
+      checkbox: <IconSquareCheck {...iconProps} />,
     };
-    setOptions([...options, newOption]);
+    return iconMap[fieldType] || <IconAlignLeft {...iconProps} />;
   };
 
-  const handleUpdateOption = (id: string, updates: Partial<SelectOption>) => {
-    setOptions(options.map((o) => (o.id === id ? { ...o, ...updates } : o)));
+  const getFieldTypeName = (fieldType: FieldType) => {
+    const nameMap: Record<FieldType, string> = {
+      text: "文本",
+      number: "数字",
+      date: "日期",
+      select: "单项选择器",
+      multiSelect: "多项选择器",
+      checkbox: "勾选框",
+    };
+    return nameMap[fieldType] || "文本";
   };
 
-  const handleDeleteOption = (id: string) => {
-    setOptions(options.filter((o) => o.id !== id));
-  };
+  // 二级菜单内容：字段类型选择
+  const TypeMenuContent = () => (
+    <div className={styles.fieldEditorModern}>
+      <div 
+        className={`${styles.menuItem} ${type === "text" ? styles.active : ""}`}
+        onClick={() => handleTypeChange("text")}
+      >
+        <IconAlignLeft size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>文本</span>
+      </div>
+      <div 
+        className={`${styles.menuItem} ${type === "number" ? styles.active : ""}`}
+        onClick={() => handleTypeChange("number")}
+      >
+        <IconHash size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>数字</span>
+      </div>
+      <div 
+        className={`${styles.menuItem} ${type === "select" ? styles.active : ""}`}
+        onClick={() => handleTypeChange("select")}
+      >
+        <IconCircleDot size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>单项选择器</span>
+      </div>
+      <div 
+        className={`${styles.menuItem} ${type === "multiSelect" ? styles.active : ""}`}
+        onClick={() => handleTypeChange("multiSelect")}
+      >
+        <IconList size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>多项选择器</span>
+      </div>
+      <div 
+        className={`${styles.menuItem} ${type === "date" ? styles.active : ""}`}
+        onClick={() => handleTypeChange("date")}
+      >
+        <IconCalendar size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>日期</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconPaperclip size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>Files & media</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconLink size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>链接</span>
+      </div>
+      <div 
+        className={`${styles.menuItem} ${type === "checkbox" ? styles.active : ""}`}
+        onClick={() => handleTypeChange("checkbox")}
+      >
+        <IconSquareCheck size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>勾选框</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconListCheck size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>清单</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconClock size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>修改时间</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconCalendarPlus size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>创建时间</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconArrowsLeftRight size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>Relation</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconTableColumn size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>Rollup</span>
+      </div>
+      <div className={styles.menuItem}>
+        <IconSparkles size={18} stroke={1.5} className={styles.menuIcon} />
+        <span>AI 总结</span>
+      </div>
+    </div>
+  );
 
+  // 主菜单
   return (
-    <Stack gap="sm" className={styles.fieldEditor}>
-      <TextInput
-        label="列名"
-        value={name}
-        onChange={(e) => setName(e.currentTarget.value)}
-        size="xs"
-      />
-      <Select
-        label="类型"
-        data={FIELD_TYPE_OPTIONS}
-        value={type}
-        onChange={(v) => setType((v as FieldType) ?? "text")}
-        size="xs"
-        comboboxProps={{ withinPortal: true, zIndex: 1000 }}
-      />
-
-      {(type === "select" || type === "multiSelect") && (
-        <Stack gap="xs">
-          <Text size="xs" fw={500}>选项</Text>
-          {options.map((opt) => (
-            <Group key={opt.id} gap="xs">
-              <Popover position="bottom-start" withinPortal>
-                <Popover.Target>
-                  <div
-                    className={styles.optionColor}
-                    style={{ backgroundColor: opt.color, cursor: "pointer" }}
-                  />
-                </Popover.Target>
-                <Popover.Dropdown p="xs">
-                  <div className={styles.colorPicker}>
-                    {OPTION_COLORS.map((color) => (
-                      <div
-                        key={color}
-                        className={`${styles.colorOption} ${opt.color === color ? styles.selected : ""}`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => handleUpdateOption(opt.id, { color })}
-                      />
-                    ))}
-                  </div>
-                </Popover.Dropdown>
-              </Popover>
-              <TextInput
-                value={opt.label}
-                onChange={(e) => handleUpdateOption(opt.id, { label: e.currentTarget.value })}
-                size="xs"
-                style={{ flex: 1 }}
-              />
-              <ActionIcon
-                size="xs"
-                variant="subtle"
-                color="red"
-                onClick={() => handleDeleteOption(opt.id)}
-              >
-                <IconTrash size={12} />
-              </ActionIcon>
-            </Group>
-          ))}
-          <div
-            className={styles.optionItem}
-            onClick={handleAddOption}
-            style={{ color: "var(--mantine-color-blue-6)" }}
-          >
-            <IconPlus size={14} />
-            <span>添加选项</span>
+    <div 
+      className={styles.fieldEditorModern}
+      onClick={(e) => {
+        console.log('[FieldEditor] main container clicked');
+        e.stopPropagation();
+      }}
+    >
+      {/* 当前类型 + 列名 - 使用嵌套 Popover 显示类型选择 */}
+      <Popover 
+        position="right-start" 
+        withinPortal 
+        offset={4}
+        closeOnClickOutside={true}
+        onOpen={() => console.log('[Nested Popover] opened')}
+        onClose={() => console.log('[Nested Popover] closed')}
+      >
+        <Popover.Target>
+          <div className={styles.fieldHeaderClickable}>
+            <div className={styles.fieldTypeIconWrapper}>
+              {getFieldTypeIcon(type)}
+            </div>
+            <input
+              ref={inputRef}
+              type="text"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className={styles.fieldNameInput}
+              placeholder="列名称"
+            />
+            <IconChevronRight size={16} stroke={1.5} className={styles.menuChevron} />
           </div>
-        </Stack>
+        </Popover.Target>
+        <Popover.Dropdown p={0}>
+          <TypeMenuContent />
+        </Popover.Dropdown>
+      </Popover>
+
+      {/* 选择器类型的标签管理 */}
+      {(type === "select" || type === "multiSelect") && (
+        <div className={styles.optionsSection}>
+          <div className={styles.optionsSectionTitle}>标签</div>
+          <OptionsManager 
+            options={options} 
+            onUpdateOptions={handleUpdateOptions}
+            showAddButton={true}
+          />
+        </div>
       )}
 
-      <Group justify="space-between" mt="xs">
-        <ActionIcon variant="subtle" color="red" onClick={onDelete}>
-          <IconTrash size={16} />
-        </ActionIcon>
-        <Group gap="xs">
-          <Badge variant="light" onClick={onClose} style={{ cursor: "pointer" }}>
-            取消
-          </Badge>
-          <Badge color="blue" onClick={handleSave} style={{ cursor: "pointer" }}>
-            保存
-          </Badge>
-        </Group>
-      </Group>
-    </Stack>
+      <div className={styles.menuDivider} />
+
+      {/* 隐藏 */}
+      <div className={styles.menuItem} onClick={handleHide}>
+        <IconEyeOff size={18} stroke={1.5} className={styles.menuIcon} />
+        <span className={styles.menuLabel}>隐藏</span>
+      </div>
+
+      {/* 复制 */}
+      <div className={styles.menuItem} onClick={handleCopy}>
+        <IconCopy size={18} stroke={1.5} className={styles.menuIcon} />
+        <span className={styles.menuLabel}>复制</span>
+      </div>
+
+      {/* 删除 */}
+      <div 
+        className={`${styles.menuItem} ${styles.danger}`}
+        onClick={() => { onDelete(); onClose(); }}
+      >
+        <IconTrash size={18} stroke={1.5} className={styles.menuIcon} />
+        <span className={styles.menuLabel}>删除</span>
+      </div>
+    </div>
   );
 }
 
@@ -1136,16 +1282,29 @@ export default function DatabaseRefView(props: NodeViewProps) {
                       >
                         <Popover
                         opened={editingColumnId === col.id}
-                        onClose={() => setEditingColumnId(null)}
+                        onClose={() => {
+                          console.log('[Popover] onClose triggered for column:', col.id);
+                          setEditingColumnId(null);
+                        }}
+                        onChange={(opened) => {
+                          console.log('[Popover] onChange:', { opened, colId: col.id, editingColumnId });
+                          // 关键修复：当 opened 为 false 时，更新状态关闭弹框
+                          if (!opened) {
+                            setEditingColumnId(null);
+                          }
+                        }}
                         position="bottom-start"
                         withinPortal
-                        closeOnClickOutside={false}
+                        closeOnClickOutside={true}
                         trapFocus={false}
                     >
                       <Popover.Target>
                         <div
                           className={styles.headerCellContent}
-                          onClick={() => isEditable && setEditingColumnId(col.id)}
+                          onClick={() => {
+                            console.log('[Popover.Target] clicked, isEditable:', isEditable, 'colId:', col.id);
+                            isEditable && setEditingColumnId(col.id);
+                          }}
                         >
                           <span>{col.name}</span>
                           <IconChevronDown size={14} />
@@ -1155,7 +1314,10 @@ export default function DatabaseRefView(props: NodeViewProps) {
                         <FieldEditor
                           column={col}
                           ydoc={ydoc}
-                          onClose={() => setEditingColumnId(null)}
+                          onClose={() => {
+                            console.log('[FieldEditor] onClose called');
+                            setEditingColumnId(null);
+                          }}
                           onDelete={() => deleteColumn(col.id)}
                         />
                       </Popover.Dropdown>
@@ -1250,14 +1412,6 @@ export default function DatabaseRefView(props: NodeViewProps) {
               ))}
             </tbody>
           </table>
-
-          {/* Add Row Button */}
-          {isEditable && (
-            <div className={styles.addRowBtn} onClick={addRow}>
-              <IconPlus size={14} />
-              <span>添加一行</span>
-            </div>
-          )}
             </div>
           </div>
         </div>

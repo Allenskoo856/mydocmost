@@ -18,7 +18,7 @@ export const GridSize = {
   /** 默认列宽 */
   defaultColumnWidth: 150,
   /** 添加列按钮宽度 */
-  newColumnBtnWidth: 120,
+  newColumnBtnWidth: 80,
   /** 行操作区域宽度 */
   rowActionsWidth: 52,
   /** 添加行按钮高度 */

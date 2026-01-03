@@ -38,15 +38,15 @@
 }
 
 .headerRow {
-  height: 40px;
+  height: 36px;
 }
 
 .headerCell {
   position: relative;
   padding: 0 12px;
   font-weight: 500;
-  font-size: 13px;
-  color: var(--mantine-color-gray-6);
+  font-size: 14px;
+  color: var(--mantine-color-gray-7);
   text-align: left;
   border-right: 1px solid var(--mantine-color-gray-3);
   border-bottom: 1px solid var(--mantine-color-gray-3);
@@ -55,7 +55,7 @@
 }
 
 [data-mantine-color-scheme="dark"] .headerCell {
-  color: var(--mantine-color-gray-5);
+  color: var(--mantine-color-gray-4);
   border-right-color: var(--mantine-color-dark-4);
   border-bottom-color: var(--mantine-color-dark-4);
 }
@@ -67,22 +67,43 @@
 .headerCellContent {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 2px;
   height: 100%;
+  padding: 6px 0;
   cursor: pointer;
-  color: var(--mantine-color-gray-6);
+  color: var(--mantine-color-gray-7);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 [data-mantine-color-scheme="dark"] .headerCellContent {
-  color: var(--mantine-color-gray-5);
+  color: var(--mantine-color-gray-4);
 }
 
 .headerCellContent:hover {
-  color: var(--mantine-color-gray-8);
+  color: var(--mantine-color-gray-9);
 }
 
 [data-mantine-color-scheme="dark"] .headerCellContent:hover {
-  color: var(--mantine-color-gray-3);
+  color: var(--mantine-color-gray-2);
+}
+
+.headerCellContent span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.headerCellContent svg {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.headerCellContent:hover svg {
+  opacity: 0.8;
 }
 
 .headerIcon {
@@ -427,4 +448,316 @@
   color: var(--mantine-color-dimmed);
   border-bottom: 1px solid var(--mantine-color-default-border);
   margin-bottom: 4px;
+}
+
+/* Modern Field Editor Styles - Pixel Perfect */
+.fieldEditorModern {
+  min-width: 240px;
+  max-width: 280px;
+  padding: 4px 0;
+}
+
+/* 顶部：类型图标 + 输入框 - 可点击展开类型选择 */
+.fieldHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+.fieldHeaderClickable {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.fieldHeaderClickable:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+[data-mantine-color-scheme="dark"] .fieldHeaderClickable:hover {
+  background: var(--mantine-color-dark-6);
+}
+
+[data-mantine-color-scheme="dark"] .fieldHeader {
+  border-bottom-color: var(--mantine-color-dark-4);
+}
+
+.fieldTypeIconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--mantine-color-gray-3);
+  color: var(--mantine-color-gray-6);
+  flex-shrink: 0;
+}
+
+[data-mantine-color-scheme="dark"] .fieldTypeIconWrapper {
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-gray-5);
+}
+
+.fieldNameInput {
+  flex: 1;
+  border: 2px solid var(--mantine-color-blue-5);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+  outline: none;
+}
+
+.fieldNameInput::selection {
+  background: var(--mantine-color-blue-2);
+}
+
+[data-mantine-color-scheme="dark"] .fieldNameInput::selection {
+  background: var(--mantine-color-blue-8);
+}
+
+/* 标签管理区域（选择器类型） */
+.optionsSection {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+[data-mantine-color-scheme="dark"] .optionsSection {
+  border-bottom-color: var(--mantine-color-dark-4);
+}
+
+.optionsSectionTitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  margin-bottom: 8px;
+}
+
+/* 菜单分隔线 */
+.menuDivider {
+  height: 1px;
+  background: var(--mantine-color-gray-2);
+  margin: 4px 0;
+}
+
+[data-mantine-color-scheme="dark"] .menuDivider {
+  background: var(--mantine-color-dark-4);
+}
+
+/* 菜单项 */
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 14px;
+  color: var(--mantine-color-text);
+}
+
+.menuItem:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+[data-mantine-color-scheme="dark"] .menuItem:hover {
+  background: var(--mantine-color-dark-6);
+}
+
+.menuItem.active {
+  background: var(--mantine-color-blue-0);
+}
+
+[data-mantine-color-scheme="dark"] .menuItem.active {
+  background: var(--mantine-color-dark-5);
+}
+
+.menuItem.danger {
+  color: var(--mantine-color-red-6);
+}
+
+.menuItem.danger:hover {
+  background: var(--mantine-color-red-0);
+}
+
+[data-mantine-color-scheme="dark"] .menuItem.danger:hover {
+  background: var(--mantine-color-dark-5);
+}
+
+.menuIcon {
+  color: var(--mantine-color-gray-6);
+  flex-shrink: 0;
+}
+
+[data-mantine-color-scheme="dark"] .menuIcon {
+  color: var(--mantine-color-gray-5);
+}
+
+.menuLabel {
+  flex: 1;
+}
+
+.menuChevron {
+  color: var(--mantine-color-gray-5);
+}
+
+/* 带开关的菜单项 */
+.menuItemSwitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--mantine-color-text);
+}
+
+/* Toggle 开关样式 */
+.toggleSwitch {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--mantine-color-gray-4);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggleSwitch.active {
+  background: var(--mantine-color-blue-5);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggleSwitch.active .toggleKnob {
+  transform: translateX(20px);
+}
+
+/* 保留原有的一些样式 */
+.fieldEditorHeader {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+[data-mantine-color-scheme="dark"] .fieldEditorHeader {
+  border-bottom-color: var(--mantine-color-dark-4);
+}
+
+.fieldEditorDivider {
+  height: 1px;
+  background: var(--mantine-color-gray-2);
+  margin: 4px 0;
+}
+
+[data-mantine-color-scheme="dark"] .fieldEditorDivider {
+  background: var(--mantine-color-dark-4);
+}
+
+.typeOptions {
+  padding: 4px 0;
+}
+
+.typeOptionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 14px;
+}
+
+.typeOptionItem:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+[data-mantine-color-scheme="dark"] .typeOptionItem:hover {
+  background: var(--mantine-color-dark-6);
+}
+
+.typeOptionItem.active {
+  background: var(--mantine-color-blue-0);
+  color: var(--mantine-color-blue-7);
+}
+
+[data-mantine-color-scheme="dark"] .typeOptionItem.active {
+  background: var(--mantine-color-dark-5);
+  color: var(--mantine-color-blue-4);
+}
+
+.typeOptionIcon {
+  font-size: 16px;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-gray-6);
+}
+
+.typeOptionItem.active .typeOptionIcon {
+  color: var(--mantine-color-blue-6);
+}
+
+.typeOptionLabel {
+  flex: 1;
+}
+
+.fieldActions {
+  padding: 4px 0;
+}
+
+.actionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 14px;
+  color: var(--mantine-color-text);
+}
+
+.actionItem:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+[data-mantine-color-scheme="dark"] .actionItem:hover {
+  background: var(--mantine-color-dark-6);
+}
+
+.actionItem.danger {
+  color: var(--mantine-color-red-6);
+}
+
+.actionItem.danger:hover {
+  background: var(--mantine-color-red-0);
+}
+
+[data-mantine-color-scheme="dark"] .actionItem.danger:hover {
+  background: var(--mantine-color-dark-5);
+}
+
+.actionIcon {
+  font-size: 16px;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
