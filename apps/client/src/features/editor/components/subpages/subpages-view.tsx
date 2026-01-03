@@ -1,25 +1,25 @@
 import { NodeViewProps, NodeViewWrapper } from "@tiptap/react";
-import { Stack, Text, Anchor, ActionIcon } from "@mantine/core";
+import { Stack, Text, ActionIcon, Box } from "@mantine/core";
 import { IconFileDescription } from "@tabler/icons-react";
 import { useGetSidebarPagesQuery } from "@/features/page/queries/page-query";
-import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import classes from "./subpages.module.css";
 import styles from "../mention/mention.module.css";
-import {
-  buildPageUrl,
-  buildSharedPageUrl,
-} from "@/features/page/page.utils.ts";
 import { useTranslation } from "react-i18next";
 import { sortPositionKeys } from "@/features/page/tree/utils/utils";
 import { useSharedPageSubpages } from "@/features/share/hooks/use-shared-page-subpages";
+import { PagePreviewDrawer } from "../doc-database/page-preview-drawer";
 
 export default function SubpagesView(props: NodeViewProps) {
   const { editor } = props;
-  const { spaceSlug, shareId } = useParams();
+  const { shareId } = useParams();
   const { t } = useTranslation();
 
   const currentPageId = editor.storage.pageId;
+
+  // 预览页面状态
+  const [previewPageId, setPreviewPageId] = useState<string | null>(null);
 
   // Get subpages from shared tree if we're in a shared context
   const sharedSubpages = useSharedPageSubpages(currentPageId);
@@ -45,6 +45,12 @@ export default function SubpagesView(props: NodeViewProps) {
     const allPages = data.pages.flatMap((page) => page.items);
     return sortPositionKeys(allPages);
   }, [data, shareId, sharedSubpages]);
+
+  const handlePageClick = (pageId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPreviewPageId(pageId);
+  };
 
   if (isLoading && !shareId) {
     return null;
@@ -77,22 +83,14 @@ export default function SubpagesView(props: NodeViewProps) {
       <div className={classes.container}>
         <Stack gap={5}>
           {subpages.map((page) => (
-            <Anchor
+            <Box
               key={page.id}
-              component={Link}
-              fw={500}
-              to={
-                shareId
-                  ? buildSharedPageUrl({
-                      shareId,
-                      pageSlugId: page.slugId,
-                      pageTitle: page.title,
-                    })
-                  : buildPageUrl(spaceSlug, page.slugId, page.title)
-              }
-              underline="never"
               className={styles.pageMentionLink}
-              draggable={false}
+              style={{
+                cursor: "pointer",
+                fontWeight: 500,
+              }}
+              onClick={(e) => handlePageClick(page.id, e)}
             >
               {page?.icon ? (
                 <span style={{ marginRight: "4px" }}>{page.icon}</span>
@@ -111,10 +109,15 @@ export default function SubpagesView(props: NodeViewProps) {
               <span className={styles.pageMentionText}>
                 {page?.title || t("untitled")}
               </span>
-            </Anchor>
+            </Box>
           ))}
         </Stack>
       </div>
+      <PagePreviewDrawer
+        pageId={previewPageId}
+        onClose={() => setPreviewPageId(null)}
+      />
     </NodeViewWrapper>
   );
 }
+
