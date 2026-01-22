@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as bcrypt from 'bcrypt';
 import { sanitize } from 'sanitize-filename-ts';
 import { FastifyRequest } from 'fastify';
+import { Readable, Transform } from 'stream';
 
 export const envPath = path.resolve(process.cwd(), '..', '..', '.env');
 
@@ -97,4 +98,19 @@ export function hasLicenseOrEE(opts: {
 }): boolean {
   const { licenseKey, plan, isCloud } = opts;
   return Boolean(licenseKey) || (isCloud && plan === 'business');
+}
+
+export function createByteCountingStream(source: Readable) {
+  let bytesRead = 0;
+  const stream = new Transform({
+    transform(chunk, encoding, callback) {
+      bytesRead += chunk.length;
+      callback(null, chunk);
+    },
+  });
+
+  source.pipe(stream);
+  source.on('error', (err) => stream.emit('error', err));
+
+  return { stream, getBytesRead: () => bytesRead };
 }
