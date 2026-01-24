@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { jsonToHtml, jsonToNode } from '../../collaboration/collaboration.util';
-import { turndown } from './turndown-utils';
 import { ExportFormat } from './dto/export-dto';
 import { Page } from '@docmost/db/types/entity.types';
 import { InjectKysely } from 'nestjs-kysely';
@@ -37,6 +36,7 @@ import {
   getAttachmentIds,
   getProsemirrorContent,
 } from '../../common/helpers/prosemirror/utils';
+import { htmlToMarkdown } from '@docmost/editor-ext';
 
 @Injectable()
 export class ExportService {
@@ -89,7 +89,7 @@ export class ExportService {
         /<colgroup[^>]*>[\s\S]*?<\/colgroup>/gim,
         '',
       );
-      return turndown(newPageHtml);
+      return htmlToMarkdown(newPageHtml);
     }
 
     return;
