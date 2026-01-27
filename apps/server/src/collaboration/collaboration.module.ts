@@ -11,6 +11,7 @@ import { HistoryProcessor } from './processors/history.processor';
 import { LoggerExtension } from './extensions/logger.extension';
 import { EnvironmentService } from '../integrations/environment/environment.service';
 import { CollabHistoryService } from './services/collab-history.service';
+import { CollaborationHandler } from './collaboration.handler';
 
 @Module({
   providers: [
@@ -20,6 +21,7 @@ import { CollabHistoryService } from './services/collab-history.service';
     LoggerExtension,
     HistoryProcessor,
     CollabHistoryService,
+    CollaborationHandler,
   ],
   exports: [CollaborationGateway],
   imports: [TokenModule],
@@ -52,16 +54,12 @@ export class CollaborationModule implements OnModuleInit, OnModuleDestroy {
     });
 
     wss.on('error', (error) =>
-      this.logger.log('WebSocket server error:', error),
+      this.logger.error('WebSocket server error:', error),
     );
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.collaborationGateway) {
-      await this.collaborationGateway.destroy();
-    }
-    if (this.collabWsAdapter) {
-      this.collabWsAdapter.destroy();
-    }
+    await this.collaborationGateway?.destroy(this.collabWsAdapter);
+    this.collabWsAdapter?.destroy();
   }
 }

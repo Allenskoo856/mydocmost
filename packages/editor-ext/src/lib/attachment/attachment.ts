@@ -92,7 +92,7 @@ export const Attachment = Node.create<AttachmentOptions>({
       mergeAttributes(
         { "data-type": this.name },
         this.options.HTMLAttributes,
-        HTMLAttributes,
+        HTMLAttributes
       ),
       [
         "a",
