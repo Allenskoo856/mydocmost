@@ -34,7 +34,7 @@ function createHeadingLinkDecoration(node: PMNode, pos: number): Decoration {
         const id = node.attrs.id;
         const baseUrl = window.location.href.split("#")[0];
         const url = `${baseUrl}#${id}`;
-        navigator.clipboard.writeText(url);
+        copyToClipboard(url);
         linkBtnContent.innerHTML = successIcon;
         setTimeout(() => (linkBtnContent.innerHTML = copyIcon), 2000);
       });
