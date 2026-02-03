@@ -4,9 +4,11 @@ import { IPagination } from "@/lib/types.ts";
 
 export async function getPageHistoryList(
   pageId: string,
+  page = 1,
 ): Promise<IPagination<IPageHistory>> {
   const req = await api.post("/pages/history", {
     pageId,
+    page,
   });
   return req.data;
 }

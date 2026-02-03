@@ -607,5 +607,9 @@
   "Highlight color": "突出显示颜色",
   "Remove color": "移除颜色",
   "Close": "关闭",
-  "Close table of contents": "关闭目录"
+  "Close table of contents": "关闭目录",
+  "Version history for": "版本历史：",
+  "document": "文档",
+  "Select version": "选择版本",
+  "Highlight changes": "高亮变更"
 }
