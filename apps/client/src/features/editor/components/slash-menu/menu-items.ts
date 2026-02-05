@@ -157,6 +157,8 @@ const CommandGroups: SlashMenuGroupedItemsType = {
         input.type = "file";
         input.accept = "image/*";
         input.multiple = true;
+        input.style.display = "none";
+        document.body.appendChild(input);
         input.onchange = async () => {
           if (input.files?.length) {
             for (const file of input.files) {
@@ -164,6 +166,7 @@ const CommandGroups: SlashMenuGroupedItemsType = {
               uploadImageAction(file, editor.view, pos, pageId);
             }
           }
+          input.remove();
         };
         input.click();
       },
@@ -183,12 +186,16 @@ const CommandGroups: SlashMenuGroupedItemsType = {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = "video/*";
+        input.multiple = true;
+        input.style.display = "none";
+        document.body.appendChild(input);
         input.onchange = async () => {
           if (input.files?.length) {
             const file = input.files[0];
             const pos = editor.view.state.selection.from;
             uploadVideoAction(file, editor.view, pos, pageId);
           }
+          input.remove();
         };
         input.click();
       },
@@ -208,12 +215,16 @@ const CommandGroups: SlashMenuGroupedItemsType = {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = "";
+        input.multiple = true;
+        input.style.display = "none";
+        document.body.appendChild(input);
         input.onchange = async () => {
           if (input.files?.length) {
             const file = input.files[0];
             const pos = editor.view.state.selection.from;
             uploadAttachmentAction(file, editor.view, pos, pageId, true);
           }
+          input.remove();
         };
         input.click();
       },
