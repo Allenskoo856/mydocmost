@@ -36,9 +36,15 @@ import PageImportModal from "@/features/page/components/page-import-modal.tsx";
 import { useTranslation } from "react-i18next";
 import { SwitchSpace } from "./switch-space";
 import ExportModal from "@/components/common/export-modal";
-import { mobileSidebarAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
+import {
+  desktopSidebarAtom,
+  mobileSidebarAtom,
+} from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
 import { useToggleSidebar } from "@/components/layouts/global/hooks/hooks/use-toggle-sidebar.ts";
 import { searchSpotlight } from "@/features/search/constants";
+import SidebarToggle from "@/components/ui/sidebar-toggle-button.tsx";
+import TopMenuCompact from "@/components/layouts/global/top-menu-compact.tsx";
+import APP_ROUTE from "@/lib/app-route.ts";
 
 export function SpaceSidebar() {
   const { t } = useTranslation();
@@ -48,6 +54,9 @@ export function SpaceSidebar() {
     useDisclosure(false);
   const [mobileSidebarOpened] = useAtom(mobileSidebarAtom);
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
+
+  const [desktopSidebarOpened] = useAtom(desktopSidebarAtom);
+  const toggleDesktopSidebar = useToggleSidebar(desktopSidebarAtom);
 
   const { spaceSlug } = useParams();
   const { data: space } = useGetSpaceBySlugQuery(spaceSlug);
@@ -66,6 +75,36 @@ export function SpaceSidebar() {
   return (
     <>
       <div className={classes.navbar}>
+        <div className={classes.topbar}>
+          <Group gap={6} wrap="nowrap">
+            <Tooltip label={t("Sidebar toggle")}>
+              <SidebarToggle
+                aria-label={t("Sidebar toggle")}
+                opened={mobileSidebarOpened}
+                onClick={toggleMobileSidebar}
+                hiddenFrom="sm"
+                size="sm"
+              />
+            </Tooltip>
+
+            <Tooltip label={t("Sidebar toggle")}>
+              <SidebarToggle
+                aria-label={t("Sidebar toggle")}
+                opened={desktopSidebarOpened}
+                onClick={toggleDesktopSidebar}
+                visibleFrom="sm"
+                size="sm"
+              />
+            </Tooltip>
+
+            <TopMenuCompact variant="text-only" />
+
+            <Link to={APP_ROUTE.HOME} className={classes.topbarLink}>
+              {t("Home")}
+            </Link>
+          </Group>
+        </div>
+
         <div
           className={classes.section}
           style={{
@@ -132,25 +171,25 @@ export function SpaceSidebar() {
               SpaceCaslAction.Manage,
               SpaceCaslSubject.Page,
             ) && (
-              <UnstyledButton
-                className={classes.menu}
-                onClick={() => {
-                  handleCreatePage();
-                  if (mobileSidebarOpened) {
-                    toggleMobileSidebar();
-                  }
-                }}
-              >
-                <div className={classes.menuItemInner}>
-                  <IconPlus
-                    size={18}
-                    className={classes.menuItemIcon}
-                    stroke={2}
-                  />
-                  <span>{t("New page")}</span>
-                </div>
-              </UnstyledButton>
-            )}
+                <UnstyledButton
+                  className={classes.menu}
+                  onClick={() => {
+                    handleCreatePage();
+                    if (mobileSidebarOpened) {
+                      toggleMobileSidebar();
+                    }
+                  }}
+                >
+                  <div className={classes.menuItemInner}>
+                    <IconPlus
+                      size={18}
+                      className={classes.menuItemIcon}
+                      stroke={2}
+                    />
+                    <span>{t("New page")}</span>
+                  </div>
+                </UnstyledButton>
+              )}
           </div>
         </div>
 
@@ -164,21 +203,21 @@ export function SpaceSidebar() {
               SpaceCaslAction.Manage,
               SpaceCaslSubject.Page,
             ) && (
-              <Group gap="xs">
-                <SpaceMenu spaceId={space.id} onSpaceSettings={openSettings} />
+                <Group gap="xs">
+                  <SpaceMenu spaceId={space.id} onSpaceSettings={openSettings} />
 
-                <Tooltip label={t("Create page")} withArrow position="right">
-                  <ActionIcon
-                    variant="default"
-                    size={18}
-                    onClick={handleCreatePage}
-                    aria-label={t("Create page")}
-                  >
-                    <IconPlus />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
-            )}
+                  <Tooltip label={t("Create page")} withArrow position="right">
+                    <ActionIcon
+                      variant="default"
+                      size={18}
+                      onClick={handleCreatePage}
+                      aria-label={t("Create page")}
+                    >
+                      <IconPlus />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
+              )}
           </Group>
 
           <div className={classes.pages}>

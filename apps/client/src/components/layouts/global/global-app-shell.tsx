@@ -69,16 +69,16 @@ export default function GlobalAppShell({
   }, [resize, stopResizing]);
 
   const location = useLocation();
-  const isSettingsRoute = location.pathname.startsWith("/settings");
-  const isSpaceRoute = location.pathname.startsWith("/s/");
-  const isHomeRoute = location.pathname.startsWith("/home");
-  const isSpacesRoute = location.pathname === "/spaces";
+  const isSettingsRoute = location.pathname.includes("/settings");
+  const isSpaceRoute = location.pathname.includes("/s/");
+  const isHomeRoute = location.pathname.includes("/home");
+  const isSpacesRoute = location.pathname.endsWith("/spaces");
   const isPageRoute = location.pathname.includes("/p/");
   const hideSidebar = isHomeRoute || isSpacesRoute;
 
   return (
     <AppShell
-      header={{ height: 45 }}
+      header={!isSpaceRoute ? { height: 45 } : undefined}
       navbar={
         !hideSidebar && {
           width: isSpaceRoute ? sidebarWidth : 300,
@@ -96,11 +96,13 @@ export default function GlobalAppShell({
           collapsed: { mobile: !isAsideOpen, desktop: !isAsideOpen },
         }
       }
-      padding="md"
+      padding={isSpaceRoute ? 0 : "md"}
     >
-      <AppShell.Header px="md" className={classes.header}>
-        <AppHeader />
-      </AppShell.Header>
+      {!isSpaceRoute && (
+        <AppShell.Header px="md" className={classes.header}>
+          <AppHeader />
+        </AppShell.Header>
+      )}
       {!hideSidebar && (
         <AppShell.Navbar
           className={classes.navbar}
