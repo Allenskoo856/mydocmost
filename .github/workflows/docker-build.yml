@@ -68,6 +68,8 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          build-args: |
+            BASE_PATH=/evadoc
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}

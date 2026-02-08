@@ -7,7 +7,7 @@ RUN npm install -g pnpm@10.4.0
 
 WORKDIR /app
 
-ARG BASE_PATH="/lbandoc"
+ARG BASE_PATH="/"
 ENV BASE_PATH=$BASE_PATH
 # Copy all files
 COPY . .
