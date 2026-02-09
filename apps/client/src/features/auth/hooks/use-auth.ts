@@ -26,11 +26,12 @@ import {
 import APP_ROUTE from "@/lib/app-route.ts";
 import { RESET } from "jotai/utils";
 import { useTranslation } from "react-i18next";
-import { isCloud } from "@/lib/config.ts";
+import { isCloud, getBasePath } from "@/lib/config.ts";
 
 // EE功能已移除 - stub实现
 const exchangeTokenRedirectUrl = (token: string) => {
-  return isCloud() ? `/exchange-token?token=${token}` : APP_ROUTE.HOME;
+  const basePath = getBasePath();
+  return isCloud() ? `${basePath}/exchange-token?token=${token}` : APP_ROUTE.HOME;
 };
 
 export default function useAuth() {

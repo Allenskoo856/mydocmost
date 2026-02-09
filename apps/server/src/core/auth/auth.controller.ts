@@ -33,7 +33,7 @@ export class AuthController {
     private authService: AuthService,
     private environmentService: EnvironmentService,
     private moduleRef: ModuleRef,
-  ) {}
+  ) { }
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -170,13 +170,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('logout')
   async logout(@Res({ passthrough: true }) res: FastifyReply) {
-    res.clearCookie('authToken');
+    const basePath = this.environmentService.getBasePath();
+    res.clearCookie('authToken', { path: basePath || '/' });
   }
 
   setAuthCookie(res: FastifyReply, token: string) {
+    const basePath = this.environmentService.getBasePath();
     res.setCookie('authToken', token, {
       httpOnly: true,
-      path: '/',
+      path: basePath || '/',
       expires: this.environmentService.getCookieExpiresIn(),
       secure: this.environmentService.isHttps(),
     });

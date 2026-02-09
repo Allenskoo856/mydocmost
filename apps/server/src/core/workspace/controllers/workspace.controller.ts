@@ -43,7 +43,7 @@ export class WorkspaceController {
     private readonly workspaceInvitationService: WorkspaceInvitationService,
     private readonly workspaceAbility: WorkspaceAbilityFactory,
     private environmentService: EnvironmentService,
-  ) {}
+  ) { }
 
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -84,7 +84,8 @@ export class WorkspaceController {
       workspace.hostname !== updatedWorkspace.hostname
     ) {
       // log user out of old hostname
-      res.clearCookie('authToken');
+      const basePath = this.environmentService.getBasePath();
+      res.clearCookie('authToken', { path: basePath || '/' });
     }
 
     return updatedWorkspace;
@@ -269,9 +270,10 @@ export class WorkspaceController {
       };
     }
 
+    const basePath = this.environmentService.getBasePath();
     res.setCookie('authToken', result.authToken, {
       httpOnly: true,
-      path: '/',
+      path: basePath || '/',
       expires: this.environmentService.getCookieExpiresIn(),
       secure: this.environmentService.isHttps(),
     });

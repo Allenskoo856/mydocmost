@@ -29,6 +29,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { executeTx } from '@docmost/db/utils';
 import { VerifyUserTokenDto } from '../dto/verify-user-token.dto';
 import { DomainService } from '../../../integrations/environment/domain.service';
+import { EnvironmentService } from '../../../integrations/environment/environment.service';
 
 @Injectable()
 export class AuthService {
@@ -39,8 +40,9 @@ export class AuthService {
     private userTokenRepo: UserTokenRepo,
     private mailService: MailService,
     private domainService: DomainService,
+    private environmentService: EnvironmentService,
     @InjectKysely() private readonly db: KyselyDB,
-  ) {}
+  ) { }
 
   async login(loginDto: LoginDto, workspaceId: string) {
     const user = await this.userRepo.findByEmail(loginDto.email, workspaceId, {
@@ -135,7 +137,8 @@ export class AuthService {
 
     const token = nanoIdGen(16);
 
-    const resetLink = `${this.domainService.getUrl(workspace.hostname)}/password-reset?token=${token}`;
+    const basePath = this.environmentService.getBasePath();
+    const resetLink = `${this.domainService.getUrl(workspace.hostname)}${basePath}/password-reset?token=${token}`;
 
     await this.userTokenRepo.insertUserToken({
       token: token,

@@ -59,10 +59,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         workspaceIds.push(workspaceId);
       }
 
+      const basePath = this.environmentService.getBasePath();
       res.setCookie('joinedWorkspaces', JSON.stringify(workspaceIds), {
         httpOnly: false,
         domain: '.' + this.environmentService.getSubdomainHost(),
-        path: '/',
+        path: basePath || '/',
         expires: addDays(new Date(), 365),
         secure: this.environmentService.isHttps(),
       });

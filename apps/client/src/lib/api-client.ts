@@ -54,7 +54,7 @@ api.interceptors.response.use(
               !isCloud() &&
               currentPath != APP_ROUTE.AUTH.SETUP
             ) {
-              window.location.href = APP_ROUTE.AUTH.SETUP;
+              window.location.href = basePath + APP_ROUTE.AUTH.SETUP;
             }
           }
           break;
@@ -80,7 +80,7 @@ function redirectToLogin() {
   ];
   const currentPath = window.location.pathname.replace(basePath, '');
   if (!exemptPaths.some((path) => currentPath.startsWith(path))) {
-    window.location.href = APP_ROUTE.AUTH.LOGIN;
+    window.location.href = basePath + APP_ROUTE.AUTH.LOGIN;
   }
 }
 
