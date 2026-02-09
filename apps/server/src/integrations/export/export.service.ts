@@ -41,7 +41,7 @@ export class ExportService {
     @InjectKysely() private readonly db: KyselyDB,
     private readonly storageService: StorageService,
     private readonly environmentService: EnvironmentService,
-  ) {}
+  ) { }
 
   async exportPage(format: string, page: Page, singlePage?: boolean) {
     const titleNode = {
@@ -107,7 +107,7 @@ export class ExportService {
       const page = await this.pageRepo.findById(pageId, {
         includeContent: true,
       });
-      if (page){
+      if (page) {
         pages = [page];
       }
     }
@@ -316,8 +316,9 @@ export class ExportService {
       const truncatedTitle = linkTitle?.substring(0, 70);
       const pageSlug = `${slugify(truncatedTitle)}-${slugId}`;
 
+      const basePath = this.environmentService.getBasePath();
       // Create the link URL
-      const link = `${this.environmentService.getAppUrl()}/s/${spaceSlug}/p/${pageSlug}`;
+      const link = `${this.environmentService.getAppUrl()}${basePath}/s/${spaceSlug}/p/${pageSlug}`;
 
       // Create a link mark and a text node with that mark
       const linkMark = editorState.schema.marks.link.create({ href: link });
