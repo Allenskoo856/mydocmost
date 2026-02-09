@@ -19,12 +19,8 @@ import useToggleAside from "@/hooks/use-toggle-aside.tsx";
 import { useAtom } from "jotai";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
 import { historyAtoms } from "@/features/page-history/atoms/history-atoms.ts";
-import {
-  getHotkeyHandler,
-  useClipboard,
-  useDisclosure,
-  useHotkeys,
-} from "@mantine/hooks";
+import { useDisclosure, useHotkeys } from "@mantine/hooks";
+import { useClipboard } from "@/hooks/use-clipboard";
 import { useParams } from "react-router-dom";
 import { usePageQuery } from "@/features/page/queries/page-query.ts";
 import { buildPageUrl } from "@/features/page/page.utils.ts";
