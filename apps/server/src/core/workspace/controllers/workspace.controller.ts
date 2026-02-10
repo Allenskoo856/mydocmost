@@ -85,7 +85,11 @@ export class WorkspaceController {
     ) {
       // log user out of old hostname
       const basePath = this.environmentService.getBasePath();
-      res.clearCookie('authToken', { path: basePath || '/' });
+      res.clearCookie('authToken', {
+        httpOnly: true,
+        path: '/',
+        secure: this.environmentService.isHttps(),
+      });
     }
 
     return updatedWorkspace;
@@ -273,7 +277,7 @@ export class WorkspaceController {
     const basePath = this.environmentService.getBasePath();
     res.setCookie('authToken', result.authToken, {
       httpOnly: true,
-      path: basePath || '/',
+      path: '/',
       expires: this.environmentService.getCookieExpiresIn(),
       secure: this.environmentService.isHttps(),
     });

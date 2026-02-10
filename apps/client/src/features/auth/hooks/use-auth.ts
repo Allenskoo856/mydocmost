@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   forgotPassword,
   login,
@@ -39,6 +40,7 @@ export default function useAuth() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const [, setCurrentUser] = useAtom(currentUserAtom);
+  const queryClient = useQueryClient();
 
   const handleSignIn = async (data: ILogin) => {
     setIsLoading(true);
@@ -146,8 +148,17 @@ export default function useAuth() {
 
   const handleLogout = async () => {
     setCurrentUser(RESET);
-    await logout();
-    navigate(APP_ROUTE.AUTH.LOGIN);
+    queryClient.clear();
+    try {
+      await logout();
+    } catch (err) {
+      // 即使 logout API 调用失败，也继续完成客户端登出流程
+      console.error('Logout API failed:', err);
+    }
+    // 使用 window.location.href 强制整页刷新，彻底清除所有客户端内存状态
+    // navigate() 是 SPA 内部跳转，不会清除 TanStack Query 缓存等状态
+    const basePath = getBasePath();
+    window.location.href = basePath + APP_ROUTE.AUTH.LOGIN;
   };
 
   const handleForgotPassword = async (data: IForgotPassword) => {

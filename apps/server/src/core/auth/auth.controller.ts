@@ -171,7 +171,7 @@ export class AuthController {
   @Post('logout')
   async logout(@Res({ passthrough: true }) res: FastifyReply) {
     const basePath = this.environmentService.getBasePath();
-    res.clearCookie('authToken', { path: basePath || '/' });
+    this.clearAuthCookie(res);
   }
 
   setAuthCookie(res: FastifyReply, token: string) {
@@ -180,6 +180,15 @@ export class AuthController {
       httpOnly: true,
       path: basePath || '/',
       expires: this.environmentService.getCookieExpiresIn(),
+      secure: this.environmentService.isHttps(),
+    });
+  }
+
+  clearAuthCookie(res: FastifyReply) {
+    const basePath = this.environmentService.getBasePath();
+    res.clearCookie('authToken', {
+      httpOnly: true,
+      path: basePath || '/',
       secure: this.environmentService.isHttps(),
     });
   }
