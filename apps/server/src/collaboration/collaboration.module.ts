@@ -7,9 +7,10 @@ import { CollabWsAdapter } from './adapter/collab-ws.adapter';
 import { IncomingMessage } from 'http';
 import { WebSocket } from 'ws';
 import { TokenModule } from '../core/auth/token.module';
-import { HistoryListener } from './listeners/history.listener';
+import { HistoryProcessor } from './processors/history.processor';
 import { LoggerExtension } from './extensions/logger.extension';
 import { EnvironmentService } from '../integrations/environment/environment.service';
+import { CollabHistoryService } from './services/collab-history.service';
 
 @Module({
   providers: [
@@ -17,7 +18,8 @@ import { EnvironmentService } from '../integrations/environment/environment.serv
     AuthenticationExtension,
     PersistenceExtension,
     LoggerExtension,
-    HistoryListener,
+    HistoryProcessor,
+    CollabHistoryService,
   ],
   exports: [CollaborationGateway],
   imports: [TokenModule],
