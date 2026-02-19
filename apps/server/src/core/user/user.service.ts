@@ -43,6 +43,14 @@ export class UserService {
       );
     }
 
+    if (typeof updateUserDto.tocDefaultOpen !== 'undefined') {
+      return this.userRepo.updatePreference(
+        userId,
+        'tocDefaultOpen',
+        updateUserDto.tocDefaultOpen,
+      );
+    }
+
     if (typeof updateUserDto.pageEditMode !== 'undefined') {
       return this.userRepo.updatePreference(
         userId,

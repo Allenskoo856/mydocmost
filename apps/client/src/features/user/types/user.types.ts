@@ -20,6 +20,7 @@ export interface IUser {
   deletedAt: Date;
   fullPageWidth: boolean; // used for update
   pageEditMode: string; // used for update
+  tocDefaultOpen?: boolean; // used for update
   hasGeneratedPassword?: boolean;
 }
 
@@ -32,6 +33,7 @@ export interface IUserSettings {
   preferences: {
     fullPageWidth: boolean;
     pageEditMode: string;
+    tocDefaultOpen?: boolean;
   };
 }
 

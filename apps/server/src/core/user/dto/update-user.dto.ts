@@ -22,6 +22,10 @@ export class UpdateUserDto extends PartialType(
   fullPageWidth: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  tocDefaultOpen: boolean;
+
+  @IsOptional()
   @IsString()
   @IsIn(['read', 'edit'])
   pageEditMode: string;

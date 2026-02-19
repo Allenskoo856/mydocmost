@@ -46,7 +46,11 @@ import ExcalidrawMenu from "./components/excalidraw/excalidraw-menu";
 import DrawioMenu from "./components/drawio/drawio-menu";
 import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
 import SearchAndReplaceDialog from "@/features/editor/components/search-and-replace/search-and-replace-dialog.tsx";
-import { useDebouncedCallback, useDocumentVisibility } from "@mantine/hooks";
+import {
+  useDebouncedCallback,
+  useDocumentVisibility,
+  useMediaQuery,
+} from "@mantine/hooks";
 import { useIdle } from "@/hooks/use-idle.ts";
 import { queryClient } from "@/main.tsx";
 import { IPage } from "@/features/page/types/page.types.ts";
@@ -104,6 +108,9 @@ export default function PageEditor({
   const slugId = extractPageSlugId(pageSlug);
   const userPageEditMode =
     currentUser?.user?.settings?.preferences?.pageEditMode ?? PageEditMode.Edit;
+  const tocDefaultOpen =
+    currentUser?.user?.settings?.preferences?.tocDefaultOpen ?? false;
+  const isMobile = useMediaQuery("(max-width: 48em)");
   
     const canScroll = useCallback(() => isComponentMounted.current && editorCreated.current, [isComponentMounted, editorCreated]);
   const { handleScrollTo } = useEditorScroll({ canScroll });
@@ -340,8 +347,12 @@ export default function PageEditor({
   useEffect(() => {
     setActiveCommentId(null);
     setShowCommentPopup(false);
+    if (!isMobile && tocDefaultOpen) {
+      setAsideState({ tab: "toc", isAsideOpen: true });
+      return;
+    }
     setAsideState({ tab: "", isAsideOpen: false });
-  }, [pageId]);
+  }, [pageId, isMobile, tocDefaultOpen]);
 
   useEffect(() => {
     if (remoteProvider?.status === WebSocketStatus.Connecting) {
