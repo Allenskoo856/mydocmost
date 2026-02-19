@@ -40,13 +40,25 @@ import { Queue } from 'bullmq';
 import { QueueJob, QueueName } from '../../../integrations/queue/constants';
 import { EventName } from '../../../common/events/event.contants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PageManageListDto, PagePropertiesBatchUpdateDto } from '../dto/page-properties.dto';
+import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
+import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
+import { sql } from 'kysely';
 
 @Injectable()
 export class PageService {
   private readonly logger = new Logger(PageService.name);
+  private readonly defaultStatusOptions = [
+    'Backlog',
+    'Todo',
+    'In Progress',
+    'Done',
+  ];
 
   constructor(
     private pageRepo: PageRepo,
+    private spaceRepo: SpaceRepo,
+    private spaceMemberRepo: SpaceMemberRepo,
     private attachmentRepo: AttachmentRepo,
     @InjectKysely() private readonly db: KyselyDB,
     private readonly storageService: StorageService,
@@ -54,6 +66,118 @@ export class PageService {
     @InjectQueue(QueueName.AI_QUEUE) private aiQueue: Queue,
     private eventEmitter: EventEmitter2,
   ) {}
+
+  normalizeTags(tags?: string[]): string[] {
+    if (!tags) return [];
+    const normalized: string[] = [];
+    const seen = new Set<string>();
+
+    for (const raw of tags) {
+      const value = raw?.trim();
+      if (!value) continue;
+      const key = value.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        normalized.push(value);
+      }
+    }
+    return normalized;
+  }
+
+  async getSpaceStatusOptions(spaceId: string, workspaceId: string) {
+    const config = await this.spaceRepo.findPagePropertyStatusConfig(
+      spaceId,
+      workspaceId,
+    );
+    if (!config?.statusOptions || !Array.isArray(config.statusOptions)) {
+      return this.defaultStatusOptions;
+    }
+    return config.statusOptions as string[];
+  }
+
+  async assertValidOwner(
+    ownerId: string | undefined,
+    spaceId: string,
+    workspaceId: string,
+  ) {
+    if (!ownerId) return;
+
+    const owner = await this.db
+      .selectFrom('users')
+      .select(['id'])
+      .where('id', '=', ownerId)
+      .where('workspaceId', '=', workspaceId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst();
+
+    if (!owner) {
+      throw new BadRequestException('Owner must belong to current workspace');
+    }
+
+    const ownerSpaces = await this.spaceMemberRepo.getUserSpaceIds(ownerId);
+    if (!ownerSpaces.includes(spaceId)) {
+      throw new BadRequestException('Owner must have access to this space');
+    }
+  }
+
+  async buildPropertyUpdateData(
+    spaceId: string,
+    workspaceId: string,
+    dto: {
+      ownerId?: string | null;
+      status?: string | null;
+      priority?: string | null;
+      dueAt?: string | Date | null;
+      tags?: string[];
+    },
+    opts?: { allowNull?: boolean },
+  ) {
+    const updateData: Record<string, any> = {};
+    const allowNull = Boolean(opts?.allowNull);
+
+    if (dto.ownerId !== undefined) {
+      if (dto.ownerId === null && allowNull) {
+        updateData.propertyOwnerId = null;
+      } else {
+        await this.assertValidOwner(dto.ownerId as string, spaceId, workspaceId);
+        updateData.propertyOwnerId = dto.ownerId;
+      }
+    }
+
+    if (dto.status !== undefined) {
+      if (dto.status === null && allowNull) {
+        updateData.propertyStatus = null;
+      } else {
+        const statusOptions = await this.getSpaceStatusOptions(spaceId, workspaceId);
+        if (!statusOptions.includes(dto.status as string)) {
+          throw new BadRequestException('Status is not in space status options');
+        }
+        updateData.propertyStatus = dto.status;
+      }
+    }
+
+    if (dto.priority !== undefined) {
+      updateData.propertyPriority = dto.priority;
+    }
+
+    if (dto.dueAt !== undefined) {
+      if (dto.dueAt === null && allowNull) {
+        updateData.propertyDueAt = null;
+      } else {
+        const parsed = new Date(dto.dueAt as string | Date);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new BadRequestException('Invalid dueAt');
+        }
+        updateData.propertyDueAt = parsed;
+      }
+    }
+
+    if (dto.tags !== undefined) {
+      updateData.propertyTags = this.normalizeTags(dto.tags);
+    }
+
+    return updateData;
+  }
 
   async findById(
     pageId: string,
@@ -88,6 +212,18 @@ export class PageService {
       parentPageId = parentPage.id;
     }
 
+    const propertyUpdateData = await this.buildPropertyUpdateData(
+      createPageDto.spaceId,
+      workspaceId,
+      {
+        ownerId: createPageDto.ownerId,
+        status: createPageDto.status,
+        priority: createPageDto.priority,
+        dueAt: createPageDto.dueAt,
+        tags: createPageDto.tags,
+      },
+    );
+
     const createdPage = await this.pageRepo.insertPage({
       slugId: generateSlugId(),
       title: createPageDto.title,
@@ -101,6 +237,7 @@ export class PageService {
       creatorId: userId,
       workspaceId: workspaceId,
       lastUpdatedById: userId,
+      ...propertyUpdateData,
     });
 
     return createdPage;
@@ -152,9 +289,21 @@ export class PageService {
     updatePageDto: UpdatePageDto,
     userId: string,
   ): Promise<Page> {
-    const contributors = new Set<string>(page.contributorIds);
+    const contributors = new Set<string>(page.contributorIds || []);
     contributors.add(userId);
     const contributorIds = Array.from(contributors);
+
+    const propertyUpdateData = await this.buildPropertyUpdateData(
+      page.spaceId,
+      page.workspaceId,
+      {
+        ownerId: updatePageDto.ownerId,
+        status: updatePageDto.status,
+        priority: updatePageDto.priority,
+        dueAt: updatePageDto.dueAt,
+        tags: updatePageDto.tags,
+      },
+    );
 
     await this.pageRepo.updatePage(
       {
@@ -163,6 +312,7 @@ export class PageService {
         lastUpdatedById: userId,
         updatedAt: new Date(),
         contributorIds: contributorIds,
+        ...propertyUpdateData,
       },
       page.id,
     );
@@ -174,6 +324,170 @@ export class PageService {
       includeLastUpdatedBy: true,
       includeContributors: true,
     });
+  }
+
+  async getPageManageList(
+    dto: PageManageListDto,
+    pagination: PaginationOptions,
+  ) {
+    let query = this.db
+      .selectFrom('pages')
+      .select([
+        'id',
+        'slugId',
+        'title',
+        'icon',
+        'parentPageId',
+        'spaceId',
+        'updatedAt',
+        'propertyOwnerId',
+        'propertyStatus',
+        'propertyPriority',
+        'propertyDueAt',
+        'propertyTags',
+      ])
+      .select((eb) => [this.pageRepo.withSpace(eb), this.pageRepo.withCreator(eb)])
+      .leftJoin('users as owner', 'owner.id', 'pages.propertyOwnerId')
+      .select(['owner.id as ownerId', 'owner.name as ownerName', 'owner.avatarUrl as ownerAvatarUrl'])
+      .where('pages.deletedAt', 'is', null)
+      .where('pages.spaceId', '=', dto.spaceId);
+
+    if (dto.keyword?.trim()) {
+      query = query.where((eb) =>
+        eb('pages.title', 'ilike', `%${dto.keyword.trim()}%`),
+      );
+    }
+
+    if (dto.status?.length) {
+      query = query.where('pages.propertyStatus', 'in', dto.status);
+    }
+
+    if (dto.priority?.length) {
+      query = query.where('pages.propertyPriority', 'in', dto.priority);
+    }
+
+    if (dto.ownerIds?.length) {
+      query = query.where('pages.propertyOwnerId', 'in', dto.ownerIds);
+    }
+
+    if (dto.tags?.length) {
+      const tags = this.normalizeTags(dto.tags).map((v) => v.toLowerCase());
+      if (tags.length > 0) {
+        query = query.where(
+          sql<boolean>`exists (select 1 from unnest(pages.property_tags) as tag where lower(tag) in (${sql.join(
+            tags.map((tag) => sql`${tag}`),
+          )}))`,
+        );
+      }
+    }
+
+    if (dto.dueRange?.from) {
+      query = query.where('pages.propertyDueAt', '>=', new Date(dto.dueRange.from));
+    }
+    if (dto.dueRange?.to) {
+      query = query.where('pages.propertyDueAt', '<=', new Date(dto.dueRange.to));
+    }
+
+    const sortBy = dto.sortBy || 'updatedAt';
+    const sortOrder = dto.sortOrder === 'asc' ? 'asc' : 'desc';
+    const sortColumn =
+      sortBy === 'dueAt'
+        ? 'pages.propertyDueAt'
+        : sortBy === 'priority'
+          ? 'pages.propertyPriority'
+          : 'pages.updatedAt';
+    query = query.orderBy(sortColumn as any, sortOrder);
+
+    const result = executeWithPagination(query, {
+      page: pagination.page,
+      perPage: pagination.limit || 50,
+    });
+
+    return result;
+  }
+
+  async getSpacePropertyTags(spaceId: string) {
+    const rows = await this.db
+      .selectFrom('pages')
+      .select('propertyTags')
+      .where('spaceId', '=', spaceId)
+      .where('deletedAt', 'is', null)
+      .execute();
+
+    const normalized = this.normalizeTags(rows.flatMap((row) => row.propertyTags || []));
+    return normalized.sort((a, b) => a.localeCompare(b));
+  }
+
+  async batchUpdatePageProperties(
+    dto: PagePropertiesBatchUpdateDto,
+    userId: string,
+    workspaceId: string,
+  ) {
+    const pageRows = await this.db
+      .selectFrom('pages')
+      .select(['id', 'spaceId', 'workspaceId'])
+      .where('id', 'in', dto.pageIds)
+      .where('deletedAt', 'is', null)
+      .execute();
+
+    const pageMap = new Map(pageRows.map((p) => [p.id, p]));
+    const failed: Array<{ pageId: string; code: string; message: string }> = [];
+    let successCount = 0;
+
+    let patchData: Record<string, any> = {};
+    try {
+      patchData = await this.buildPropertyUpdateData(
+        dto.spaceId,
+        workspaceId,
+        dto.patch,
+        { allowNull: true },
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Invalid patch payload';
+      throw new BadRequestException(message);
+    }
+
+    const userSpaces = await this.spaceMemberRepo.getUserSpaceIds(userId);
+
+    for (const pageId of dto.pageIds) {
+      const page = pageMap.get(pageId);
+      if (!page) {
+        failed.push({
+          pageId,
+          code: 'NOT_FOUND',
+          message: 'Page not found',
+        });
+        continue;
+      }
+      if (page.spaceId !== dto.spaceId || page.workspaceId !== workspaceId) {
+        failed.push({
+          pageId,
+          code: 'SPACE_MISMATCH',
+          message: 'Page does not belong to target space',
+        });
+        continue;
+      }
+
+      if (!userSpaces.includes(dto.spaceId)) {
+        failed.push({
+          pageId,
+          code: 'FORBIDDEN',
+          message: 'No permission to edit this page',
+        });
+        continue;
+      }
+
+      await this.pageRepo.updatePage(
+        {
+          ...patchData,
+          lastUpdatedById: userId,
+        },
+        pageId,
+      );
+      successCount += 1;
+    }
+
+    return { successCount, failed };
   }
 
   async getSidebarPages(

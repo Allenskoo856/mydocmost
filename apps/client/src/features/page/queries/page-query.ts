@@ -9,9 +9,12 @@ import {
   keepPreviousData,
 } from "@tanstack/react-query";
 import {
+  batchUpdatePageProperties,
   createPage,
   deletePage,
   getPageById,
+  getPageManageList,
+  getPagePropertyTags,
   getSidebarPages,
   updatePage,
   movePage,
@@ -26,6 +29,8 @@ import {
   IPage,
   IPageInput,
   SidebarPagesParams,
+  IPageManageListParams,
+  IPagePropertiesBatchUpdateInput,
 } from "@/features/page/types/page.types";
 import { notifications } from "@mantine/notifications";
 import { IPagination, QueryParams } from "@/lib/types.ts";
@@ -120,6 +125,46 @@ export function useUpdatePageMutation() {
         data.icon,
       );
     },
+  });
+}
+
+export function usePageManageListQuery(
+  params: IPageManageListParams | null,
+): UseQueryResult<IPagination<IPage>, Error> {
+  return useQuery({
+    queryKey: ["page-manage-list", params],
+    queryFn: () => getPageManageList(params),
+    enabled: Boolean(params?.spaceId),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useBatchUpdatePagePropertiesMutation() {
+  return useMutation<
+    { successCount: number; failed: Array<{ pageId: string; code: string; message: string }> },
+    Error,
+    IPagePropertiesBatchUpdateInput
+  >({
+    mutationFn: (data) => batchUpdatePageProperties(data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["page-manage-list"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["pages"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["root-sidebar-pages", variables.spaceId],
+      });
+    },
+  });
+}
+
+export function usePagePropertyTagsQuery(spaceId?: string) {
+  return useQuery({
+    queryKey: ["page-property-tags", spaceId],
+    queryFn: () => getPagePropertyTags(spaceId),
+    enabled: Boolean(spaceId),
   });
 }
 

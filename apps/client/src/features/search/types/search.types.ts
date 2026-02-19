@@ -15,6 +15,11 @@ export interface IPageSearch {
   rank: string;
   highlight: string;
   space: Partial<ISpace>;
+  propertyOwnerId?: string | null;
+  propertyStatus?: string | null;
+  propertyPriority?: "P0" | "P1" | "P2" | "P3" | null;
+  propertyDueAt?: Date | string | null;
+  propertyTags?: string[];
 }
 
 export interface SearchSuggestionParams {
@@ -36,6 +41,14 @@ export interface IPageSearchParams {
   query: string;
   spaceId?: string;
   shareId?: string;
+  status?: string[];
+  priority?: Array<"P0" | "P1" | "P2" | "P3">;
+  ownerIds?: string[];
+  tags?: string[];
+  dueRange?: {
+    from?: string;
+    to?: string;
+  };
 }
 
 export interface IAttachmentSearch {

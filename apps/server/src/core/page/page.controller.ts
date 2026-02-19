@@ -35,6 +35,11 @@ import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { RecentPageDto } from './dto/recent-page.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { DeletedPageDto } from './dto/deleted-page.dto';
+import {
+  PageManageListDto,
+  PagePropertiesBatchUpdateDto,
+  PagePropertyTagsDto,
+} from './dto/page-properties.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -388,5 +393,46 @@ export class PageController {
       throw new ForbiddenException();
     }
     return this.pageService.getPageBreadCrumbs(page.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/manage/list')
+  async getPageManageList(
+    @Body() dto: PageManageListDto,
+    @Body() pagination: PaginationOptions,
+    @AuthUser() user: User,
+  ) {
+    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.pageService.getPageManageList(dto, pagination);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/properties/tags')
+  async getPagePropertyTags(@Body() dto: PagePropertyTagsDto, @AuthUser() user: User) {
+    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.pageService.getSpacePropertyTags(dto.spaceId);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/properties/batch-update')
+  async batchUpdatePageProperties(
+    @Body() dto: PagePropertiesBatchUpdateDto,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    if (ability.cannot(SpaceCaslAction.Edit, SpaceCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.pageService.batchUpdatePageProperties(dto, user.id, workspace.id);
   }
 }

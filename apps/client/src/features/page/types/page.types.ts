@@ -22,6 +22,14 @@ export interface IPage {
   lastUpdatedBy: ILastUpdatedBy;
   deletedBy: IDeletedBy;
   space: Partial<ISpace>;
+  propertyOwnerId?: string | null;
+  propertyStatus?: string | null;
+  propertyPriority?: "P0" | "P1" | "P2" | "P3" | null;
+  propertyDueAt?: Date | string | null;
+  propertyTags?: string[];
+  ownerId?: string | null;
+  ownerName?: string | null;
+  ownerAvatarUrl?: string | null;
 }
 
 interface ICreator {
@@ -73,6 +81,42 @@ export interface IPageInput {
   coverPhoto: string;
   position: string;
   isLocked: boolean;
+  ownerId?: string | null;
+  status?: string | null;
+  priority?: "P0" | "P1" | "P2" | "P3" | null;
+  dueAt?: string | null;
+  tags?: string[];
+}
+
+export interface IPageManageListParams {
+  spaceId: string;
+  page?: number;
+  limit?: number;
+  keyword?: string;
+  status?: string[];
+  priority?: Array<"P0" | "P1" | "P2" | "P3">;
+  ownerIds?: string[];
+  tags?: string[];
+  dueRange?: {
+    from?: string;
+    to?: string;
+  };
+  sortBy?: "updatedAt" | "dueAt" | "priority";
+  sortOrder?: "asc" | "desc";
+}
+
+export interface IPagePropertiesBatchPatch {
+  ownerId?: string | null;
+  status?: string | null;
+  priority?: "P0" | "P1" | "P2" | "P3" | null;
+  dueAt?: string | null;
+  tags?: string[];
+}
+
+export interface IPagePropertiesBatchUpdateInput {
+  spaceId: string;
+  pageIds: string[];
+  patch: IPagePropertiesBatchPatch;
 }
 
 export interface IExportPageParams {

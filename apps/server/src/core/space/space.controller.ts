@@ -34,6 +34,10 @@ import {
 } from '../casl/interfaces/workspace-ability.type';
 import WorkspaceAbilityFactory from '../casl/abilities/workspace-ability.factory';
 import { CreateSpaceDto } from './dto/create-space.dto';
+import {
+  SpacePagePropertyStatusConfigDto,
+  UpdateSpacePagePropertyStatusConfigDto,
+} from './dto/page-property-status.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('spaces')
@@ -237,5 +241,39 @@ export class SpaceController {
         'please provide either a userId or groupId and both',
       );
     }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('page-properties/status-config/get')
+  async getPagePropertyStatusConfig(
+    @Body() dto: SpacePagePropertyStatusConfigDto,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Settings)) {
+      throw new ForbiddenException();
+    }
+
+    return this.spaceService.getPagePropertyStatusConfig(dto.spaceId, workspace.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('page-properties/status-config/update')
+  async updatePagePropertyStatusConfig(
+    @Body() dto: UpdateSpacePagePropertyStatusConfigDto,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Settings)) {
+      throw new ForbiddenException();
+    }
+
+    return this.spaceService.updatePagePropertyStatusConfig(
+      dto.spaceId,
+      workspace.id,
+      dto.statusOptions,
+    );
   }
 }

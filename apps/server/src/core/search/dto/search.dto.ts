@@ -1,10 +1,26 @@
 import {
+  IsArray,
   IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { PAGE_PRIORITY_OPTIONS } from '../../page/dto/create-page.dto';
+
+class DueRangeDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+}
 
 export class SearchDTO {
   @IsNotEmpty()
@@ -30,6 +46,31 @@ export class SearchDTO {
   @IsOptional()
   @IsNumber()
   offset?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  status?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(PAGE_PRIORITY_OPTIONS, { each: true })
+  priority?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  ownerIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DueRangeDto)
+  dueRange?: DueRangeDto;
 }
 
 export class SearchShareDTO extends SearchDTO {

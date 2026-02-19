@@ -169,4 +169,35 @@ export class SpaceRepo {
       spaceId,
     });
   }
+
+  async findPagePropertyStatusConfig(spaceId: string, workspaceId: string) {
+    return this.db
+      .selectFrom('spacePagePropertyConfigs')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .where('workspaceId', '=', workspaceId)
+      .executeTakeFirst();
+  }
+
+  async upsertPagePropertyStatusConfig(
+    spaceId: string,
+    workspaceId: string,
+    statusOptions: string[],
+  ) {
+    return this.db
+      .insertInto('spacePagePropertyConfigs')
+      .values({
+        spaceId,
+        workspaceId,
+        statusOptions,
+      })
+      .onConflict((oc) =>
+        oc.column('spaceId').doUpdateSet({
+          statusOptions,
+          updatedAt: new Date(),
+        }),
+      )
+      .returningAll()
+      .executeTakeFirst();
+  }
 }

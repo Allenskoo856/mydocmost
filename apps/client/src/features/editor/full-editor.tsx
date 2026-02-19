@@ -5,6 +5,7 @@ import PageEditor from "@/features/editor/page-editor";
 import { Container } from "@mantine/core";
 import { useAtom } from "jotai";
 import { userAtom } from "@/features/user/atoms/current-user-atom.ts";
+import PagePropertiesPanel from "@/features/page/components/page-properties-panel.tsx";
 
 const MemoizedTitleEditor = React.memo(TitleEditor);
 const MemoizedPageEditor = React.memo(PageEditor);
@@ -15,6 +16,7 @@ export interface FullEditorProps {
   title: string;
   content: string;
   spaceSlug: string;
+  spaceId: string;
   editable: boolean;
 }
 
@@ -24,6 +26,7 @@ export function FullEditor({
   slugId,
   content,
   spaceSlug,
+  spaceId,
   editable,
 }: FullEditorProps) {
   const [user] = useAtom(userAtom);
@@ -42,6 +45,7 @@ export function FullEditor({
         spaceSlug={spaceSlug}
         editable={editable}
       />
+      <PagePropertiesPanel pageId={pageId} spaceId={spaceId} editable={editable} />
       <MemoizedPageEditor
         pageId={pageId}
         editable={editable}

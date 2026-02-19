@@ -20,6 +20,13 @@ import { InjectQueue } from '@nestjs/bullmq';
 
 @Injectable()
 export class SpaceService {
+  private readonly defaultPageStatusOptions = [
+    'Backlog',
+    'Todo',
+    'In Progress',
+    'Done',
+  ];
+
   constructor(
     private spaceRepo: SpaceRepo,
     private spaceMemberService: SpaceMemberService,
@@ -147,5 +154,66 @@ export class SpaceService {
 
     await this.spaceRepo.deleteSpace(spaceId, workspaceId);
     await this.attachmentQueue.add(QueueJob.DELETE_SPACE_ATTACHMENTS, space);
+  }
+
+  normalizeStatusOptions(statusOptions: string[]) {
+    const cleaned: string[] = [];
+    const seen = new Set<string>();
+
+    for (const item of statusOptions) {
+      const value = item?.trim();
+      if (!value) continue;
+      const key = value.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        cleaned.push(value);
+      }
+    }
+
+    if (cleaned.length === 0) {
+      throw new BadRequestException('At least one status option is required');
+    }
+
+    return cleaned;
+  }
+
+  async getPagePropertyStatusConfig(spaceId: string, workspaceId: string) {
+    const space = await this.spaceRepo.findById(spaceId, workspaceId);
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+
+    let config = await this.spaceRepo.findPagePropertyStatusConfig(
+      spaceId,
+      workspaceId,
+    );
+
+    if (!config) {
+      config = await this.spaceRepo.upsertPagePropertyStatusConfig(
+        spaceId,
+        workspaceId,
+        this.defaultPageStatusOptions,
+      );
+    }
+
+    return config;
+  }
+
+  async updatePagePropertyStatusConfig(
+    spaceId: string,
+    workspaceId: string,
+    statusOptions: string[],
+  ) {
+    const space = await this.spaceRepo.findById(spaceId, workspaceId);
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+
+    const normalized = this.normalizeStatusOptions(statusOptions);
+    return this.spaceRepo.upsertPagePropertyStatusConfig(
+      spaceId,
+      workspaceId,
+      normalized,
+    );
   }
 }

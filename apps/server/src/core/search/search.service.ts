@@ -45,6 +45,11 @@ export class SearchService {
         'creatorId',
         'createdAt',
         'updatedAt',
+        'propertyOwnerId',
+        'propertyStatus',
+        'propertyPriority',
+        'propertyDueAt',
+        'propertyTags',
         sql<number>`ts_rank(tsv, to_tsquery('english', f_unaccent(${searchQuery})))`.as(
           'rank',
         ),
@@ -60,10 +65,47 @@ export class SearchService {
       .$if(Boolean(searchParams.creatorId), (qb) =>
         qb.where('creatorId', '=', searchParams.creatorId),
       )
+      .$if(Boolean(searchParams.status?.length), (qb) =>
+        qb.where('propertyStatus', 'in', searchParams.status),
+      )
+      .$if(Boolean(searchParams.priority?.length), (qb) =>
+        qb.where('propertyPriority', 'in', searchParams.priority),
+      )
+      .$if(Boolean(searchParams.ownerIds?.length), (qb) =>
+        qb.where('propertyOwnerId', 'in', searchParams.ownerIds),
+      )
       .where('deletedAt', 'is', null)
       .orderBy('rank', 'desc')
       .limit(searchParams.limit | 25)
       .offset(searchParams.offset || 0);
+
+    if (searchParams.tags?.length) {
+      const normalizedTags = searchParams.tags
+        .map((tag) => tag?.trim().toLowerCase())
+        .filter(Boolean);
+      if (normalizedTags.length > 0) {
+        queryResults = queryResults.where(
+          sql<boolean>`exists (select 1 from unnest(pages.property_tags) as tag where lower(tag) in (${sql.join(
+            normalizedTags.map((tag) => sql`${tag}`),
+          )}))`,
+        );
+      }
+    }
+
+    if (searchParams.dueRange?.from) {
+      queryResults = queryResults.where(
+        'propertyDueAt',
+        '>=',
+        new Date(searchParams.dueRange.from),
+      );
+    }
+    if (searchParams.dueRange?.to) {
+      queryResults = queryResults.where(
+        'propertyDueAt',
+        '<=',
+        new Date(searchParams.dueRange.to),
+      );
+    }
 
     if (!searchParams.shareId) {
       queryResults = queryResults.select((eb) => this.pageRepo.withSpace(eb));

@@ -21,6 +21,14 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
   const [filters, setFilters] = useState<{
     spaceId?: string | null;
     contentType?: string;
+    status?: string[];
+    priority?: string[];
+    tags?: string[];
+    ownerIds?: string[];
+    dueRange?: {
+      from?: string;
+      to?: string;
+    };
   }>({
     contentType: "page",
   });
@@ -34,6 +42,21 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
 
     if (filters.spaceId) {
       params.spaceId = filters.spaceId;
+    }
+    if (filters.status?.length) {
+      params.status = filters.status;
+    }
+    if (filters.priority?.length) {
+      params.priority = filters.priority;
+    }
+    if (filters.tags?.length) {
+      params.tags = filters.tags;
+    }
+    if (filters.ownerIds?.length) {
+      params.ownerIds = filters.ownerIds;
+    }
+    if (filters.dueRange?.from || filters.dueRange?.to) {
+      params.dueRange = filters.dueRange;
     }
 
     return params;

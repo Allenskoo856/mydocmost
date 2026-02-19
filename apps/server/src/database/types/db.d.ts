@@ -223,6 +223,11 @@ export interface Pages {
   isLocked: Generated<boolean>;
   lastUpdatedById: string | null;
   parentPageId: string | null;
+  propertyDueAt: Timestamp | null;
+  propertyOwnerId: string | null;
+  propertyPriority: string | null;
+  propertyStatus: string | null;
+  propertyTags: Generated<string[]>;
   position: string | null;
   slugId: string;
   spaceId: string;
@@ -232,6 +237,14 @@ export interface Pages {
   updatedAt: Generated<Timestamp>;
   workspaceId: string;
   ydoc: Buffer | null;
+}
+
+export interface SpacePagePropertyConfigs {
+  createdAt: Generated<Timestamp>;
+  spaceId: string;
+  statusOptions: Json;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface Shares {
@@ -371,6 +384,7 @@ export interface DB {
   pages: Pages;
   shares: Shares;
   spaceMembers: SpaceMembers;
+  spacePagePropertyConfigs: SpacePagePropertyConfigs;
   spaces: Spaces;
   userMfa: UserMfa;
   users: Users;

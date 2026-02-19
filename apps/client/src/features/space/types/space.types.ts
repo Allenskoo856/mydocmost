@@ -75,3 +75,11 @@ export interface IExportSpaceParams {
   format: ExportFormat;
   includeAttachments?: boolean;
 }
+
+export interface ISpacePagePropertyStatusConfig {
+  spaceId: string;
+  workspaceId: string;
+  statusOptions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}

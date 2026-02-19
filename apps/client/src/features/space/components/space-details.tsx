@@ -18,6 +18,7 @@ import {
   ResponsiveSettingsControl,
   ResponsiveSettingsRow,
 } from "@/components/ui/responsive-settings-row.tsx";
+import SpacePagePropertySettings from "@/features/space/components/space-page-property-settings.tsx";
 
 interface SpaceDetailsProps {
   spaceId: string;
@@ -87,6 +88,10 @@ export default function SpaceDetails({ spaceId, readOnly }: SpaceDetailsProps) {
           </div>
 
           <EditSpaceForm space={space} readOnly={readOnly} />
+
+          <Divider my="lg" />
+
+          <SpacePagePropertySettings spaceId={spaceId} readOnly={readOnly} />
 
           {!readOnly && (
             <>

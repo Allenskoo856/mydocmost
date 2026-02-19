@@ -11,6 +11,8 @@ import {
   Group,
   Switch,
   getDefaultZIndex,
+  MultiSelect,
+  TagsInput,
 } from "@mantine/core";
 import {
   IconChevronDown,
@@ -23,6 +25,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useGetSpacesQuery } from "@/features/space/queries/space-query";
+import { useSpacePagePropertyStatusConfigQuery } from "@/features/space/queries/space-query";
 import { useLicense } from "@/ee/hooks/use-license";
 import classes from "./search-spotlight-filters.module.css";
 import { isCloud } from "@/lib/config.ts";
@@ -50,7 +53,16 @@ export function SearchSpotlightFilters({
   const [spaceSearchQuery, setSpaceSearchQuery] = useState("");
   const [debouncedSpaceQuery] = useDebouncedValue(spaceSearchQuery, 300);
   const [contentType, setContentType] = useState<string | null>("page");
+  const [status, setStatus] = useState<string[]>([]);
+  const [priority, setPriority] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [ownerIds, setOwnerIds] = useState<string[]>([]);
+  const [dueFrom, setDueFrom] = useState<string>("");
+  const [dueTo, setDueTo] = useState<string>("");
   const [workspace] = useAtom(workspaceAtom);
+  const effectiveSpaceId = selectedSpaceId || spaceId || undefined;
+  const { data: statusConfig } =
+    useSpacePagePropertyStatusConfigQuery(effectiveSpaceId);
 
   const { data: spacesData } = useGetSpacesQuery({
     page: 1,
@@ -80,6 +92,14 @@ export function SearchSpotlightFilters({
       onFiltersChange({
         spaceId: selectedSpaceId,
         contentType,
+        status,
+        priority,
+        tags,
+        ownerIds,
+        dueRange: {
+          from: dueFrom || undefined,
+          to: dueTo || undefined,
+        },
       });
     }
   }, []);
@@ -100,6 +120,14 @@ export function SearchSpotlightFilters({
       onFiltersChange({
         spaceId: spaceId,
         contentType,
+        status,
+        priority,
+        tags,
+        ownerIds,
+        dueRange: {
+          from: dueFrom || undefined,
+          to: dueTo || undefined,
+        },
       });
     }
   };
@@ -123,6 +151,52 @@ export function SearchSpotlightFilters({
       onFiltersChange({
         spaceId: newSelectedSpaceId,
         contentType: newContentType,
+        status,
+        priority,
+        tags,
+        ownerIds,
+        dueRange: {
+          from: dueFrom || undefined,
+          to: dueTo || undefined,
+        },
+      });
+    }
+  };
+
+  const handlePropertyFilterChange = (next: {
+    status?: string[];
+    priority?: string[];
+    tags?: string[];
+    ownerIds?: string[];
+    dueFrom?: string;
+    dueTo?: string;
+  }) => {
+    const nextStatus = next.status ?? status;
+    const nextPriority = next.priority ?? priority;
+    const nextTags = next.tags ?? tags;
+    const nextOwnerIds = next.ownerIds ?? ownerIds;
+    const nextDueFrom = next.dueFrom ?? dueFrom;
+    const nextDueTo = next.dueTo ?? dueTo;
+
+    setStatus(nextStatus);
+    setPriority(nextPriority);
+    setTags(nextTags);
+    setOwnerIds(nextOwnerIds);
+    setDueFrom(nextDueFrom);
+    setDueTo(nextDueTo);
+
+    if (onFiltersChange) {
+      onFiltersChange({
+        spaceId: selectedSpaceId,
+        contentType,
+        status: nextStatus,
+        priority: nextPriority,
+        tags: nextTags,
+        ownerIds: nextOwnerIds,
+        dueRange: {
+          from: nextDueFrom || undefined,
+          to: nextDueTo || undefined,
+        },
       });
     }
   };
@@ -287,6 +361,70 @@ export function SearchSpotlightFilters({
           ))}
         </Menu.Dropdown>
       </Menu>
+
+      <MultiSelect
+        value={status}
+        onChange={(value) => handlePropertyFilterChange({ status: value })}
+        data={(statusConfig?.statusOptions || []).map((value) => ({
+          value,
+          label: value,
+        }))}
+        placeholder={t("Status")}
+        size="xs"
+        w={180}
+      />
+
+      <MultiSelect
+        value={priority}
+        onChange={(value) => handlePropertyFilterChange({ priority: value })}
+        data={["P0", "P1", "P2", "P3"].map((value) => ({
+          value,
+          label: value,
+        }))}
+        placeholder={t("Priority")}
+        size="xs"
+        w={130}
+      />
+
+      <TagsInput
+        value={tags}
+        onChange={(value) => handlePropertyFilterChange({ tags: value })}
+        placeholder={t("Tags")}
+        size="xs"
+        w={180}
+      />
+
+      <TagsInput
+        value={ownerIds}
+        onChange={(value) =>
+          handlePropertyFilterChange({ ownerIds: value })
+        }
+        placeholder={t("Owner IDs")}
+        size="xs"
+        w={180}
+      />
+
+      <TextInput
+        type="datetime-local"
+        value={dueFrom}
+        onChange={(e) =>
+          handlePropertyFilterChange({ dueFrom: e.currentTarget.value })
+        }
+        size="xs"
+        w={180}
+        placeholder={t("Due from")}
+      />
+
+      <TextInput
+        type="datetime-local"
+        value={dueTo}
+        onChange={(e) =>
+          handlePropertyFilterChange({ dueTo: e.currentTarget.value })
+        }
+        size="xs"
+        w={180}
+        placeholder={t("Due to")}
+      />
     </div>
   );
 }

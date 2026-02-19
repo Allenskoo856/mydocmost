@@ -6,6 +6,8 @@ import {
   IMovePageToSpace,
   IPage,
   IPageInput,
+  IPageManageListParams,
+  IPagePropertiesBatchUpdateInput,
   SidebarPagesParams,
 } from '@/features/page/types/page.types';
 import { QueryParams } from "@/lib/types";
@@ -29,6 +31,28 @@ export async function getPageById(
 
 export async function updatePage(data: Partial<IPageInput>): Promise<IPage> {
   const req = await api.post<IPage>("/pages/update", data);
+  return req.data;
+}
+
+export async function getPageManageList(
+  params: IPageManageListParams,
+): Promise<IPagination<IPage>> {
+  const req = await api.post<IPagination<IPage>>("/pages/manage/list", params);
+  return req.data;
+}
+
+export async function batchUpdatePageProperties(
+  data: IPagePropertiesBatchUpdateInput,
+): Promise<{
+  successCount: number;
+  failed: Array<{ pageId: string; code: string; message: string }>;
+}> {
+  const req = await api.post("/pages/properties/batch-update", data);
+  return req.data;
+}
+
+export async function getPagePropertyTags(spaceId: string): Promise<string[]> {
+  const req = await api.post<string[]>("/pages/properties/tags", { spaceId });
   return req.data;
 }
 

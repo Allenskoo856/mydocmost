@@ -13,6 +13,7 @@ import {
   Pages,
   Shares,
   SpaceMembers,
+  SpacePagePropertyConfigs,
   Spaces,
   UserMfa,
   Users,
@@ -37,6 +38,7 @@ export interface DbInterface {
   pages: Pages;
   shares: Shares;
   spaceMembers: SpaceMembers;
+  spacePagePropertyConfigs: SpacePagePropertyConfigs;
   spaces: Spaces;
   userMfa: UserMfa;
   users: Users;
