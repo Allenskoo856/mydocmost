@@ -273,6 +273,45 @@ export interface SpaceMembers {
   userId: string | null;
 }
 
+export interface TemplateUsages {
+  createdAt: Generated<Timestamp>;
+  createdPageId: string | null;
+  id: Generated<string>;
+  spaceId: string;
+  templateId: string;
+  userId: string;
+  workspaceId: string;
+}
+
+export interface Templates {
+  category: string;
+  content: Json | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  deletedAt: Timestamp | null;
+  icon: string | null;
+  id: Generated<string>;
+  isRecommended: Generated<boolean>;
+  maintainerId: string | null;
+  name: string;
+  propertyDueAt: Timestamp | null;
+  propertyOwnerId: string | null;
+  propertyPriority: string | null;
+  propertyStatus: string | null;
+  propertyTags: Generated<string[]>;
+  publishedAt: Timestamp | null;
+  publishedById: string | null;
+  recommendedOrder: number | null;
+  scenes: Generated<string[]>;
+  spaceId: string;
+  status: string;
+  textContent: string | null;
+  tsv: string | null;
+  updatedAt: Generated<Timestamp>;
+  updaterId: string | null;
+  workspaceId: string;
+}
+
 export interface Spaces {
   createdAt: Generated<Timestamp>;
   creatorId: string | null;
@@ -386,6 +425,8 @@ export interface DB {
   spaceMembers: SpaceMembers;
   spacePagePropertyConfigs: SpacePagePropertyConfigs;
   spaces: Spaces;
+  templateUsages: TemplateUsages;
+  templates: Templates;
   userMfa: UserMfa;
   users: Users;
   userTokens: UserTokens;

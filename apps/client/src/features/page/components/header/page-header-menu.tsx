@@ -10,6 +10,7 @@ import {
   IconMessage,
   IconPrinter,
   IconSearch,
+  IconTemplate,
   IconTrash,
   IconWifiOff,
 } from "@tabler/icons-react";
@@ -44,6 +45,8 @@ import { PageStateSegmentedControl } from "@/features/user/components/page-state
 import MovePageModal from "@/features/page/components/move-page-modal.tsx";
 import { useTimeAgo } from "@/hooks/use-time-ago.tsx";
 import ShareModal from "@/features/share/components/share-modal.tsx";
+import SaveTemplateFromPageModal from "@/features/template/components/save-template-from-page-modal.tsx";
+import OverwriteTemplateFromPageModal from "@/features/template/components/overwrite-template-from-page-modal.tsx";
 
 interface PageHeaderMenuProps {
   readOnly?: boolean;
@@ -135,6 +138,14 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
     movePageModalOpened,
     { open: openMovePageModal, close: closeMoveSpaceModal },
   ] = useDisclosure(false);
+  const [
+    saveTemplateOpened,
+    { open: openSaveTemplateModal, close: closeSaveTemplateModal },
+  ] = useDisclosure(false);
+  const [
+    overwriteTemplateOpened,
+    { open: openOverwriteTemplateModal, close: closeOverwriteTemplateModal },
+  ] = useDisclosure(false);
   const [pageEditor] = useAtom(pageEditorAtom);
   const pageUpdatedAt = useTimeAgo(page?.updatedAt);
 
@@ -206,6 +217,24 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
               onClick={openMovePageModal}
             >
               {t("Move")}
+            </Menu.Item>
+          )}
+
+          {!readOnly && (
+            <Menu.Item
+              leftSection={<IconTemplate size={16} />}
+              onClick={openSaveTemplateModal}
+            >
+              {t("Save as template")}
+            </Menu.Item>
+          )}
+
+          {!readOnly && (
+            <Menu.Item
+              leftSection={<IconTemplate size={16} />}
+              onClick={openOverwriteTemplateModal}
+            >
+              {t("Overwrite template")}
             </Menu.Item>
           )}
 
@@ -286,6 +315,21 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
         currentSpaceSlug={spaceSlug}
         onClose={closeMoveSpaceModal}
         open={movePageModalOpened}
+      />
+
+      <SaveTemplateFromPageModal
+        opened={saveTemplateOpened}
+        onClose={closeSaveTemplateModal}
+        pageId={page.id}
+        spaceId={page.spaceId}
+        defaultName={page.title}
+      />
+
+      <OverwriteTemplateFromPageModal
+        opened={overwriteTemplateOpened}
+        onClose={closeOverwriteTemplateModal}
+        pageId={page.id}
+        spaceId={page.spaceId}
       />
     </>
   );

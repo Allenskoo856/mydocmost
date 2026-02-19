@@ -26,6 +26,8 @@ import { useTrackOrigin } from "@/hooks/use-track-origin";
 import SpacesPage from "@/pages/spaces/spaces.tsx";
 import SpaceTrash from "@/pages/space/space-trash.tsx";
 import SpacePageManage from "@/pages/space/space-page-manage.tsx";
+import SpaceTemplateCenter from "@/pages/space/space-template-center.tsx";
+import SpaceTemplatePreview from "@/pages/space/space-template-preview.tsx";
 import { useTranslation } from "react-i18next";
 
 export default function App() {
@@ -61,6 +63,11 @@ export default function App() {
           <Route path={"/s/:spaceSlug"} element={<SpaceHome />} />
           <Route path={"/s/:spaceSlug/trash"} element={<SpaceTrash />} />
           <Route path={"/s/:spaceSlug/pages/manage"} element={<SpacePageManage />} />
+          <Route path={"/s/:spaceSlug/templates"} element={<SpaceTemplateCenter />} />
+          <Route
+            path={"/s/:spaceSlug/templates/:templateId/preview"}
+            element={<SpaceTemplatePreview />}
+          />
           <Route
             path={"/s/:spaceSlug/p/:pageSlug"}
             element={

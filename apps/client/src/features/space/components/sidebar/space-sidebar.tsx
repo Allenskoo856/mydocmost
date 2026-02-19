@@ -11,6 +11,7 @@ import {
   IconDots,
   IconFileExport,
   IconHome,
+  IconTemplate,
   IconPlus,
   IconSearch,
   IconSettings,
@@ -46,6 +47,7 @@ import { searchSpotlight } from "@/features/search/constants";
 import SidebarToggle from "@/components/ui/sidebar-toggle-button.tsx";
 import TopMenuCompact from "@/components/layouts/global/top-menu-compact.tsx";
 import APP_ROUTE from "@/lib/app-route.ts";
+import NewPageTemplateModal from "@/features/template/components/new-page-template-modal.tsx";
 
 export function SpaceSidebar() {
   const { t } = useTranslation();
@@ -53,6 +55,10 @@ export function SpaceSidebar() {
   const location = useLocation();
   const [opened, { open: openSettings, close: closeSettings }] =
     useDisclosure(false);
+  const [
+    newPageModalOpened,
+    { open: openNewPageModal, close: closeNewPageModal },
+  ] = useDisclosure(false);
   const [mobileSidebarOpened] = useAtom(mobileSidebarAtom);
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
 
@@ -69,7 +75,7 @@ export function SpaceSidebar() {
     return <></>;
   }
 
-  function handleCreatePage() {
+  function createBlankPage() {
     tree?.create({ parentId: null, type: "internal", index: 0 });
   }
 
@@ -159,6 +165,28 @@ export function SpaceSidebar() {
 
             <UnstyledButton
               component={Link}
+              to={`/s/${spaceSlug}/templates`}
+              className={clsx(
+                classes.menu,
+                location.pathname.toLowerCase().startsWith(
+                  `/s/${spaceSlug}/templates`,
+                )
+                  ? classes.activeButton
+                  : "",
+              )}
+            >
+              <div className={classes.menuItemInner}>
+                <IconTemplate
+                  size={18}
+                  className={classes.menuItemIcon}
+                  stroke={2}
+                />
+                <span>{t("Template center")}</span>
+              </div>
+            </UnstyledButton>
+
+            <UnstyledButton
+              component={Link}
               to={`/s/${spaceSlug}/pages/manage`}
               className={clsx(
                 classes.menu,
@@ -196,7 +224,7 @@ export function SpaceSidebar() {
                 <UnstyledButton
                   className={classes.menu}
                   onClick={() => {
-                    handleCreatePage();
+                    openNewPageModal();
                     if (mobileSidebarOpened) {
                       toggleMobileSidebar();
                     }
@@ -232,7 +260,7 @@ export function SpaceSidebar() {
                     <ActionIcon
                       variant="default"
                       size={18}
-                      onClick={handleCreatePage}
+                      onClick={openNewPageModal}
                       aria-label={t("Create page")}
                     >
                       <IconPlus />
@@ -258,6 +286,14 @@ export function SpaceSidebar() {
         opened={opened}
         onClose={closeSettings}
         spaceId={space?.slug}
+      />
+
+      <NewPageTemplateModal
+        opened={newPageModalOpened}
+        onClose={closeNewPageModal}
+        spaceId={space.id}
+        spaceSlug={spaceSlug}
+        onCreateBlank={createBlankPage}
       />
     </>
   );

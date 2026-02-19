@@ -15,6 +15,8 @@ import {
   SpaceMembers,
   SpacePagePropertyConfigs,
   Spaces,
+  Templates,
+  TemplateUsages,
   UserMfa,
   Users,
   UserTokens,
@@ -40,6 +42,8 @@ export interface DbInterface {
   spaceMembers: SpaceMembers;
   spacePagePropertyConfigs: SpacePagePropertyConfigs;
   spaces: Spaces;
+  templates: Templates;
+  templateUsages: TemplateUsages;
   userMfa: UserMfa;
   users: Users;
   userTokens: UserTokens;
