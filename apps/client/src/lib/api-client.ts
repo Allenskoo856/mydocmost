@@ -76,11 +76,15 @@ function redirectToLogin() {
     APP_ROUTE.AUTH.SIGNUP,
     APP_ROUTE.AUTH.FORGOT_PASSWORD,
     APP_ROUTE.AUTH.PASSWORD_RESET,
+    APP_ROUTE.AUTH.MFA_CHALLENGE,
+    APP_ROUTE.AUTH.MFA_SETUP_REQUIRED,
     "/invites",
   ];
   const currentPath = window.location.pathname.replace(basePath, '');
   if (!exemptPaths.some((path) => currentPath.startsWith(path))) {
-    window.location.href = basePath + APP_ROUTE.AUTH.LOGIN;
+    const redirectTo = currentPath + window.location.search + window.location.hash;
+    const params = new URLSearchParams({ redirect: redirectTo });
+    window.location.href = `${basePath}${APP_ROUTE.AUTH.LOGIN}?${params.toString()}`;
   }
 }
 
