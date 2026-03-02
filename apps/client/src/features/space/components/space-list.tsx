@@ -8,11 +8,14 @@ import { useTranslation } from "react-i18next";
 import Paginate from "@/components/common/paginate.tsx";
 import { CustomAvatar } from "@/components/ui/custom-avatar.tsx";
 import { AvatarIconType } from "@/features/attachments/types/attachment.types.ts";
+import { SearchInput } from "@/components/common/search-input.tsx";
+import NoTableResults from "@/components/common/no-table-results.tsx";
+import { usePaginateAndSearch } from "@/hooks/use-paginate-and-search.tsx";
 
 export default function SpaceList() {
   const { t } = useTranslation();
-  const [page, setPage] = useState(1);
-  const { data, isLoading } = useGetSpacesQuery({ page });
+  const { search, page, setPage, handleSearch } = usePaginateAndSearch();
+  const { data, isLoading } = useGetSpacesQuery({ page, query: search });
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>(null);
 
@@ -23,6 +26,7 @@ export default function SpaceList() {
 
   return (
     <>
+      <SearchInput onSearch={handleSearch} />
       <Table.ScrollContainer minWidth={500}>
         <Table highlightOnHover verticalSpacing="sm" layout="fixed">
           <Table.Thead>
@@ -33,38 +37,42 @@ export default function SpaceList() {
           </Table.Thead>
 
           <Table.Tbody>
-            {data?.items.map((space, index) => (
-              <Table.Tr
-                key={index}
-                style={{ cursor: "pointer" }}
-                onClick={() => handleClick(space.id)}
-              >
-                <Table.Td>
-                  <Group gap="sm" wrap="nowrap">
-                    <CustomAvatar
-                      color="initials"
-                      avatarUrl={space.logo}
-                      type={AvatarIconType.SPACE_ICON}
-                      variant="filled"
-                      name={space.name}
-                    />
-                    <div>
-                      <Text fz="sm" fw={500} lineClamp={1}>
-                        {space.name}
-                      </Text>
-                      <Text fz="xs" c="dimmed" lineClamp={2}>
-                        {space.description}
-                      </Text>
-                    </div>
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" style={{ whiteSpace: "nowrap" }}>
-                    {formatMemberCount(space.memberCount, t)}
-                  </Text>
-                </Table.Td>
-              </Table.Tr>
-            ))}
+            {data?.items.length > 0 ? (
+              data?.items.map((space, index) => (
+                <Table.Tr
+                  key={index}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleClick(space.id)}
+                >
+                  <Table.Td>
+                    <Group gap="sm" wrap="nowrap">
+                      <CustomAvatar
+                        color="initials"
+                        avatarUrl={space.logo}
+                        type={AvatarIconType.SPACE_ICON}
+                        variant="filled"
+                        name={space.name}
+                      />
+                      <div>
+                        <Text fz="sm" fw={500} lineClamp={1}>
+                          {space.name}
+                        </Text>
+                        <Text fz="xs" c="dimmed" lineClamp={2}>
+                          {space.description}
+                        </Text>
+                      </div>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" style={{ whiteSpace: "nowrap" }}>
+                      {formatMemberCount(space.memberCount, t)}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            ) : (
+              <NoTableResults colSpan={2} />
+            )}
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>

@@ -1,6 +1,5 @@
 import { Table, Group, Text, Anchor } from "@mantine/core";
 import { useGetGroupsQuery } from "@/features/group/queries/group-query";
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { IconGroupCircle } from "@/components/icons/icon-people-circle.tsx";
 import { useTranslation } from "react-i18next";
@@ -8,13 +7,15 @@ import { formatMemberCount } from "@/lib";
 import { IGroup } from "@/features/group/types/group.types.ts";
 import Paginate from "@/components/common/paginate.tsx";
 import { queryClient } from "@/main.tsx";
-import { getSpaces } from "@/features/space/services/space-service.ts";
 import { getGroupMembers } from "@/features/group/services/group-service.ts";
+import { SearchInput } from "@/components/common/search-input.tsx";
+import NoTableResults from "@/components/common/no-table-results.tsx";
+import { usePaginateAndSearch } from "@/hooks/use-paginate-and-search.tsx";
 
 export default function GroupList() {
   const { t } = useTranslation();
-  const [page, setPage] = useState(1);
-  const { data, isLoading } = useGetGroupsQuery({ page });
+  const { search, page, setPage, handleSearch } = usePaginateAndSearch();
+  const { data, isLoading } = useGetGroupsQuery({ page, query: search });
 
   const prefetchGroupMembers = (groupId: string) => {
     queryClient.prefetchQuery({
@@ -25,6 +26,7 @@ export default function GroupList() {
 
   return (
     <>
+      <SearchInput onSearch={handleSearch} />
       <Table.ScrollContainer minWidth={500}>
         <Table highlightOnHover verticalSpacing="sm" layout="fixed">
           <Table.Thead>
@@ -35,49 +37,53 @@ export default function GroupList() {
           </Table.Thead>
 
           <Table.Tbody>
-            {data?.items.map((group: IGroup, index: number) => (
-              <Table.Tr key={index}>
-                <Table.Td onMouseEnter={() => prefetchGroupMembers(group.id)}>
-                  <Anchor
-                    size="sm"
-                    underline="never"
-                    style={{
-                      cursor: "pointer",
-                      color: "var(--mantine-color-text)",
-                    }}
-                    component={Link}
-                    to={`/settings/groups/${group.id}`}
-                  >
-                    <Group gap="sm" wrap="nowrap">
-                      <IconGroupCircle />
-                      <div>
-                        <Text fz="sm" fw={500} lineClamp={1}>
-                          {group.name}
-                        </Text>
-                        <Text fz="xs" c="dimmed" lineClamp={2}>
-                          {group.description}
-                        </Text>
-                      </div>
-                    </Group>
-                  </Anchor>
-                </Table.Td>
-                <Table.Td>
-                  <Anchor
-                    size="sm"
-                    underline="never"
-                    style={{
-                      cursor: "pointer",
-                      color: "var(--mantine-color-text)",
-                      whiteSpace: "nowrap",
-                    }}
-                    component={Link}
-                    to={`/settings/groups/${group.id}`}
-                  >
-                    {formatMemberCount(group.memberCount, t)}
-                  </Anchor>
-                </Table.Td>
-              </Table.Tr>
-            ))}
+            {data?.items.length > 0 ? (
+              data?.items.map((group: IGroup, index: number) => (
+                <Table.Tr key={index}>
+                  <Table.Td onMouseEnter={() => prefetchGroupMembers(group.id)}>
+                    <Anchor
+                      size="sm"
+                      underline="never"
+                      style={{
+                        cursor: "pointer",
+                        color: "var(--mantine-color-text)",
+                      }}
+                      component={Link}
+                      to={`/settings/groups/${group.id}`}
+                    >
+                      <Group gap="sm" wrap="nowrap">
+                        <IconGroupCircle />
+                        <div>
+                          <Text fz="sm" fw={500} lineClamp={1}>
+                            {group.name}
+                          </Text>
+                          <Text fz="xs" c="dimmed" lineClamp={2}>
+                            {group.description}
+                          </Text>
+                        </div>
+                      </Group>
+                    </Anchor>
+                  </Table.Td>
+                  <Table.Td>
+                    <Anchor
+                      size="sm"
+                      underline="never"
+                      style={{
+                        cursor: "pointer",
+                        color: "var(--mantine-color-text)",
+                        whiteSpace: "nowrap",
+                      }}
+                      component={Link}
+                      to={`/settings/groups/${group.id}`}
+                    >
+                      {formatMemberCount(group.memberCount, t)}
+                    </Anchor>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            ) : (
+              <NoTableResults colSpan={2} />
+            )}
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>
