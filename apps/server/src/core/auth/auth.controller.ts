@@ -8,6 +8,7 @@ import {
   UseGuards,
   Logger,
 } from '@nestjs/common';
+import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './services/auth.service';
 import { SetupGuard } from './guards/setup.guard';
@@ -25,6 +26,7 @@ import { FastifyReply } from 'fastify';
 import { validateSsoEnforcement } from './auth.util';
 import { ModuleRef } from '@nestjs/core';
 
+@UseGuards(ThrottlerGuard)
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
@@ -101,6 +103,7 @@ export class AuthController {
     return workspace;
   }
 
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
@@ -156,6 +159,7 @@ export class AuthController {
     return this.authService.verifyUserToken(verifyUserTokenDto, workspace.id);
   }
 
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('collab-token')
@@ -166,6 +170,7 @@ export class AuthController {
     return this.authService.getCollabToken(user, workspace.id);
   }
 
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('logout')

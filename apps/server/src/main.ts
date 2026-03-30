@@ -18,6 +18,8 @@ import { EnvironmentService } from './integrations/environment/environment.servi
 import { getMcpControllerPath } from './core/mcp/mcp-path.util';
 import { envPath } from './common/helpers';
 import { existsSync } from 'node:fs';
+import fastifyIp from 'fastify-ip';
+import { InternalLogFilter } from './common/logger/internal-log-filter';
 
 async function bootstrap() {
   if (existsSync(envPath)) {
@@ -63,6 +65,7 @@ async function bootstrap() {
 
   app.useWebSocketAdapter(redisIoAdapter);
 
+  await app.register(fastifyIp);
   await app.register(fastifyMultipart);
   await app.register(fastifyCookie);
 
