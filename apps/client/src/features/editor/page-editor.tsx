@@ -9,7 +9,6 @@ import {
 } from "@hocuspocus/provider";
 import {
   EditorContent,
-  EditorProvider,
   useEditor,
   useEditorState,
 } from "@tiptap/react";
@@ -61,6 +60,8 @@ import { PageEditMode } from "@/features/user/types/user.types.ts";
 import { jwtDecode } from "jwt-decode";
 import { searchSpotlight } from "@/features/search/constants.ts";
 import { useEditorScroll } from "./hooks/use-editor-scroll";
+import EditorSkeleton from "@/features/editor/components/editor-skeleton.tsx";
+import { markPerf, measurePerf } from "@/lib/perf.ts";
 
 interface PageEditorProps {
   pageId: string;
@@ -73,8 +74,6 @@ export default function PageEditor({
   editable,
   content,
 }: PageEditorProps) {
-
-  
   const collaborationURL = useCollaborationUrl();
   const isComponentMounted = useRef(false);
   const editorCreated = useRef(false);
@@ -95,9 +94,7 @@ export default function PageEditor({
   const ydoc = ydocRef.current;
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
-  const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom,
-  );
+  const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
   const menuContainerRef = useRef(null);
   const documentName = `page.${pageId}`;
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
@@ -111,8 +108,11 @@ export default function PageEditor({
   const tocDefaultOpen =
     currentUser?.user?.settings?.preferences?.tocDefaultOpen ?? false;
   const isMobile = useMediaQuery("(max-width: 48em)");
-  
-    const canScroll = useCallback(() => isComponentMounted.current && editorCreated.current, [isComponentMounted, editorCreated]);
+
+  const canScroll = useCallback(
+    () => isComponentMounted.current && editorCreated.current,
+    [isComponentMounted, editorCreated],
+  );
   const { handleScrollTo } = useEditorScroll({ canScroll });
   // Providers only created once per pageId
   const providersRef = useRef<{
@@ -121,25 +121,16 @@ export default function PageEditor({
   } | null>(null);
   const [providersReady, setProvidersReady] = useState(false);
 
-  const localProvider = providersRef.current?.local;
   const remoteProvider = providersRef.current?.remote;
-
-  // Track when collaborative provider is ready and synced
-  const [collabReady, setCollabReady] = useState(false);
-  useEffect(() => {
-    if (
-      remoteProvider?.status === WebSocketStatus.Connected &&
-      isLocalSynced &&
-      isRemoteSynced
-    ) {
-      setCollabReady(true);
-    }
-  }, [remoteProvider?.status, isLocalSynced, isRemoteSynced]);
 
   useEffect(() => {
     if (!providersRef.current) {
+      markPerf(`page-editor:${pageId}:providers-init`, { pageId });
       const local = new IndexeddbPersistence(documentName, ydoc);
-      local.on("synced", () => setLocalSynced(true));
+      local.on("synced", () => {
+        setLocalSynced(true);
+        markPerf(`page-editor:${pageId}:local-synced`, { pageId });
+      });
       const remote = new HocuspocusProvider({
         name: documentName,
         url: collaborationURL,
@@ -165,11 +156,15 @@ export default function PageEditor({
         },
         onStatus: (status) => {
           if (status.status === "connected") {
+            markPerf(`page-editor:${pageId}:collab-connected`, { pageId });
             setYjsConnectionStatus(status.status);
           }
         },
       });
-      remote.on("synced", () => setRemoteSynced(true));
+      remote.on("synced", () => {
+        setRemoteSynced(true);
+        markPerf(`page-editor:${pageId}:remote-synced`, { pageId });
+      });
       remote.on("disconnect", () => {
         setYjsConnectionStatus(WebSocketStatus.Disconnected);
       });
@@ -235,6 +230,7 @@ export default function PageEditor({
   const editor = useEditor(
     {
       extensions,
+      content,
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: false,
@@ -280,6 +276,7 @@ export default function PageEditor({
       },
       onCreate({ editor }) {
         if (editor) {
+          markPerf(`page-editor:${pageId}:editor-created`, { pageId });
           // @ts-ignore
           setEditor(editor);
           editor.storage.pageId = pageId;
@@ -373,10 +370,18 @@ export default function PageEditor({
         remoteProvider?.status === WebSocketStatus.Connected
       ) {
         setIsCollabReady(true);
+        markPerf(`page-editor:${pageId}:collab-ready`, { pageId });
       }
     }, 500);
     return () => clearTimeout(collabReadyTimeout);
-  }, [isRemoteSynced, isLocalSynced, remoteProvider?.status]);
+  }, [
+    pageId,
+    isRemoteSynced,
+    isLocalSynced,
+    remoteProvider?.status,
+    isCollabReady,
+    isSynced,
+  ]);
 
   useEffect(() => {
     // Only honor user default page edit mode preference and permissions
@@ -393,34 +398,29 @@ export default function PageEditor({
     }
   }, [userPageEditMode, editor, editable]);
 
-  const hasConnectedOnceRef = useRef(false);
-  const [showStatic, setShowStatic] = useState(true);
-
   useEffect(() => {
-    if (
-      !hasConnectedOnceRef.current &&
-      remoteProvider?.status === WebSocketStatus.Connected
-    ) {
-      hasConnectedOnceRef.current = true;
-      setShowStatic(false);
-    }
-  }, [remoteProvider?.status]);
+    if (!editor) return;
 
-  if (showStatic) {
-    return (
-      <EditorProvider
-        editable={false}
-        immediatelyRender={true}
-        extensions={mainExtensions}
-        content={content}
-      />
-    );
-  }
+    const startMark = `page-editor:${pageId}:editor-created`;
+    const endMark = `page-editor:${pageId}:content-visible`;
+    const rafId = window.requestAnimationFrame(() => {
+      markPerf(endMark, { pageId, isCollabReady });
+      measurePerf("page-editor-visible", startMark, endMark, {
+        pageId,
+        isCollabReady,
+      });
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [editor, pageId, isCollabReady]);
+
+  const showSkeleton = !editor;
 
   return (
     <div className="editor-container" style={{ position: "relative" }}>
+      {showSkeleton && <EditorSkeleton />}
       <div ref={menuContainerRef}>
-        <EditorContent editor={editor} />
+        {editor && <EditorContent editor={editor} />}
 
         {editor && (
           <SearchAndReplaceDialog editor={editor} editable={editable} />
@@ -440,10 +440,12 @@ export default function PageEditor({
             <LinkMenu editor={editor} appendTo={menuContainerRef} />
           </div>
         )}
-        {showCommentPopup && <CommentDialog editor={editor} pageId={pageId} />}
+        {showCommentPopup && editor && (
+          <CommentDialog editor={editor} pageId={pageId} />
+        )}
       </div>
       <div
-        onClick={() => editor.commands.focus("end")}
+        onClick={() => editor?.commands.focus("end")}
         style={{ paddingBottom: "20vh" }}
       ></div>
     </div>

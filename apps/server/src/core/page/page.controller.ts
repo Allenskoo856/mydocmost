@@ -7,6 +7,7 @@ import {
   HttpStatus,
   NotFoundException,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
@@ -40,6 +41,15 @@ import {
   PagePropertiesBatchUpdateDto,
   PagePropertyTagsDto,
 } from './dto/page-properties.dto';
+import { FastifyReply } from 'fastify';
+import { performance } from 'node:perf_hooks';
+import {
+  appendPerfHeader,
+  appendServerTiming,
+  estimatePayloadBytes,
+  measureAsync,
+  roundPerf,
+} from '../../common/helpers/perf.util';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -53,23 +63,51 @@ export class PageController {
 
   @HttpCode(HttpStatus.OK)
   @Post('/info')
-  async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
-    const page = await this.pageRepo.findById(dto.pageId, {
-      includeSpace: true,
-      includeContent: true,
-      includeCreator: true,
-      includeLastUpdatedBy: true,
-      includeContributors: true,
-    });
+  async getPage(
+    @Body() dto: PageInfoDto,
+    @AuthUser() user: User,
+    @Res({ passthrough: true }) res: FastifyReply,
+  ) {
+    const controllerStart = performance.now();
+    const { result: page, durationMs: pageQueryMs } = await measureAsync(
+      'pages.info.query',
+      () =>
+        this.pageRepo.findById(dto.pageId, {
+          includeSpace: true,
+          includeContent: true,
+          includeCreator: true,
+          includeLastUpdatedBy: true,
+          includeContributors: true,
+        }),
+      { pageId: dto.pageId },
+    );
 
     if (!page) {
       throw new NotFoundException('Page not found');
     }
 
-    const ability = await this.spaceAbility.createForUser(user, page.spaceId);
+    const { result: ability, durationMs: abilityMs } = await measureAsync(
+      'pages.info.ability',
+      () => this.spaceAbility.createForUser(user, page.spaceId),
+      { pageId: dto.pageId, spaceId: page.spaceId },
+    );
     if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
       throw new ForbiddenException();
     }
+
+    const payloadBytes = estimatePayloadBytes(page);
+    const contentBytes = estimatePayloadBytes(page.content);
+    const totalMs = performance.now() - controllerStart;
+
+    appendServerTiming(res, [
+      { name: 'pageQuery', durationMs: pageQueryMs, description: 'page repo' },
+      { name: 'ability', durationMs: abilityMs, description: 'space ability' },
+      { name: 'total', durationMs: totalMs, description: 'controller total' },
+    ]);
+    appendPerfHeader(res, 'X-Docmost-Response-Bytes', payloadBytes);
+    appendPerfHeader(res, 'X-Docmost-Content-Bytes', contentBytes);
+    appendPerfHeader(res, 'X-Docmost-Page-Query-Ms', roundPerf(pageQueryMs));
+    appendPerfHeader(res, 'X-Docmost-Ability-Ms', roundPerf(abilityMs));
 
     return page;
   }

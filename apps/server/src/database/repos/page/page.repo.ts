@@ -16,6 +16,12 @@ import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventName } from '../../../common/events/event.contants';
+import {
+  estimatePayloadBytes,
+  isPerfDebugEnabled,
+  roundPerf,
+} from '../../../common/helpers/perf.util';
+import { performance } from 'node:perf_hooks';
 
 @Injectable()
 export class PageRepo {
@@ -102,7 +108,18 @@ export class PageRepo {
       query = query.where('slugId', '=', pageId);
     }
 
-    return query.executeTakeFirst();
+    const start = performance.now();
+    const page = await query.executeTakeFirst();
+
+    if (isPerfDebugEnabled()) {
+      console.debug('[perf] repo.page.findById', {
+        pageId,
+        durationMs: roundPerf(performance.now() - start),
+        responseBytes: estimatePayloadBytes(page),
+      });
+    }
+
+    return page;
   }
 
   async updatePage(

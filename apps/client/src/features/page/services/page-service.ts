@@ -16,6 +16,7 @@ import { saveAs } from "file-saver";
 import { InfiniteData } from "@tanstack/react-query";
 import { IFileTask } from '@/features/file-task/types/file-task.types.ts';
 import { IAttachment } from '@/features/attachments/types/attachment.types.ts';
+import { logRequestPerf, markPerf, measurePerf } from "@/lib/perf.ts";
 
 export async function createPage(data: Partial<IPage>): Promise<IPage> {
   const req = await api.post<IPage>("/pages/create", data);
@@ -25,7 +26,16 @@ export async function createPage(data: Partial<IPage>): Promise<IPage> {
 export async function getPageById(
   pageInput: Partial<IPageInput>,
 ): Promise<IPage> {
+  const pageId = pageInput.pageId ?? "unknown";
+  const startMark = `pages.info:${pageId}:start`;
+  const endMark = `pages.info:${pageId}:end`;
+
+  markPerf(startMark, { pageId });
+  logRequestPerf("pages.info", "start", { pageId });
   const req = await api.post<IPage>("/pages/info", pageInput);
+  markPerf(endMark, { pageId });
+  measurePerf("pages.info", startMark, endMark, { pageId });
+  logRequestPerf("pages.info", "end", { pageId });
   return req.data;
 }
 

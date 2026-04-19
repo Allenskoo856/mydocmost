@@ -6,6 +6,7 @@ import { Container } from "@mantine/core";
 import { useAtom } from "jotai";
 import { userAtom } from "@/features/user/atoms/current-user-atom.ts";
 import PagePropertiesPanel from "@/features/page/components/page-properties-panel.tsx";
+import { markPerf } from "@/lib/perf.ts";
 
 const MemoizedTitleEditor = React.memo(TitleEditor);
 const MemoizedPageEditor = React.memo(PageEditor);
@@ -31,6 +32,10 @@ export function FullEditor({
 }: FullEditorProps) {
   const [user] = useAtom(userAtom);
   const fullPageWidth = user.settings?.preferences?.fullPageWidth;
+
+  React.useEffect(() => {
+    markPerf(`full-editor:${pageId}:mount`, { pageId, spaceId });
+  }, [pageId, spaceId]);
 
   return (
     <Container

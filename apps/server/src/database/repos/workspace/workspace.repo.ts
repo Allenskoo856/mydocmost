@@ -9,6 +9,8 @@ import {
 } from '@docmost/db/types/entity.types';
 import { ExpressionBuilder, sql } from 'kysely';
 import { DB, Workspaces } from '@docmost/db/types/db';
+import { isPerfDebugEnabled, roundPerf } from '../../../common/helpers/perf.util';
+import { performance } from 'node:perf_hooks';
 
 @Injectable()
 export class WorkspaceRepo {
@@ -68,20 +70,41 @@ export class WorkspaceRepo {
   }
 
   async findFirst(): Promise<Workspace> {
-    return await this.db
+    const start = performance.now();
+    const workspace = await this.db
       .selectFrom('workspaces')
       .selectAll()
       .orderBy('createdAt', 'asc')
       .limit(1)
       .executeTakeFirst();
+
+    if (isPerfDebugEnabled()) {
+      console.debug('[perf] repo.workspace.findFirst', {
+        durationMs: roundPerf(performance.now() - start),
+        workspaceId: workspace?.id,
+      });
+    }
+
+    return workspace;
   }
 
   async findByHostname(hostname: string): Promise<Workspace> {
-    return await this.db
+    const start = performance.now();
+    const workspace = await this.db
       .selectFrom('workspaces')
       .selectAll()
       .where(sql`LOWER(hostname)`, '=', sql`LOWER(${hostname})`)
       .executeTakeFirst();
+
+    if (isPerfDebugEnabled()) {
+      console.debug('[perf] repo.workspace.findByHostname', {
+        hostname,
+        durationMs: roundPerf(performance.now() - start),
+        workspaceId: workspace?.id,
+      });
+    }
+
+    return workspace;
   }
 
   async hostnameExists(

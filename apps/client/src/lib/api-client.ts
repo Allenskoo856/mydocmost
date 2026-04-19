@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import APP_ROUTE from "@/lib/app-route.ts";
 import { getBasePath, isCloud } from "@/lib/config.ts";
+import { logRequestPerf, parseServerTiming } from "@/lib/perf.ts";
 
 const basePath = getBasePath();
 
@@ -11,6 +12,18 @@ const api: AxiosInstance = axios.create({
 
 api.interceptors.response.use(
   (response) => {
+    if (import.meta.env.DEV) {
+      const serverTiming = parseServerTiming(response.headers["server-timing"]);
+      const contentLength = response.headers["content-length"];
+      logRequestPerf("http-response", "end", {
+        url: response.config.url,
+        status: response.status,
+        durationMs: serverTiming.total,
+        serverTiming,
+        contentLength,
+      });
+    }
+
     // we need the response headers for these endpoints
     const exemptEndpoints = [
       `${basePath}/api/pages/export`,

@@ -10,6 +10,7 @@ import {
 } from "@/features/space/types/space.types";
 import { IPagination, QueryParams } from "@/lib/types.ts";
 import { saveAs } from "file-saver";
+import { logRequestPerf, markPerf, measurePerf } from "@/lib/perf.ts";
 
 export async function getSpaces(
   params?: QueryParams,
@@ -19,7 +20,15 @@ export async function getSpaces(
 }
 
 export async function getSpaceById(spaceId: string): Promise<ISpace> {
+  const startMark = `spaces.info:${spaceId}:start`;
+  const endMark = `spaces.info:${spaceId}:end`;
+
+  markPerf(startMark, { spaceId });
+  logRequestPerf("spaces.info", "start", { spaceId });
   const req = await api.post<ISpace>("/spaces/info", { spaceId });
+  markPerf(endMark, { spaceId });
+  measurePerf("spaces.info", startMark, endMark, { spaceId });
+  logRequestPerf("spaces.info", "end", { spaceId });
   return req.data;
 }
 

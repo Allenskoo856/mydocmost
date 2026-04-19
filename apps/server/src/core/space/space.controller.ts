@@ -7,6 +7,7 @@ import {
   HttpStatus,
   NotFoundException,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { SpaceService } from './services/space.service';
@@ -38,6 +39,15 @@ import {
   SpacePagePropertyStatusConfigDto,
   UpdateSpacePagePropertyStatusConfigDto,
 } from './dto/page-property-status.dto';
+import { FastifyReply } from 'fastify';
+import {
+  appendPerfHeader,
+  appendServerTiming,
+  estimatePayloadBytes,
+  measureAsync,
+  roundPerf,
+} from '../../common/helpers/perf.util';
+import { performance } from 'node:perf_hooks';
 
 @UseGuards(JwtAuthGuard)
 @Controller('spaces')
@@ -66,25 +76,30 @@ export class SpaceController {
     @Body() spaceIdDto: SpaceIdDto,
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
+    @Res({ passthrough: true }) res: FastifyReply,
   ) {
-    const space = await this.spaceService.getSpaceInfo(
-      spaceIdDto.spaceId,
-      workspace.id,
+    const controllerStart = performance.now();
+    const { result: space, durationMs: spaceQueryMs } = await measureAsync(
+      'spaces.info.query',
+      () => this.spaceService.getSpaceInfo(spaceIdDto.spaceId, workspace.id),
+      { spaceId: spaceIdDto.spaceId, workspaceId: workspace.id },
     );
 
     if (!space) {
       throw new NotFoundException('Space not found');
     }
 
-    const ability = await this.spaceAbility.createForUser(user, space.id);
+    const { result: userSpaceRoles, durationMs: roleQueryMs } =
+      await measureAsync(
+        'spaces.info.roles',
+        () => this.spaceMemberRepo.getUserSpaceRoles(user.id, space.id),
+        { userId: user.id, spaceId: space.id },
+      );
+
+    const ability = this.spaceAbility.createForRoles(userSpaceRoles);
     if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Settings)) {
       throw new ForbiddenException();
     }
-
-    const userSpaceRoles = await this.spaceMemberRepo.getUserSpaceRoles(
-      user.id,
-      space.id,
-    );
 
     const userSpaceRole = findHighestUserSpaceRole(userSpaceRoles);
 
@@ -94,7 +109,19 @@ export class SpaceController {
       permissions: ability.rules,
     };
 
-    return { ...space, membership };
+    const payload = { ...space, membership };
+    const totalMs = performance.now() - controllerStart;
+
+    appendServerTiming(res, [
+      { name: 'spaceQuery', durationMs: spaceQueryMs, description: 'space service' },
+      { name: 'roles', durationMs: roleQueryMs, description: 'space roles' },
+      { name: 'total', durationMs: totalMs, description: 'controller total' },
+    ]);
+    appendPerfHeader(res, 'X-Docmost-Response-Bytes', estimatePayloadBytes(payload));
+    appendPerfHeader(res, 'X-Docmost-Space-Query-Ms', roundPerf(spaceQueryMs));
+    appendPerfHeader(res, 'X-Docmost-Roles-Ms', roundPerf(roleQueryMs));
+
+    return payload;
   }
 
   @HttpCode(HttpStatus.OK)

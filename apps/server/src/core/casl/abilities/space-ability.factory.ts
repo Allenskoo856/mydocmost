@@ -13,6 +13,7 @@ import {
   SpaceCaslSubject,
 } from '../interfaces/space-ability.type';
 import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
+import { UserSpaceRole } from '@docmost/db/repos/space/types';
 
 @Injectable()
 export default class SpaceAbilityFactory {
@@ -23,6 +24,10 @@ export default class SpaceAbilityFactory {
       spaceId,
     );
 
+    return this.createForRoles(userSpaceRoles);
+  }
+
+  createForRoles(userSpaceRoles?: UserSpaceRole[]) {
     const userSpaceRole = findHighestUserSpaceRole(userSpaceRoles);
 
     switch (userSpaceRole) {

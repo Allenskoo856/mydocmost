@@ -14,6 +14,12 @@ import { DB } from '@docmost/db/types/db';
 import { validate as isValidUUID } from 'uuid';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventName } from '../../../common/events/event.contants';
+import {
+  estimatePayloadBytes,
+  isPerfDebugEnabled,
+  roundPerf,
+} from '../../../common/helpers/perf.util';
+import { performance } from 'node:perf_hooks';
 
 @Injectable()
 export class SpaceRepo {
@@ -40,7 +46,19 @@ export class SpaceRepo {
     } else {
       query = query.where(sql`LOWER(slug)`, '=', sql`LOWER(${spaceId})`);
     }
-    return query.executeTakeFirst();
+
+    const start = performance.now();
+    const space = await query.executeTakeFirst();
+
+    if (isPerfDebugEnabled()) {
+      console.debug('[perf] repo.space.findById', {
+        spaceId,
+        durationMs: roundPerf(performance.now() - start),
+        responseBytes: estimatePayloadBytes(space),
+      });
+    }
+
+    return space;
   }
 
   async findBySlug(

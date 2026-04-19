@@ -13,6 +13,8 @@ import { MemberInfo, UserSpaceRole } from './types';
 import { executeWithPagination } from '@docmost/db/pagination/pagination';
 import { GroupRepo } from '@docmost/db/repos/group/group.repo';
 import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
+import { isPerfDebugEnabled, roundPerf } from '../../../common/helpers/perf.util';
+import { performance } from 'node:perf_hooks';
 
 @Injectable()
 export class SpaceMemberRepo {
@@ -188,6 +190,7 @@ export class SpaceMemberRepo {
     userId: string,
     spaceId: string,
   ): Promise<UserSpaceRole[]> {
+    const start = performance.now();
     const roles = await this.db
       .selectFrom('spaceMembers')
       .select(['userId', 'role'])
@@ -202,6 +205,15 @@ export class SpaceMemberRepo {
           .where('spaceMembers.spaceId', '=', spaceId),
       )
       .execute();
+
+    if (isPerfDebugEnabled()) {
+      console.debug('[perf] repo.spaceMember.getUserSpaceRoles', {
+        userId,
+        spaceId,
+        durationMs: roundPerf(performance.now() - start),
+        roleCount: roles?.length ?? 0,
+      });
+    }
 
     if (!roles || roles.length === 0) {
       return undefined;
