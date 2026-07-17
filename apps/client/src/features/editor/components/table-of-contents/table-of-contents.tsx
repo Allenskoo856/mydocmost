@@ -5,6 +5,7 @@ import classes from "./table-of-contents.module.css";
 import clsx from "clsx";
 import { Box, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { useDebouncedCallback } from "@mantine/hooks";
 
 type TableOfContentsProps = {
   editor: ReturnType<typeof useEditor>;
@@ -79,13 +80,17 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
     setHeadingDOMNodes(result.nodes);
   };
 
+  // A heading rescan walks the whole document; debounce it so collab sync
+  // bursts and rapid edits don't trigger a full scan per transaction.
+  const debouncedHandleUpdate = useDebouncedCallback(handleUpdate, 300);
+
   useEffect(() => {
-    props.editor?.on("update", handleUpdate);
+    props.editor?.on("update", debouncedHandleUpdate);
 
     return () => {
-      props.editor?.off("update", handleUpdate);
+      props.editor?.off("update", debouncedHandleUpdate);
     };
-  }, [props.editor]);
+  }, [props.editor, debouncedHandleUpdate]);
 
   useEffect(
     () => {

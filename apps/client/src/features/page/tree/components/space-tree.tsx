@@ -13,7 +13,7 @@ import {
   usePageQuery,
   useUpdatePageMutation,
 } from "@/features/page/queries/page-query.ts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import classes from "@/features/page/tree/styles/tree.module.css";
 import { ActionIcon, Box, Menu, rem } from "@mantine/core";
@@ -89,7 +89,10 @@ interface ImportModalState {
   isOpen: boolean;
   targetParentId: string | null;
 }
-const importModalAtom = atom<ImportModalState>({ isOpen: false, targetParentId: null });
+const importModalAtom = atom<ImportModalState>({
+  isOpen: false,
+  targetParentId: null,
+});
 
 export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   const { pageSlug } = useParams();
@@ -231,12 +234,19 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
     };
   }, [setTreeApi]);
 
+  // Keep a stable filtered reference so react-arborist's internal memoized
+  // derivations survive unrelated re-renders (e.g. page switches).
+  const filteredTreeData = useMemo(
+    () => data.filter((node) => node?.spaceId === spaceId),
+    [data, spaceId],
+  );
+
   return (
     <>
       <div ref={mergedRef} className={classes.treeContainer}>
         {isRootReady && rootElement.current && (
           <Tree
-            data={data.filter((node) => node?.spaceId === spaceId)}
+            data={filteredTreeData}
             disableDrag={readOnly}
             disableDrop={readOnly}
             disableEdit={readOnly}
@@ -266,13 +276,15 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
           </Tree>
         )}
       </div>
-      
+
       {/* PageImportModal lifted outside of react-arborist tree context */}
       <PageImportModal
         spaceId={spaceId}
         targetParentId={importModalState.targetParentId || undefined}
         open={importModalState.isOpen}
-        onClose={() => setImportModalState({ isOpen: false, targetParentId: null })}
+        onClose={() =>
+          setImportModalState({ isOpen: false, targetParentId: null })
+        }
       />
     </>
   );
@@ -692,34 +704,42 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
         </Menu.Dropdown>
       </Menu>
 
-      <MovePageModal
-        pageId={node.id}
-        slugId={node.data.slugId}
-        currentSpaceSlug={spaceSlug}
-        onClose={closeMoveSpaceModal}
-        open={movePageModalOpened}
-      />
+      {movePageModalOpened && (
+        <MovePageModal
+          pageId={node.id}
+          slugId={node.data.slugId}
+          currentSpaceSlug={spaceSlug}
+          onClose={closeMoveSpaceModal}
+          open={movePageModalOpened}
+        />
+      )}
 
-      <CopyPageModal
-        pageId={node.id}
-        currentSpaceSlug={spaceSlug}
-        onClose={closeCopySpaceModal}
-        open={copyPageModalOpened}
-      />
+      {copyPageModalOpened && (
+        <CopyPageModal
+          pageId={node.id}
+          currentSpaceSlug={spaceSlug}
+          onClose={closeCopySpaceModal}
+          open={copyPageModalOpened}
+        />
+      )}
 
-      <MovePageInSpaceModal
-        pageId={node.id}
-        spaceId={spaceId}
-        open={moveInSpaceOpened}
-        onClose={closeMoveInSpaceModal}
-      />
+      {moveInSpaceOpened && (
+        <MovePageInSpaceModal
+          pageId={node.id}
+          spaceId={spaceId}
+          open={moveInSpaceOpened}
+          onClose={closeMoveInSpaceModal}
+        />
+      )}
 
-      <ExportModal
-        type="page"
-        id={node.id}
-        open={exportOpened}
-        onClose={closeExportModal}
-      />
+      {exportOpened && (
+        <ExportModal
+          type="page"
+          id={node.id}
+          open={exportOpened}
+          onClose={closeExportModal}
+        />
+      )}
     </>
   );
 }

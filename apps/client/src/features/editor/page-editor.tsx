@@ -1,5 +1,11 @@
 import "@/features/editor/styles/index.css";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import {
@@ -12,7 +18,9 @@ import {
   EditorProvider,
   useEditor,
   useEditorState,
+  type Editor,
 } from "@tiptap/react";
+import { Skeleton } from "@mantine/core";
 import {
   collabExtensions,
   mainExtensions,
@@ -73,8 +81,6 @@ export default function PageEditor({
   editable,
   content,
 }: PageEditorProps) {
-
-  
   const collaborationURL = useCollaborationUrl();
   const isComponentMounted = useRef(false);
   const editorCreated = useRef(false);
@@ -82,7 +88,7 @@ export default function PageEditor({
   useEffect(() => {
     isComponentMounted.current = true;
   }, []);
-  
+
   const [currentUser] = useAtom(currentUserAtom);
   const [, setEditor] = useAtom(pageEditorAtom);
   const [, setAsideState] = useAtom(asideStateAtom);
@@ -111,18 +117,60 @@ export default function PageEditor({
   const tocDefaultOpen =
     currentUser?.user?.settings?.preferences?.tocDefaultOpen ?? false;
   const isMobile = useMediaQuery("(max-width: 48em)");
-  
-    const canScroll = useCallback(() => isComponentMounted.current && editorCreated.current, [isComponentMounted, editorCreated]);
-  const { handleScrollTo } = useEditorScroll({ canScroll });
-  // Providers only created once per pageId
-  const providersRef = useRef<{
-    local: IndexeddbPersistence;
-    remote: HocuspocusProvider;
-  } | null>(null);
-  const [providersReady, setProvidersReady] = useState(false);
 
-  const localProvider = providersRef.current?.local;
-  const remoteProvider = providersRef.current?.remote;
+  const canScroll = useCallback(
+    () => isComponentMounted.current && editorCreated.current,
+    [isComponentMounted, editorCreated],
+  );
+  const { handleScrollTo } = useEditorScroll({ canScroll });
+  // Create providers once per page mount (a page switch remounts this
+  // component via key={page.id}). They are created synchronously during the
+  // first render so the collab editor below is instantiated a single time
+  // with the final extension set, instead of being built once without collab
+  // and then destroyed and rebuilt when the provider appears. Safe without
+  // StrictMode; every mount is destroyed in the cleanup effect below.
+  const [providers] = useState(() => {
+    const local = new IndexeddbPersistence(documentName, ydoc);
+    local.on("synced", () => setLocalSynced(true));
+
+    const remote = new HocuspocusProvider({
+      name: documentName,
+      url: collaborationURL,
+      document: ydoc,
+      token: collabQuery?.token,
+      connect: true,
+      preserveConnection: false,
+      onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
+        const payload = jwtDecode(collabQuery?.token);
+        const now = Date.now().valueOf() / 1000;
+        const isTokenExpired = now >= payload.exp;
+        if (isTokenExpired) {
+          refetchCollabToken().then((result) => {
+            if (result.data?.token) {
+              remote.disconnect();
+              setTimeout(() => {
+                remote.configuration.token = result.data.token;
+                remote.connect();
+              }, 100);
+            }
+          });
+        }
+      },
+      onStatus: (status) => {
+        if (status.status === "connected") {
+          setYjsConnectionStatus(status.status);
+        }
+      },
+    });
+    remote.on("synced", () => setRemoteSynced(true));
+    remote.on("disconnect", () => {
+      setYjsConnectionStatus(WebSocketStatus.Disconnected);
+    });
+
+    return { local, remote };
+  });
+
+  const remoteProvider = providers.remote;
 
   // Track when collaborative provider is ready and synced
   const [collabReady, setCollabReady] = useState(false);
@@ -136,55 +184,13 @@ export default function PageEditor({
     }
   }, [remoteProvider?.status, isLocalSynced, isRemoteSynced]);
 
+  // Destroy providers only on final unmount
   useEffect(() => {
-    if (!providersRef.current) {
-      const local = new IndexeddbPersistence(documentName, ydoc);
-      local.on("synced", () => setLocalSynced(true));
-      const remote = new HocuspocusProvider({
-        name: documentName,
-        url: collaborationURL,
-        document: ydoc,
-        token: collabQuery?.token,
-        connect: true,
-        preserveConnection: false,
-        onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-          const payload = jwtDecode(collabQuery?.token);
-          const now = Date.now().valueOf() / 1000;
-          const isTokenExpired = now >= payload.exp;
-          if (isTokenExpired) {
-            refetchCollabToken().then((result) => {
-              if (result.data?.token) {
-                remote.disconnect();
-                setTimeout(() => {
-                  remote.configuration.token = result.data.token;
-                  remote.connect();
-                }, 100);
-              }
-            });
-          }
-        },
-        onStatus: (status) => {
-          if (status.status === "connected") {
-            setYjsConnectionStatus(status.status);
-          }
-        },
-      });
-      remote.on("synced", () => setRemoteSynced(true));
-      remote.on("disconnect", () => {
-        setYjsConnectionStatus(WebSocketStatus.Disconnected);
-      });
-      providersRef.current = { local, remote };
-      setProvidersReady(true);
-    } else {
-      setProvidersReady(true);
-    }
-    // Only destroy on final unmount
     return () => {
-      providersRef.current?.remote.destroy();
-      providersRef.current?.local.destroy();
-      providersRef.current = null;
+      providers.remote.destroy();
+      providers.local.destroy();
     };
-  }, [pageId]);
+  }, [providers]);
 
   /*
   useEffect(() => {
@@ -203,8 +209,7 @@ export default function PageEditor({
 
   // Only connect/disconnect on tab/idle, not destroy
   useEffect(() => {
-    if (!providersReady || !providersRef.current) return;
-    const remoteProvider = providersRef.current.remote;
+    if (!remoteProvider) return;
     if (
       isIdle &&
       documentState === "hidden" &&
@@ -222,7 +227,7 @@ export default function PageEditor({
       remoteProvider.connect();
       setTimeout(() => setIsCollabReady(true), 500);
     }
-  }, [isIdle, documentState, providersReady, resetIdle]);
+  }, [isIdle, documentState, remoteProvider, resetIdle]);
 
   const extensions = useMemo(() => {
     if (!remoteProvider || !currentUser?.user) return mainExtensions;
@@ -289,9 +294,9 @@ export default function PageEditor({
       },
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
-        const editorJson = editor.getJSON();
-        //update local page cache to reduce flickers
-        debouncedUpdateContent(editorJson);
+        // update local page cache to reduce flickers; getJSON() serializes
+        // the whole document, so it must stay inside the debounced callback
+        debouncedUpdateContent(editor);
       },
     },
     [pageId, editable, remoteProvider],
@@ -304,13 +309,14 @@ export default function PageEditor({
     },
   });
 
-  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
+  const debouncedUpdateContent = useDebouncedCallback((editor: Editor) => {
+    if (editor.isDestroyed) return;
     const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
 
     if (pageData) {
       queryClient.setQueryData(["pages", slugId], {
         ...pageData,
-        content: newContent,
+        content: editor.getJSON(),
         updatedAt: new Date(),
       });
     }
@@ -406,7 +412,43 @@ export default function PageEditor({
     }
   }, [remoteProvider?.status]);
 
+  // Large documents skip the static placeholder editor: it parses and renders
+  // the whole document with the full extension set, only to be destroyed once
+  // the collab connection is up. On big pages this double render freezes
+  // low-end CPUs for seconds, so show a skeleton and wait for collab instead.
+  const isLargeContent = useMemo(() => {
+    if (!content) return false;
+    try {
+      // ~300KB of ProseMirror JSON (on the order of 100k+ chars of text)
+      return JSON.stringify(content).length > 300_000;
+    } catch {
+      return false;
+    }
+  }, [content]);
+
+  const [staticFallback, setStaticFallback] = useState(false);
+
+  // Fall back to the static render if the collab connection is not established
+  // within 8s, so large pages stay readable when the collab server is down.
+  useEffect(() => {
+    if (!showStatic || !isLargeContent || staticFallback) return;
+    if (remoteProvider?.status === WebSocketStatus.Connected) return;
+    const timeout = setTimeout(() => setStaticFallback(true), 8000);
+    return () => clearTimeout(timeout);
+  }, [showStatic, isLargeContent, staticFallback, remoteProvider?.status]);
+
   if (showStatic) {
+    if (isLargeContent && !staticFallback) {
+      return (
+        <div>
+          <Skeleton height={16} radius="sm" mb="sm" width="55%" />
+          <Skeleton height={12} radius="sm" mb="sm" />
+          <Skeleton height={12} radius="sm" mb="sm" />
+          <Skeleton height={12} radius="sm" mb="sm" width="85%" />
+          <Skeleton height={12} radius="sm" mb="sm" width="70%" />
+        </div>
+      );
+    }
     return (
       <EditorProvider
         editable={false}
