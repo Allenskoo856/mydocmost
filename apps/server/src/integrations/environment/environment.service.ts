@@ -277,10 +277,17 @@ export class EnvironmentService {
   }
 
   getMcpAgentUserEmail(): string {
-    return this.configService.get<string>('MCP_AGENT_USER_EMAIL', 'agent@docmost.local');
+    return this.configService.get<string>(
+      'MCP_AGENT_USER_EMAIL',
+      'agent@docmost.local',
+    );
   }
 
   getMcpRateLimitRps(): number {
-    return parseInt(this.configService.get<string>('MCP_RATE_LIMIT_RPS', '10'), 10);
+    const value = parseInt(
+      this.configService.get<string>('MCP_RATE_LIMIT_RPS', '10'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 10;
   }
 }

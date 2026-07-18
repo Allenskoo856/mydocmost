@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   MinLength,
   ValidateIf,
   validateSync,
@@ -125,7 +126,6 @@ export class EnvironmentVariables {
   @IsString()
   AI_EMBEDDING_DIMENSION: string;
 
-
   @IsOptional()
   @ValidateIf((obj) => obj.AI_DRIVER)
   @IsString()
@@ -139,7 +139,9 @@ export class EnvironmentVariables {
   OPENAI_API_KEY: string;
 
   @IsOptional()
-  @ValidateIf((obj) => obj.AI_DRIVER && obj.OPENAI_API_URL && obj.AI_DRIVER === 'openai')
+  @ValidateIf(
+    (obj) => obj.AI_DRIVER && obj.OPENAI_API_URL && obj.AI_DRIVER === 'openai',
+  )
   @IsUrl({ protocols: ['http', 'https'], require_tld: false })
   OPENAI_API_URL: string;
 
@@ -165,6 +167,7 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\d+$/)
   MCP_RATE_LIMIT_RPS: string;
 }
 

@@ -36,6 +36,14 @@ export class WorkspaceRepo {
   ];
   constructor(@InjectKysely() private readonly db: KyselyDB) {}
 
+  async findAll(): Promise<Workspace[]> {
+    return await this.db
+      .selectFrom('workspaces')
+      .select(this.baseFields)
+      .where('deletedAt', 'is', null)
+      .execute();
+  }
+
   async findById(
     workspaceId: string,
     opts?: {

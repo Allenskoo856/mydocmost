@@ -35,8 +35,7 @@ export class McpAuthGuard implements CanActivate {
 
   private timingSafeEqual(a: string, b: string): boolean {
     if (a.length !== b.length) {
-      // 为避免直接返回，继续做一次比较以模糊长度差异
-      // 实际生产仍建议固定长度 token
+      // Perform a comparison even when lengths differ to reduce timing leakage.
       const bufA = Buffer.from(a);
       const bufB = Buffer.alloc(bufA.length, 0);
       return crypto.timingSafeEqual(bufA, bufB) && false;
