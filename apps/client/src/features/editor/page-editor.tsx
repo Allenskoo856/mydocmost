@@ -15,7 +15,6 @@ import {
 } from "@hocuspocus/provider";
 import {
   EditorContent,
-  EditorProvider,
   useEditor,
   useEditorState,
   type Editor,
@@ -23,6 +22,7 @@ import {
 import { Skeleton } from "@mantine/core";
 import {
   collabExtensions,
+  largeDocumentExtensions,
   mainExtensions,
 } from "@/features/editor/extensions/extensions";
 import { useAtom } from "jotai";
@@ -66,17 +66,26 @@ import { PageEditMode } from "@/features/user/types/user.types.ts";
 import { jwtDecode } from "jwt-decode";
 import { searchSpotlight } from "@/features/search/constants.ts";
 import { useEditorScroll } from "./hooks/use-editor-scroll";
+import {
+  isLargeDocumentContent,
+  isLargeDocumentSize,
+} from "./utils/large-document";
+import { PageContentSnapshot } from "./readonly-page-snapshot";
 
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
   content: any;
+  renderedContent?: string;
+  contentSize?: number;
 }
 
 export default function PageEditor({
   pageId,
   editable,
   content,
+  renderedContent,
+  contentSize,
 }: PageEditorProps) {
   const collaborationURL = useCollaborationUrl();
   const isComponentMounted = useRef(false);
@@ -106,7 +115,6 @@ export default function PageEditor({
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
   const { isIdle, resetIdle } = useIdle(FIVE_MINUTES, { initialState: false });
   const documentState = useDocumentVisibility();
-  const [isCollabReady, setIsCollabReady] = useState(false);
   const { pageSlug } = useParams();
   const slugId = extractPageSlugId(pageSlug);
   const userPageEditMode =
@@ -117,6 +125,13 @@ export default function PageEditor({
     [isComponentMounted, editorCreated],
   );
   const { handleScrollTo } = useEditorScroll({ canScroll });
+  const isLargeContent = useMemo(
+    () => isLargeDocumentSize(contentSize) || isLargeDocumentContent(content),
+    [content, contentSize],
+  );
+  const baseExtensions = isLargeContent
+    ? largeDocumentExtensions
+    : mainExtensions;
   // Create providers once per page mount (a page switch remounts this
   // component via key={page.id}). They are created synchronously during the
   // first render so the collab editor below is instantiated a single time
@@ -156,7 +171,7 @@ export default function PageEditor({
         }
       },
     });
-    remote.on("synced", () => setRemoteSynced(true));
+    remote.on("synced", ({ state }) => setRemoteSynced(state));
     remote.on("disconnect", () => {
       setYjsConnectionStatus(WebSocketStatus.Disconnected);
     });
@@ -165,18 +180,10 @@ export default function PageEditor({
   });
 
   const remoteProvider = providers.remote;
-
-  // Track when collaborative provider is ready and synced
-  const [collabReady, setCollabReady] = useState(false);
-  useEffect(() => {
-    if (
-      remoteProvider?.status === WebSocketStatus.Connected &&
-      isLocalSynced &&
-      isRemoteSynced
-    ) {
-      setCollabReady(true);
-    }
-  }, [remoteProvider?.status, isLocalSynced, isRemoteSynced]);
+  const collabReady =
+    remoteProvider.status === WebSocketStatus.Connected &&
+    isLocalSynced &&
+    isRemoteSynced;
 
   // Destroy providers only on final unmount
   useEffect(() => {
@@ -210,7 +217,6 @@ export default function PageEditor({
       remoteProvider.status === WebSocketStatus.Connected
     ) {
       remoteProvider.disconnect();
-      setIsCollabReady(false);
       return;
     }
     if (
@@ -219,17 +225,16 @@ export default function PageEditor({
     ) {
       resetIdle();
       remoteProvider.connect();
-      setTimeout(() => setIsCollabReady(true), 500);
     }
   }, [isIdle, documentState, remoteProvider, resetIdle]);
 
   const extensions = useMemo(() => {
-    if (!remoteProvider || !currentUser?.user) return mainExtensions;
+    if (!remoteProvider || !currentUser?.user) return baseExtensions;
     return [
-      ...mainExtensions,
+      ...baseExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
     ];
-  }, [remoteProvider, currentUser?.user]);
+  }, [baseExtensions, remoteProvider, currentUser?.user]);
 
   const editor = useEditor(
     {
@@ -288,12 +293,13 @@ export default function PageEditor({
       },
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
+        if (isLargeContent) return;
         // update local page cache to reduce flickers; getJSON() serializes
         // the whole document, so it must stay inside the debounced callback
         debouncedUpdateContent(editor);
       },
     },
-    [pageId, editable, remoteProvider],
+    [pageId, editable, remoteProvider, isLargeContent],
   );
 
   const editorIsEditable = useEditorState({
@@ -356,21 +362,6 @@ export default function PageEditor({
     }
   }, [remoteProvider?.status]);
 
-  const isSynced = isLocalSynced && isRemoteSynced;
-
-  useEffect(() => {
-    const collabReadyTimeout = setTimeout(() => {
-      if (
-        !isCollabReady &&
-        isSynced &&
-        remoteProvider?.status === WebSocketStatus.Connected
-      ) {
-        setIsCollabReady(true);
-      }
-    }, 500);
-    return () => clearTimeout(collabReadyTimeout);
-  }, [isRemoteSynced, isLocalSynced, remoteProvider?.status]);
-
   // forceEdit (clicking "Edit" in static read mode) overrides the read
   // preference.
   const [forceEdit] = useAtom(pageForceEditAtom);
@@ -384,63 +375,29 @@ export default function PageEditor({
     }
   }, [userPageEditMode, forceEdit, editor, editable]);
 
-  const hasConnectedOnceRef = useRef(false);
+  const hasSyncedOnceRef = useRef(false);
   const [showStatic, setShowStatic] = useState(true);
 
   useEffect(() => {
-    if (
-      !hasConnectedOnceRef.current &&
-      remoteProvider?.status === WebSocketStatus.Connected
-    ) {
-      hasConnectedOnceRef.current = true;
+    if (!hasSyncedOnceRef.current && collabReady) {
+      hasSyncedOnceRef.current = true;
       setShowStatic(false);
     }
-  }, [remoteProvider?.status]);
-
-  // Large documents skip the static placeholder editor: it parses and renders
-  // the whole document with the full extension set, only to be destroyed once
-  // the collab connection is up. On big pages this double render freezes
-  // low-end CPUs for seconds, so show a skeleton and wait for collab instead.
-  const isLargeContent = useMemo(() => {
-    if (!content) return false;
-    try {
-      // ~300KB of ProseMirror JSON (on the order of 100k+ chars of text)
-      return JSON.stringify(content).length > 300_000;
-    } catch {
-      return false;
-    }
-  }, [content]);
-
-  const [staticFallback, setStaticFallback] = useState(false);
-
-  // Fall back to the static render if the collab connection is not established
-  // within 8s, so large pages stay readable when the collab server is down.
-  useEffect(() => {
-    if (!showStatic || !isLargeContent || staticFallback) return;
-    if (remoteProvider?.status === WebSocketStatus.Connected) return;
-    const timeout = setTimeout(() => setStaticFallback(true), 8000);
-    return () => clearTimeout(timeout);
-  }, [showStatic, isLargeContent, staticFallback, remoteProvider?.status]);
+  }, [collabReady]);
 
   if (showStatic) {
-    if (isLargeContent && !staticFallback) {
-      return (
-        <div>
-          <Skeleton height={16} radius="sm" mb="sm" width="55%" />
-          <Skeleton height={12} radius="sm" mb="sm" />
-          <Skeleton height={12} radius="sm" mb="sm" />
-          <Skeleton height={12} radius="sm" mb="sm" width="85%" />
-          <Skeleton height={12} radius="sm" mb="sm" width="70%" />
-        </div>
-      );
+    if (renderedContent) {
+      return <PageContentSnapshot renderedContent={renderedContent} />;
     }
+
     return (
-      <EditorProvider
-        editable={false}
-        immediatelyRender={true}
-        extensions={mainExtensions}
-        content={content}
-      />
+      <div>
+        <Skeleton height={16} radius="sm" mb="sm" width="55%" />
+        <Skeleton height={12} radius="sm" mb="sm" />
+        <Skeleton height={12} radius="sm" mb="sm" />
+        <Skeleton height={12} radius="sm" mb="sm" width="85%" />
+        <Skeleton height={12} radius="sm" mb="sm" width="70%" />
+      </div>
     );
   }
 

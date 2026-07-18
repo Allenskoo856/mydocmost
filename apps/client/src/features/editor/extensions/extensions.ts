@@ -93,6 +93,16 @@ lowlight.register("fortran", fortran);
 lowlight.register("haskell", haskell);
 lowlight.register("scala", scala);
 
+const createCodeBlockExtension = (enableLowlight: boolean) =>
+  CustomCodeBlock.configure({
+    view: CodeBlockView,
+    lowlight,
+    enableLowlight,
+    HTMLAttributes: {
+      spellcheck: false,
+    },
+  });
+
 export const mainExtensions = [
   StarterKit.configure({
     heading: false,
@@ -200,13 +210,7 @@ export const mainExtensions = [
   Callout.configure({
     view: CalloutView,
   }),
-  CustomCodeBlock.configure({
-    view: CodeBlockView,
-    lowlight,
-    HTMLAttributes: {
-      spellcheck: false,
-    },
-  }),
+  createCodeBlockExtension(true),
   Selection,
   Attachment.configure({
     view: AttachmentView,
@@ -246,6 +250,12 @@ export const mainExtensions = [
     },
   }).configure(),
 ] as any;
+
+// Large documents retain the code-block schema, NodeView and language list,
+// but skip lowlight's synchronous full-document decoration plugin.
+export const largeDocumentExtensions = mainExtensions.map((extension) =>
+  extension.name === "codeBlock" ? createCodeBlockExtension(false) : extension,
+) as any;
 
 type CollabExtensions = (provider: HocuspocusProvider, user: IUser) => any[];
 

@@ -111,7 +111,7 @@ export function CalloutMenu({ editor }: EditorMenuProps) {
     <BaseBubbleMenu
       editor={editor}
       pluginKey={`callout-menu`}
-      updateDelay={0}
+      updateDelay={100}
       tippyOptions={{
         getReferenceClientRect,
         offset: [0, 10],

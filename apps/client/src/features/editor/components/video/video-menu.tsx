@@ -104,7 +104,7 @@ export function VideoMenu({ editor }: EditorMenuProps) {
     <BaseBubbleMenu
       editor={editor}
       pluginKey={`video-menu`}
-      updateDelay={0}
+      updateDelay={100}
       tippyOptions={{
         getReferenceClientRect,
         offset: [0, 8],

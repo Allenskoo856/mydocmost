@@ -25,11 +25,15 @@ export class PageHistoryIdDto {
 export class PageInfoDto extends PageIdDto {
   @IsOptional()
   @IsBoolean()
-  includeSpace: boolean;
+  includeSpace?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  includeContent: boolean;
+  includeContent?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  includeRenderedContent?: boolean;
 }
 
 export class DeletePageDto extends PageIdDto {

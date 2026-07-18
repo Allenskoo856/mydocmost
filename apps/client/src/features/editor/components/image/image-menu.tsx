@@ -104,7 +104,7 @@ export function ImageMenu({ editor }: EditorMenuProps) {
     <BaseBubbleMenu
       editor={editor}
       pluginKey={`image-menu`}
-      updateDelay={0}
+      updateDelay={100}
       tippyOptions={{
         getReferenceClientRect,
         offset: [0, 8],

@@ -6,9 +6,11 @@ import clsx from "clsx";
 import { Box, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { useDebouncedCallback } from "@mantine/hooks";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { Transaction } from "@tiptap/pm/state";
 
 type TableOfContentsProps = {
-  editor: ReturnType<typeof useEditor>;
+  editor: ReturnType<typeof useEditor> | null;
   isShare?: boolean;
 };
 
@@ -16,7 +18,7 @@ export type HeadingLink = {
   label: string;
   level: number;
   element: HTMLElement;
-  position: number;
+  position?: number;
 };
 
 const recalculateLinks = (nodePos: NodePos[]) => {
@@ -43,6 +45,63 @@ const recalculateLinks = (nodePos: NodePos[]) => {
   return { links, nodes };
 };
 
+const recalculateSnapshotLinks = () => {
+  const elements = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      "[data-page-snapshot] h1, [data-page-snapshot] h2, [data-page-snapshot] h3",
+    ),
+  );
+  const links = elements
+    .filter((element) => element.textContent?.trim())
+    .map((element) => ({
+      label: element.textContent.trim(),
+      level: Number(element.tagName.slice(1)),
+      element,
+    }));
+
+  return { links, nodes: elements };
+};
+
+const rangeContainsHeading = (
+  doc: ProseMirrorNode,
+  from: number,
+  to: number,
+) => {
+  let containsHeading = false;
+  const safeFrom = Math.max(0, Math.min(from - 1, doc.content.size));
+  const safeTo = Math.max(safeFrom, Math.min(to + 1, doc.content.size));
+
+  doc.nodesBetween(safeFrom, safeTo, (node) => {
+    if (node.type.name === "heading") {
+      containsHeading = true;
+      return false;
+    }
+  });
+
+  return containsHeading;
+};
+
+const transactionChangesHeading = (transaction: Transaction) => {
+  if (!transaction.docChanged) return false;
+  if (transaction.selection.$head.parent.type.name === "heading") {
+    return true;
+  }
+
+  let changesHeading = false;
+  transaction.mapping.maps.forEach((stepMap) => {
+    stepMap.forEach((oldFrom, oldTo, newFrom, newTo) => {
+      if (
+        rangeContainsHeading(transaction.before, oldFrom, oldTo) ||
+        rangeContainsHeading(transaction.doc, newFrom, newTo)
+      ) {
+        changesHeading = true;
+      }
+    });
+  });
+
+  return changesHeading;
+};
+
 export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   const { t } = useTranslation();
   const [links, setLinks] = useState<HeadingLink[]>([]);
@@ -50,7 +109,13 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   const [activeElement, setActiveElement] = useState<HTMLElement | null>(null);
   const headerPaddingRef = useRef<HTMLDivElement | null>(null);
 
-  const handleScrollToHeading = (position: number) => {
+  const handleScrollToHeading = (item: HeadingLink) => {
+    if (!props.editor || item.position === undefined) {
+      item.element.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const position = item.position;
     const { view } = props.editor;
 
     const headerOffset = parseInt(
@@ -74,7 +139,9 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   };
 
   const handleUpdate = () => {
-    const result = recalculateLinks(props.editor?.$nodes("heading"));
+    const result = props.editor
+      ? recalculateLinks(props.editor.$nodes("heading"))
+      : recalculateSnapshotLinks();
 
     setLinks(result.links);
     setHeadingDOMNodes(result.nodes);
@@ -83,21 +150,27 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   // A heading rescan walks the whole document; debounce it so collab sync
   // bursts and rapid edits don't trigger a full scan per transaction.
   const debouncedHandleUpdate = useDebouncedCallback(handleUpdate, 300);
+  const handleEditorUpdate = ({
+    transaction,
+  }: {
+    transaction: Transaction;
+  }) => {
+    if (transactionChangesHeading(transaction)) {
+      debouncedHandleUpdate();
+    }
+  };
 
   useEffect(() => {
-    props.editor?.on("update", debouncedHandleUpdate);
+    props.editor?.on("update", handleEditorUpdate);
+    document.addEventListener("PAGE_SNAPSHOT_RENDERED", handleUpdate);
+    const frame = requestAnimationFrame(handleUpdate);
 
     return () => {
-      props.editor?.off("update", debouncedHandleUpdate);
+      cancelAnimationFrame(frame);
+      props.editor?.off("update", handleEditorUpdate);
+      document.removeEventListener("PAGE_SNAPSHOT_RENDERED", handleUpdate);
     };
   }, [props.editor, debouncedHandleUpdate]);
-
-  useEffect(
-    () => {
-      handleUpdate();
-    },
-    props.isShare ? [props.editor] : [],
-  );
 
   useEffect(() => {
     try {
@@ -169,7 +242,7 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
         {links.map((item, idx) => (
           <Box<"button">
             component="button"
-            onClick={() => handleScrollToHeading(item.position)}
+            onClick={() => handleScrollToHeading(item)}
             key={idx}
             className={clsx(classes.link, {
               [classes.linkActive]: item.element === activeElement,

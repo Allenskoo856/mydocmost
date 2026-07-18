@@ -2,7 +2,7 @@ import classes from "@/features/editor/styles/editor.module.css";
 import React, { useEffect } from "react";
 import { TitleEditor } from "@/features/editor/title-editor";
 import PageEditor from "@/features/editor/page-editor";
-import ReadonlyPageEditor from "@/features/editor/readonly-page-editor";
+import ReadonlyPageSnapshot from "@/features/editor/readonly-page-snapshot";
 import { Container } from "@mantine/core";
 import { useAtom } from "jotai";
 import { useMediaQuery } from "@mantine/hooks";
@@ -26,7 +26,9 @@ export interface FullEditorProps {
   pageId: string;
   slugId: string;
   title: string;
-  content: string;
+  content?: unknown;
+  renderedContent?: string;
+  contentSize?: number;
   spaceSlug: string;
   spaceId: string;
   editable: boolean;
@@ -37,6 +39,8 @@ export function FullEditor({
   title,
   slugId,
   content,
+  renderedContent,
+  contentSize,
   spaceSlug,
   spaceId,
   editable,
@@ -87,13 +91,13 @@ export function FullEditor({
       className={classes.editor}
     >
       {readMode ? (
-        <ReadonlyPageEditor title={title} content={content} pageId={pageId}>
+        <ReadonlyPageSnapshot title={title} renderedContent={renderedContent}>
           <PagePropertiesPanel
             pageId={pageId}
             spaceId={spaceId}
             editable={editable}
           />
-        </ReadonlyPageEditor>
+        </ReadonlyPageSnapshot>
       ) : (
         <>
           <MemoizedTitleEditor
@@ -112,6 +116,8 @@ export function FullEditor({
             pageId={pageId}
             editable={editable}
             content={content}
+            renderedContent={renderedContent}
+            contentSize={contentSize}
           />
         </>
       )}

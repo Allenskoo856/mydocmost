@@ -60,7 +60,7 @@ export function LinkMenu({ editor, appendTo }: EditorMenuProps) {
     <BaseBubbleMenu
       editor={editor}
       pluginKey={`link-menu}`}
-      updateDelay={0}
+      updateDelay={100}
       tippyOptions={{
         appendTo: () => {
           return appendTo?.current;

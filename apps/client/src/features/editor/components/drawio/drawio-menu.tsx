@@ -64,7 +64,7 @@ export function DrawioMenu({ editor }: EditorMenuProps) {
     <BaseBubbleMenu
       editor={editor}
       pluginKey={`drawio-menu`}
-      updateDelay={0}
+      updateDelay={100}
       tippyOptions={{
         getReferenceClientRect,
         offset: [0, 8],

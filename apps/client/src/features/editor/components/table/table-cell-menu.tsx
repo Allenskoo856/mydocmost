@@ -56,7 +56,7 @@ export const TableCellMenu = React.memo(
       <BaseBubbleMenu
         editor={editor}
         pluginKey="table-cell-menu"
-        updateDelay={0}
+        updateDelay={100}
         tippyOptions={{
           appendTo: () => {
             return appendTo?.current;
@@ -69,7 +69,7 @@ export const TableCellMenu = React.memo(
         <ActionIcon.Group>
           <TableBackgroundColor editor={editor} />
           <TableTextAlignment editor={editor} />
-          
+
           <Tooltip position="top" label={t("Merge cells")}>
             <ActionIcon
               onClick={mergeCells}

@@ -40,6 +40,7 @@ import {
   PagePropertiesBatchUpdateDto,
   PagePropertyTagsDto,
 } from './dto/page-properties.dto';
+import { PageSnapshotService } from './services/page-snapshot.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -48,15 +49,17 @@ export class PageController {
     private readonly pageService: PageService,
     private readonly pageRepo: PageRepo,
     private readonly pageHistoryService: PageHistoryService,
+    private readonly pageSnapshotService: PageSnapshotService,
     private readonly spaceAbility: SpaceAbilityFactory,
   ) {}
 
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
+    const includeContent = dto.includeContent ?? true;
     const page = await this.pageRepo.findById(dto.pageId, {
       includeSpace: true,
-      includeContent: true,
+      includeContent: includeContent || dto.includeRenderedContent,
       includeCreator: true,
       includeLastUpdatedBy: true,
       includeContributors: true,
@@ -71,7 +74,22 @@ export class PageController {
       throw new ForbiddenException();
     }
 
-    return page;
+    if (!dto.includeRenderedContent) {
+      return page;
+    }
+
+    const snapshot = await this.pageSnapshotService.getSnapshot({
+      id: page.id,
+      updatedAt: page.updatedAt,
+      content: page.content,
+    });
+    const { content, ...pageMetadata } = page;
+
+    return {
+      ...pageMetadata,
+      ...(includeContent ? { content } : {}),
+      ...snapshot,
+    };
   }
 
   @HttpCode(HttpStatus.OK)
@@ -412,7 +430,10 @@ export class PageController {
 
   @HttpCode(HttpStatus.OK)
   @Post('/properties/tags')
-  async getPagePropertyTags(@Body() dto: PagePropertyTagsDto, @AuthUser() user: User) {
+  async getPagePropertyTags(
+    @Body() dto: PagePropertyTagsDto,
+    @AuthUser() user: User,
+  ) {
     const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
     if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
       throw new ForbiddenException();
@@ -433,6 +454,10 @@ export class PageController {
       throw new ForbiddenException();
     }
 
-    return this.pageService.batchUpdatePageProperties(dto, user.id, workspace.id);
+    return this.pageService.batchUpdatePageProperties(
+      dto,
+      user.id,
+      workspace.id,
+    );
   }
 }

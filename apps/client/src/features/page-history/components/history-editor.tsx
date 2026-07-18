@@ -1,8 +1,12 @@
-import '@/features/editor/styles/index.css';
-import React, { useEffect } from 'react';
-import { EditorContent, useEditor } from '@tiptap/react';
-import { mainExtensions } from '@/features/editor/extensions/extensions';
-import { Title } from '@mantine/core';
+import "@/features/editor/styles/index.css";
+import React, { useEffect, useMemo } from "react";
+import { EditorContent, useEditor } from "@tiptap/react";
+import {
+  largeDocumentExtensions,
+  mainExtensions,
+} from "@/features/editor/extensions/extensions";
+import { Title } from "@mantine/core";
+import { isLargeDocumentContent } from "@/features/editor/utils/large-document";
 
 export interface HistoryEditorProps {
   title: string;
@@ -10,10 +14,18 @@ export interface HistoryEditorProps {
 }
 
 export function HistoryEditor({ title, content }: HistoryEditorProps) {
-  const editor = useEditor({
-    extensions: mainExtensions,
-    editable: false,
-  });
+  const isLargeContent = useMemo(
+    () => isLargeDocumentContent(content),
+    [content],
+  );
+  const extensions = isLargeContent ? largeDocumentExtensions : mainExtensions;
+  const editor = useEditor(
+    {
+      extensions,
+      editable: false,
+    },
+    [isLargeContent],
+  );
 
   useEffect(() => {
     if (editor && content) {

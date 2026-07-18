@@ -4,7 +4,9 @@ export interface IPage {
   id: string;
   slugId: string;
   title: string;
-  content: string;
+  content?: unknown;
+  renderedContent?: string;
+  contentSize?: number;
   icon: string;
   coverPhoto: string;
   parentPageId: string;
@@ -86,6 +88,8 @@ export interface IPageInput {
   priority?: "P0" | "P1" | "P2" | "P3" | null;
   dueAt?: string | null;
   tags?: string[];
+  includeContent?: boolean;
+  includeRenderedContent?: boolean;
 }
 
 export interface IPageManageListParams {

@@ -19,8 +19,17 @@ export default function CodeBlockView(props: NodeViewProps) {
     language || null,
   );
   const [isSelected, setIsSelected] = useState(false);
+  const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
+    // Only Mermaid switches between source and preview based on selection.
+    // Registering this listener for every regular code block makes each cursor
+    // move fan out to every code-block NodeView in a large document.
+    if (language !== "mermaid") {
+      setIsSelected(false);
+      return;
+    }
+
     const updateSelection = () => {
       const { state } = editor;
       const { from, to } = state.selection;
@@ -31,11 +40,12 @@ export default function CodeBlockView(props: NodeViewProps) {
       setIsSelected(isNodeSelected);
     };
 
+    updateSelection();
     editor.on("selectionUpdate", updateSelection);
     return () => {
       editor.off("selectionUpdate", updateSelection);
     };
-  }, [editor, getPos(), node.nodeSize]);
+  }, [editor, getPos, language, node.nodeSize]);
 
   function changeLanguage(language: string) {
     setLanguageValue(language);
@@ -45,42 +55,48 @@ export default function CodeBlockView(props: NodeViewProps) {
   }
 
   return (
-    <NodeViewWrapper className="codeBlock">
-      <Group
-        justify="flex-end"
-        contentEditable={false}
-        className={classes.menuGroup}
-      >
-        <Select
-          placeholder="auto"
-          checkIconPosition="right"
-          data={extension.options.lowlight.listLanguages().sort()}
-          value={languageValue}
-          onChange={changeLanguage}
-          searchable
-          style={{ maxWidth: "130px" }}
-          classNames={{ input: classes.selectInput }}
-          disabled={!editor.isEditable}
-        />
+    <NodeViewWrapper
+      className="codeBlock"
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => setShowControls(false)}
+    >
+      {showControls && (
+        <Group
+          justify="flex-end"
+          contentEditable={false}
+          className={classes.menuGroup}
+        >
+          <Select
+            placeholder="auto"
+            checkIconPosition="right"
+            data={extension.options.lowlight.listLanguages().sort()}
+            value={languageValue}
+            onChange={changeLanguage}
+            searchable
+            style={{ maxWidth: "130px" }}
+            classNames={{ input: classes.selectInput }}
+            disabled={!editor.isEditable}
+          />
 
-        <CopyButton value={node?.textContent} timeout={2000}>
-          {({ copied, copy }) => (
-            <Tooltip
-              label={copied ? t("Copied") : t("Copy")}
-              withArrow
-              position="right"
-            >
-              <ActionIcon
-                color={copied ? "teal" : "gray"}
-                variant="subtle"
-                onClick={copy}
+          <CopyButton value={node?.textContent} timeout={2000}>
+            {({ copied, copy }) => (
+              <Tooltip
+                label={copied ? t("Copied") : t("Copy")}
+                withArrow
+                position="right"
               >
-                {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
-              </ActionIcon>
-            </Tooltip>
-          )}
-        </CopyButton>
-      </Group>
+                <ActionIcon
+                  color={copied ? "teal" : "gray"}
+                  variant="subtle"
+                  onClick={copy}
+                >
+                  {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </CopyButton>
+        </Group>
+      )}
 
       <pre
         spellCheck="false"

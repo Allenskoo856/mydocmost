@@ -1,7 +1,10 @@
 import "@/features/editor/styles/index.css";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorProvider } from "@tiptap/react";
-import { mainExtensions } from "@/features/editor/extensions/extensions";
+import {
+  largeDocumentExtensions,
+  mainExtensions,
+} from "@/features/editor/extensions/extensions";
 import { Document } from "@tiptap/extension-document";
 import { Heading, generateNodeId, UniqueID } from "@docmost/editor-ext";
 import { Text } from "@tiptap/extension-text";
@@ -12,6 +15,7 @@ import {
   readOnlyEditorAtom,
 } from "@/features/editor/atoms/editor-atoms.ts";
 import { useEditorScroll } from "./hooks/use-editor-scroll";
+import { isLargeDocumentContent } from "./utils/large-document";
 
 interface PageEditorProps {
   title: string;
@@ -44,8 +48,16 @@ export default function ReadonlyPageEditor({
     isComponentMounted.current = true;
   }, []);
 
+  const isLargeContent = useMemo(
+    () => isLargeDocumentContent(content),
+    [content],
+  );
+
   const extensions = useMemo(() => {
-    const filteredExtensions = mainExtensions.filter(
+    const baseExtensions = isLargeContent
+      ? largeDocumentExtensions
+      : mainExtensions;
+    const filteredExtensions = baseExtensions.filter(
       (ext) => ext.name !== "uniqueID",
     );
 
@@ -56,7 +68,7 @@ export default function ReadonlyPageEditor({
         updateDocument: false,
       }),
     ];
-  }, []);
+  }, [isLargeContent]);
 
   const titleExtensions = [
     Document.extend({

@@ -5,6 +5,7 @@ import { ReactNodeViewRenderer } from "@tiptap/react";
 
 export interface CustomCodeBlockOptions extends CodeBlockLowlightOptions {
   view: any;
+  enableLowlight: boolean;
 }
 
 const TAB_CHAR = "\u00A0\u00A0";
@@ -17,7 +18,22 @@ export const CustomCodeBlock = CodeBlockLowlight.extend<CustomCodeBlockOptions>(
       return {
         ...this.parent?.(),
         view: null,
+        enableLowlight: true,
       };
+    },
+
+    addProseMirrorPlugins() {
+      const plugins = this.parent?.() ?? [];
+
+      if (this.options.enableLowlight) {
+        return plugins;
+      }
+
+      // Keep the base code-block paste handler while removing lowlight's
+      // full-document scans and synchronous syntax highlighting.
+      // CodeBlockLowlight appends its decoration plugin after the base
+      // code-block paste handler.
+      return plugins.slice(0, -1);
     },
 
     addKeyboardShortcuts() {
@@ -39,11 +55,11 @@ export const CustomCodeBlock = CodeBlockLowlight.extend<CustomCodeBlockOptions>(
           if (this.editor.isActive("codeBlock")) {
             const { state } = this.editor;
             const { $from } = state.selection;
-            
+
             let codeBlockNode = null;
             let codeBlockPos = null;
             let depth = 0;
-            
+
             for (depth = $from.depth; depth > 0; depth--) {
               const node = $from.node(depth);
               if (node.type.name === "codeBlock") {
@@ -52,23 +68,23 @@ export const CustomCodeBlock = CodeBlockLowlight.extend<CustomCodeBlockOptions>(
                 break;
               }
             }
-            
+
             if (codeBlockNode && codeBlockPos !== null) {
               const codeBlockStart = codeBlockPos;
               const codeBlockEnd = codeBlockPos + codeBlockNode.nodeSize;
-              
+
               const contentStart = codeBlockStart + 1;
               const contentEnd = codeBlockEnd - 1;
-              
+
               this.editor.commands.setTextSelection({
                 from: contentStart,
                 to: contentEnd,
               });
-              
+
               return true;
             }
           }
-          
+
           return false;
         },
       };
@@ -77,5 +93,5 @@ export const CustomCodeBlock = CodeBlockLowlight.extend<CustomCodeBlockOptions>(
     addNodeView() {
       return ReactNodeViewRenderer(this.options.view);
     },
-  }
+  },
 );

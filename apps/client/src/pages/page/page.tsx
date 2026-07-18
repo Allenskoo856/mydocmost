@@ -67,6 +67,8 @@ export default function Page() {
           pageId={page.id}
           title={page.title}
           content={page.content}
+          renderedContent={page.renderedContent}
+          contentSize={page.contentSize}
           slugId={page.slugId}
           spaceSlug={page?.space?.slug}
           spaceId={page.spaceId}

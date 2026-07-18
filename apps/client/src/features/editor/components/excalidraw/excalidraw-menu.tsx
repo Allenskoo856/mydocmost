@@ -66,7 +66,7 @@ export function ExcalidrawMenu({ editor }: EditorMenuProps) {
     <BaseBubbleMenu
       editor={editor}
       pluginKey={`excalidraw-menu}`}
-      updateDelay={0}
+      updateDelay={100}
       tippyOptions={{
         getReferenceClientRect,
         offset: [0, 8],
