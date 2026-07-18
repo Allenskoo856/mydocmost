@@ -24,6 +24,7 @@ import {
   sanitizeUrl,
 } from "@docmost/editor-ext";
 import { ResizableWrapper } from "../common/resizable-wrapper";
+import { useLazyRender } from "@/features/editor/hooks/use-lazy-render";
 import classes from "./embed-view.module.css";
 
 const schema = z.object({
@@ -37,6 +38,9 @@ export default function EmbedView(props: NodeViewProps) {
   const { t } = useTranslation();
   const { node, selected, updateAttributes, editor } = props;
   const { src, provider, height: nodeHeight } = node.attrs;
+  // Loading an embed iframe spawns a whole browsing context; defer it until
+  // the embed scrolls near the viewport.
+  const { ref: lazyRef, shouldRender } = useLazyRender();
 
   const embedUrl = useMemo(() => {
     if (src) {
@@ -97,14 +101,33 @@ export default function EmbedView(props: NodeViewProps) {
             "ProseMirror-selectednode": selected,
           })}
         >
-          <iframe
-            className={classes.embedIframe}
-            src={sanitizeUrl(embedUrl)}
-            allow="encrypted-media"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            allowFullScreen
-            frameBorder="0"
-          />
+          <div ref={lazyRef} style={{ width: "100%", height: "100%" }}>
+            {shouldRender ? (
+              <iframe
+                className={classes.embedIframe}
+                src={sanitizeUrl(embedUrl)}
+                allow="encrypted-media"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                allowFullScreen
+                frameBorder="0"
+              />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                }}
+              >
+                <Text component="span" size="sm" c="dimmed">
+                  {t("Embed {{provider}}", {
+                    provider: getEmbedProviderById(provider)?.name,
+                  })}
+                </Text>
+              </div>
+            )}
+          </div>
         </ResizableWrapper>
       ) : (
         <Popover

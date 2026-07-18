@@ -7,21 +7,27 @@ import { Heading, generateNodeId, UniqueID } from "@docmost/editor-ext";
 import { Text } from "@tiptap/extension-text";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { useAtom } from "jotai";
-import { readOnlyEditorAtom } from "@/features/editor/atoms/editor-atoms.ts";
+import {
+  pageEditorAtom,
+  readOnlyEditorAtom,
+} from "@/features/editor/atoms/editor-atoms.ts";
 import { useEditorScroll } from "./hooks/use-editor-scroll";
 
 interface PageEditorProps {
   title: string;
   content: any;
   pageId?: string;
+  children?: React.ReactNode;
 }
 
 export default function ReadonlyPageEditor({
   title,
   content,
   pageId,
+  children,
 }: PageEditorProps) {
   const [, setReadOnlyEditor] = useAtom(readOnlyEditorAtom);
+  const [, setPageEditor] = useAtom(pageEditorAtom);
   const isComponentMounted = useRef(false);
   const editorCreated = useRef(false);
 
@@ -73,6 +79,8 @@ export default function ReadonlyPageEditor({
         content={title}
       ></EditorProvider>
 
+      {children}
+
       <EditorProvider
         editable={false}
         immediatelyRender={true}
@@ -85,6 +93,10 @@ export default function ReadonlyPageEditor({
             }
             // @ts-ignore
             setReadOnlyEditor(editor);
+            // Also expose it as the page editor so TOC, word count and
+            // comment navigation keep working in static read mode.
+            // @ts-ignore
+            setPageEditor(editor);
 
             handleScrollTo(editor);
             editorCreated.current = true;

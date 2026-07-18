@@ -8,6 +8,7 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { useAtomValue } from "jotai";
 import {
   pageEditorAtom,
+  pageForceEditAtom,
   titleEditorAtom,
 } from "@/features/editor/atoms/editor-atoms";
 import {
@@ -168,16 +169,18 @@ export function TitleEditor({
     };
   }, [pageId]);
 
+  // forceEdit (clicking "Edit" in static read mode) overrides the read
+  // preference.
+  const [forceEdit] = useAtom(pageForceEditAtom);
+
   useEffect(() => {
     // honor user default page edit mode preference
-    if (userPageEditMode && titleEditor && editable) {
-      if (userPageEditMode === PageEditMode.Edit) {
-        titleEditor.setEditable(true);
-      } else if (userPageEditMode === PageEditMode.Read) {
-        titleEditor.setEditable(false);
-      }
+    if (titleEditor && editable) {
+      titleEditor.setEditable(
+        forceEdit || userPageEditMode === PageEditMode.Edit,
+      );
     }
-  }, [userPageEditMode, titleEditor, editable]);
+  }, [userPageEditMode, forceEdit, titleEditor, editable]);
 
   const openSearchDialog = () => {
     const event = new CustomEvent("openFindDialogFromEditor", {});

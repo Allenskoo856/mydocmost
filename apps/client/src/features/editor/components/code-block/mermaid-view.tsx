@@ -6,6 +6,7 @@ import classes from "./code-block.module.css";
 import { useTranslation } from "react-i18next";
 import { useComputedColorScheme } from "@mantine/core";
 import DOMPurify from "dompurify";
+import { useLazyRender } from "@/features/editor/hooks/use-lazy-render";
 
 interface MermaidViewProps {
   props: NodeViewProps;
@@ -26,8 +27,13 @@ export default function MermaidView({ props }: MermaidViewProps) {
     });
   }, [computedColorScheme]);
 
+  const { ref: lazyRef, shouldRender } = useLazyRender();
+
   // Re-render the diagram whenever the node content or theme changes.
+  // Deferred until the block scrolls near the viewport: mermaid.render is
+  // expensive on large documents.
   useEffect(() => {
+    if (!shouldRender) return;
     const id = `mermaid-${uuidv4()}`;
     if (node.textContent.length > 0) {
       mermaid
@@ -47,10 +53,11 @@ export default function MermaidView({ props }: MermaidViewProps) {
           }
         });
     }
-  }, [node.textContent, computedColorScheme]);
+  }, [node.textContent, computedColorScheme, shouldRender]);
 
   return (
     <div
+      ref={lazyRef}
       className={classes.mermaid}
       contentEditable={false}
       dangerouslySetInnerHTML={{ __html: preview }}

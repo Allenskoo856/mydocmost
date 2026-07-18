@@ -7,6 +7,7 @@ import { Popover, Textarea } from "@mantine/core";
 import classes from "./math.module.css";
 import { v4 } from "uuid";
 import { useTranslation } from "react-i18next";
+import { useLazyRender } from "@/features/editor/hooks/use-lazy-render";
 
 export default function MathInlineView(props: NodeViewProps) {
   const { t } = useTranslation();
@@ -17,6 +18,9 @@ export default function MathInlineView(props: NodeViewProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  // KaTeX rendering is synchronous and expensive; defer it until the inline
+  // formula scrolls near the viewport.
+  const { ref: lazyRef, shouldRender } = useLazyRender();
 
   const renderMath = (
     katexString: string,
@@ -32,8 +36,9 @@ export default function MathInlineView(props: NodeViewProps) {
   };
 
   useEffect(() => {
+    if (!shouldRender) return;
     renderMath(node.attrs.text, mathResultContainer.current);
-  }, [node.attrs.text]);
+  }, [node.attrs.text, shouldRender]);
 
   useEffect(() => {
     if (isEditing) {
@@ -65,6 +70,7 @@ export default function MathInlineView(props: NodeViewProps) {
       >
         <Popover.Target>
           <NodeViewWrapper
+            ref={lazyRef}
             data-katex="true"
             className={[
               classes.mathInline,
@@ -80,8 +86,22 @@ export default function MathInlineView(props: NodeViewProps) {
               style={{ display: isEditing ? undefined : "none" }}
               ref={mathPreviewContainer}
             ></div>
+            {!shouldRender &&
+              !isEditing &&
+              node.attrs.text.trim().length > 0 && (
+                <span
+                  style={{
+                    color: "var(--mantine-color-dimmed)",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {node.attrs.text}
+                </span>
+              )}
             <div
-              style={{ display: isEditing ? "none" : undefined }}
+              style={{
+                display: isEditing || !shouldRender ? "none" : undefined,
+              }}
               ref={mathResultContainer}
             ></div>
             {((isEditing && !preview?.trim().length) ||

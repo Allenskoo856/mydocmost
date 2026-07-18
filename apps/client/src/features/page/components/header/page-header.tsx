@@ -1,6 +1,7 @@
 import classes from "./page-header.module.css";
 import PageHeaderMenu from "@/features/page/components/header/page-header-menu.tsx";
-import { Group, Tooltip } from "@mantine/core";
+import { Button, Group, Tooltip } from "@mantine/core";
+import { IconEdit } from "@tabler/icons-react";
 import Breadcrumb from "@/features/page/components/breadcrumbs/breadcrumb.tsx";
 import { useAtom } from "jotai";
 import {
@@ -10,6 +11,9 @@ import {
 import { useToggleSidebar } from "@/components/layouts/global/hooks/hooks/use-toggle-sidebar.ts";
 import SidebarToggle from "@/components/ui/sidebar-toggle-button.tsx";
 import { useTranslation } from "react-i18next";
+import { currentUserAtom } from "@/features/user/atoms/current-user-atom.ts";
+import { PageEditMode } from "@/features/user/types/user.types.ts";
+import { pageForceEditAtom } from "@/features/editor/atoms/editor-atoms.ts";
 
 interface Props {
   readOnly?: boolean;
@@ -20,6 +24,14 @@ export default function PageHeader({ readOnly }: Props) {
   const toggleMobile = useToggleSidebar(mobileSidebarAtom);
   const [desktopOpened] = useAtom(desktopSidebarAtom);
   const toggleDesktop = useToggleSidebar(desktopSidebarAtom);
+  const [currentUser] = useAtom(currentUserAtom);
+  const [forceEdit, setForceEdit] = useAtom(pageForceEditAtom);
+  const userPageEditMode =
+    currentUser?.user?.settings?.preferences?.pageEditMode ?? PageEditMode.Edit;
+  // In static read mode (read preference) with edit permission, offer an
+  // explicit switch to the full collaborative editor.
+  const showEditButton =
+    !readOnly && userPageEditMode === PageEditMode.Read && !forceEdit;
 
   return (
     <div className={classes.header}>
@@ -32,7 +44,7 @@ export default function PageHeader({ readOnly }: Props) {
       >
         <Group wrap="nowrap" gap="var(--mantine-spacing-xs)">
           {!mobileOpened && (
-            <Tooltip label={t("Sidebar toggle")}> 
+            <Tooltip label={t("Sidebar toggle")}>
               <SidebarToggle
                 aria-label={t("Sidebar toggle")}
                 opened={mobileOpened}
@@ -44,7 +56,7 @@ export default function PageHeader({ readOnly }: Props) {
           )}
 
           {!desktopOpened && (
-            <Tooltip label={t("Sidebar toggle")}> 
+            <Tooltip label={t("Sidebar toggle")}>
               <SidebarToggle
                 aria-label={t("Sidebar toggle")}
                 opened={desktopOpened}
@@ -65,6 +77,16 @@ export default function PageHeader({ readOnly }: Props) {
           wrap="nowrap"
           gap="var(--mantine-spacing-xs)"
         >
+          {showEditButton && (
+            <Button
+              size="compact-sm"
+              variant="light"
+              leftSection={<IconEdit size={16} />}
+              onClick={() => setForceEdit(true)}
+            >
+              {t("Edit")}
+            </Button>
+          )}
           <PageHeaderMenu readOnly={readOnly} />
         </Group>
       </Group>

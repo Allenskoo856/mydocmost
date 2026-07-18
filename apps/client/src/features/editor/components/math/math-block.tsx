@@ -9,6 +9,7 @@ import { v4 } from "uuid";
 import { IconTrashX } from "@tabler/icons-react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useTranslation } from "react-i18next";
+import { useLazyRender } from "@/features/editor/hooks/use-lazy-render";
 
 export default function MathBlockView(props: NodeViewProps) {
   const { t } = useTranslation();
@@ -20,6 +21,9 @@ export default function MathBlockView(props: NodeViewProps) {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [debouncedPreview] = useDebouncedValue(preview, 500);
+  // KaTeX rendering is synchronous and expensive; defer it until the block
+  // scrolls near the viewport (large documents can hold hundreds of these).
+  const { ref: lazyRef, shouldRender } = useLazyRender();
 
   const renderMath = (
     katexString: string,
@@ -38,8 +42,9 @@ export default function MathBlockView(props: NodeViewProps) {
   };
 
   useEffect(() => {
+    if (!shouldRender) return;
     renderMath(node.attrs.text, mathResultContainer.current);
-  }, [node.attrs.text]);
+  }, [node.attrs.text, shouldRender]);
 
   useEffect(() => {
     if (isEditing) {
@@ -73,6 +78,7 @@ export default function MathBlockView(props: NodeViewProps) {
     >
       <Popover.Target>
         <NodeViewWrapper
+          ref={lazyRef}
           data-katex="true"
           className={[
             classes.mathBlock,
@@ -90,8 +96,20 @@ export default function MathBlockView(props: NodeViewProps) {
             }}
             ref={mathPreviewContainer}
           ></div>
+          {!shouldRender && !isEditing && node.attrs.text.trim().length > 0 && (
+            <div
+              style={{
+                color: "var(--mantine-color-dimmed)",
+                fontFamily: "monospace",
+              }}
+            >
+              {node.attrs.text}
+            </div>
+          )}
           <div
-            style={{ display: isEditing ? "none" : undefined }}
+            style={{
+              display: isEditing || !shouldRender ? "none" : undefined,
+            }}
             ref={mathResultContainer}
           ></div>
           {((isEditing && !preview?.trim().length) ||

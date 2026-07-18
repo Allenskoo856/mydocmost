@@ -30,6 +30,7 @@ import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
 import {
   pageEditorAtom,
+  pageForceEditAtom,
   yjsConnectionStatusAtom,
 } from "@/features/editor/atoms/editor-atoms";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom";
@@ -54,11 +55,7 @@ import ExcalidrawMenu from "./components/excalidraw/excalidraw-menu";
 import DrawioMenu from "./components/drawio/drawio-menu";
 import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
 import SearchAndReplaceDialog from "@/features/editor/components/search-and-replace/search-and-replace-dialog.tsx";
-import {
-  useDebouncedCallback,
-  useDocumentVisibility,
-  useMediaQuery,
-} from "@mantine/hooks";
+import { useDebouncedCallback, useDocumentVisibility } from "@mantine/hooks";
 import { useIdle } from "@/hooks/use-idle.ts";
 import { queryClient } from "@/main.tsx";
 import { IPage } from "@/features/page/types/page.types.ts";
@@ -114,9 +111,6 @@ export default function PageEditor({
   const slugId = extractPageSlugId(pageSlug);
   const userPageEditMode =
     currentUser?.user?.settings?.preferences?.pageEditMode ?? PageEditMode.Edit;
-  const tocDefaultOpen =
-    currentUser?.user?.settings?.preferences?.tocDefaultOpen ?? false;
-  const isMobile = useMediaQuery("(max-width: 48em)");
 
   const canScroll = useCallback(
     () => isComponentMounted.current && editorCreated.current,
@@ -350,15 +344,8 @@ export default function PageEditor({
     };
   }, []);
 
-  useEffect(() => {
-    setActiveCommentId(null);
-    setShowCommentPopup(false);
-    if (!isMobile && tocDefaultOpen) {
-      setAsideState({ tab: "toc", isAsideOpen: true });
-      return;
-    }
-    setAsideState({ tab: "", isAsideOpen: false });
-  }, [pageId, isMobile, tocDefaultOpen]);
+  // Reset comment state and apply the aside default on every page switch.
+  // This effect moved to FullEditor so it also runs in static read mode.
 
   useEffect(() => {
     if (remoteProvider?.status === WebSocketStatus.Connecting) {
@@ -384,20 +371,18 @@ export default function PageEditor({
     return () => clearTimeout(collabReadyTimeout);
   }, [isRemoteSynced, isLocalSynced, remoteProvider?.status]);
 
+  // forceEdit (clicking "Edit" in static read mode) overrides the read
+  // preference.
+  const [forceEdit] = useAtom(pageForceEditAtom);
+
   useEffect(() => {
     // Only honor user default page edit mode preference and permissions
     if (editor) {
-      if (userPageEditMode && editable) {
-        if (userPageEditMode === PageEditMode.Edit) {
-          editor.setEditable(true);
-        } else if (userPageEditMode === PageEditMode.Read) {
-          editor.setEditable(false);
-        }
-      } else {
-        editor.setEditable(false);
-      }
+      const canEdit =
+        editable && (forceEdit || userPageEditMode === PageEditMode.Edit);
+      editor.setEditable(canEdit);
     }
-  }, [userPageEditMode, editor, editable]);
+  }, [userPageEditMode, forceEdit, editor, editable]);
 
   const hasConnectedOnceRef = useRef(false);
   const [showStatic, setShowStatic] = useState(true);

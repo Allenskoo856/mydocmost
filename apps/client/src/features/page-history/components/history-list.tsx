@@ -63,7 +63,7 @@ function HistoryList({ pageId }: Props) {
     });
 
   const handleRestore = useCallback(() => {
-    if (activeHistoryData) {
+    if (activeHistoryData && mainEditor && mainEditorTitle) {
       mainEditorTitle
         .chain()
         .clearContent()
@@ -115,10 +115,9 @@ function HistoryList({ pageId }: Props) {
           ))}
       </ScrollArea>
 
-      {spaceAbility.cannot(
-        SpaceCaslAction.Manage,
-        SpaceCaslSubject.Page,
-      ) ? null : (
+      {spaceAbility.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Page) ||
+      !mainEditor ||
+      !mainEditorTitle ? null : (
         <>
           <Divider />
           <Group p="xs" wrap="nowrap">
