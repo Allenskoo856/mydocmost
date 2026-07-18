@@ -25,7 +25,6 @@ import ShareRedirect from "@/pages/share/share-redirect.tsx";
 import { useTrackOrigin } from "@/hooks/use-track-origin";
 import SpacesPage from "@/pages/spaces/spaces.tsx";
 import SpaceTrash from "@/pages/space/space-trash.tsx";
-import SpacePageManage from "@/pages/space/space-page-manage.tsx";
 import { useTranslation } from "react-i18next";
 
 export default function App() {
@@ -60,7 +59,6 @@ export default function App() {
           <Route path={"/spaces"} element={<SpacesPage />} />
           <Route path={"/s/:spaceSlug"} element={<SpaceHome />} />
           <Route path={"/s/:spaceSlug/trash"} element={<SpaceTrash />} />
-          <Route path={"/s/:spaceSlug/pages/manage"} element={<SpacePageManage />} />
           <Route
             path={"/s/:spaceSlug/p/:pageSlug"}
             element={
