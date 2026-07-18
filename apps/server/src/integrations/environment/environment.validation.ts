@@ -153,6 +153,19 @@ export class EnvironmentVariables {
   @ValidateIf((obj) => obj.AI_DRIVER && obj.AI_DRIVER === 'ollama')
   @IsUrl({ protocols: ['http', 'https'], require_tld: false })
   OLLAMA_API_URL: string;
+
+  @IsOptional()
+  @ValidateIf((obj) => obj.MCP_API_TOKEN != null && obj.MCP_API_TOKEN !== '')
+  @MinLength(32)
+  MCP_API_TOKEN: string;
+
+  @IsOptional()
+  @IsString()
+  MCP_AGENT_USER_EMAIL: string;
+
+  @IsOptional()
+  @IsString()
+  MCP_RATE_LIMIT_RPS: string;
 }
 
 export function validate(config: Record<string, any>) {

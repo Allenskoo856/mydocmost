@@ -270,4 +270,17 @@ export class EnvironmentService {
       'http://localhost:11434',
     );
   }
+
+  getMcpApiToken(): string | undefined {
+    const token = this.configService.get<string>('MCP_API_TOKEN');
+    return token?.trim() || undefined;
+  }
+
+  getMcpAgentUserEmail(): string {
+    return this.configService.get<string>('MCP_AGENT_USER_EMAIL', 'agent@docmost.local');
+  }
+
+  getMcpRateLimitRps(): number {
+    return parseInt(this.configService.get<string>('MCP_RATE_LIMIT_RPS', '10'), 10);
+  }
 }
