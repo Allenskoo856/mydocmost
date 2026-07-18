@@ -1,18 +1,30 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-import { AppModule } from './app.module';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { Logger, NotFoundException, ValidationPipe } from '@nestjs/common';
+import {
+  Logger,
+  NotFoundException,
+  RequestMethod,
+  ValidationPipe,
+} from '@nestjs/common';
 import { TransformHttpResponseInterceptor } from './common/interceptors/http-response.interceptor';
 import { WsRedisIoAdapter } from './ws/adapter/ws-redis.adapter';
 import { InternalLogFilter } from './common/logger/internal-log-filter';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyCookie from '@fastify/cookie';
 import { EnvironmentService } from './integrations/environment/environment.service';
+import { getMcpControllerPath } from './core/mcp/mcp-path.util';
+import { envPath } from './common/helpers';
+import { existsSync } from 'node:fs';
 
 async function bootstrap() {
+  if (existsSync(envPath)) {
+    process.loadEnvFile(envPath);
+  }
+  const { AppModule } = await import('./app.module');
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
@@ -35,7 +47,14 @@ async function bootstrap() {
   const fullApiPrefix = `/${apiPrefix}`;
 
   app.setGlobalPrefix(apiPrefix, {
-    exclude: ['robots.txt', 'share/:shareId/p/:pageSlug'],
+    exclude: [
+      'robots.txt',
+      'share/:shareId/p/:pageSlug',
+      {
+        path: `${getMcpControllerPath(basePath)}/(.*)`,
+        method: RequestMethod.ALL,
+      },
+    ],
   });
 
   const reflector = app.get(Reflector);

@@ -37,6 +37,7 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/multipart": "^9.0.3",
     "@fastify/static": "^8.2.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs-labs/nestjs-ioredis": "^11.0.4",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.9",
@@ -132,7 +133,14 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.ts$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1",
+      "^src/(.*)$": "<rootDir>/$1",
+      "^@docmost/db/(.*)$": "<rootDir>/database/$1",
+      "^@docmost/transactional/(.*)$": "<rootDir>/integrations/transactional/$1",
+      "^@docmost/ee/(.*)$": "<rootDir>/ee/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

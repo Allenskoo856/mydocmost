@@ -16,6 +16,8 @@ import { GroupModule } from './group/group.module';
 import { CaslModule } from './casl/casl.module';
 import { DomainMiddleware } from '../common/middlewares/domain.middleware';
 import { ShareModule } from './share/share.module';
+import { McpModule } from './mcp/mcp.module';
+import { getMcpControllerPath } from './mcp/mcp-path.util';
 
 @Module({
   imports: [
@@ -30,6 +32,7 @@ import { ShareModule } from './share/share.module';
     GroupModule,
     CaslModule,
     ShareModule,
+    McpModule,
   ],
 })
 export class CoreModule implements NestModule {
@@ -41,6 +44,10 @@ export class CoreModule implements NestModule {
         { path: 'health', method: RequestMethod.GET },
         { path: 'health/live', method: RequestMethod.GET },
         { path: 'billing/stripe/webhook', method: RequestMethod.POST },
+        {
+          path: `${getMcpControllerPath()}/(.*)`,
+          method: RequestMethod.ALL,
+        },
       )
       .forRoutes('*');
   }

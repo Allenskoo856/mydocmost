@@ -61,15 +61,15 @@ doc/           # 中文文档（dev/ 为部署与定制指南，PRD/ 为产品�
 
 所有命令在仓库根目录执行（Node 22 + pnpm 10.4，`pnpm install` 优先）：
 
-| 命令 | 说明 |
-| --- | --- |
-| `pnpm dev` | 并行启动前端（Vite, :5173）和后端（Nest watch, :3000） |
-| `pnpm client:dev` / `pnpm server:dev` | 单独启动前端 / 后端开发服务 |
-| `pnpm build` | Nx 构建全部（含 editor-ext、client、server） |
-| `pnpm client:build` / `pnpm server:build` / `pnpm editor-ext:build` | 单独构建 |
-| `pnpm start` | 生产模式启动后端（`node dist/main`，同时托管前端静态文件） |
-| `pnpm collab` / `pnpm collab:dev` | 启动独立的协同编辑服务 |
-| `pnpm email:dev` | React Email 模板预览（:5019） |
+| 命令                                                                | 说明                                                       |
+| ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `pnpm dev`                                                          | 并行启动前端（Vite, :5173）和后端（Nest watch, :3000）     |
+| `pnpm client:dev` / `pnpm server:dev`                               | 单独启动前端 / 后端开发服务                                |
+| `pnpm build`                                                        | Nx 构建全部（含 editor-ext、client、server）               |
+| `pnpm client:build` / `pnpm server:build` / `pnpm editor-ext:build` | 单独构建                                                   |
+| `pnpm start`                                                        | 生产模式启动后端（`node dist/main`，同时托管前端静态文件） |
+| `pnpm collab` / `pnpm collab:dev`                                   | 启动独立的协同编辑服务                                     |
+| `pnpm email:dev`                                                    | React Email 模板预览（:5019）                              |
 
 数据库迁移（Kysely，在根目录通过 filter 调用）：
 
@@ -127,6 +127,40 @@ pnpm --filter ./apps/server run format   # Prettier（后端）
 - **CI**：`.github/workflows/docker-build.yml` 在 push 到 `main`/`master`/`feature_nonetwork` 或打 tag 时构建并推送镜像到 DockerHub（需配置 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` secrets）。
 - **子目录部署**：设置 `APP_URL` + `BASE_PATH`（以 `/` 开头、不以 `/` 结尾），Nginx 需为 `/api`、`/socket.io`、`/collab` 配置 WebSocket 代理头。完整配置示例见根 `README.md`。
 - **内网部署**：参考 `doc/dev/INTERNAL_NETWORK_DEPLOYMENT_GUIDE.md`，必须 `CLOUD=false`、`DISABLE_TELEMETRY=true`。
+
+## MCP Agent 接口
+
+后端在配置 `MCP_API_TOKEN` 后提供 MCP 2024-11 SSE 接口；未配置时端点保持存在，但统一返回 401。相关环境变量：
+
+| 变量                   | 默认值                | 说明                                                           |
+| ---------------------- | --------------------- | -------------------------------------------------------------- |
+| `MCP_API_TOKEN`        | 空                    | Bearer Token，启用时至少 32 字符；生产环境建议使用随机长字符串 |
+| `MCP_AGENT_USER_EMAIL` | `agent@docmost.local` | 每个 Workspace 内系统 Agent 用户的邮箱                         |
+| `MCP_RATE_LIMIT_RPS`   | `10`                  | 每个 MCP 会话每秒允许的 messages 请求数，必须为正整数          |
+
+- SSE 连接：`GET {BASE_PATH}/mcp/sse`
+- 消息投递：`POST {BASE_PATH}/mcp/messages?sessionId=<id>`
+- 两个端点都必须携带 `Authorization: Bearer <MCP_API_TOKEN>`。
+- 支持 `list_workspaces`、`create_space`、`insert_page_tree`、`create_page`、`update_page`、`move_page`、`list_space_pages`、`get_page_markdown`、`analyze_page_tree` 共 9 个 tools。
+- 页面写入内容使用 Markdown；服务端同步生成 ProseMirror JSON、纯文本和 Ydoc。`insert_page_tree` 单次最多 100 个页面节点。
+
+通用 MCP Client 配置示例（具体字段名以客户端版本为准）：
+
+```json
+{
+  "mcpServers": {
+    "docmost": {
+      "type": "sse",
+      "url": "https://docs.internal.example/docmost/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer REPLACE_WITH_MCP_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+实现依据：`apps/server/src/core/mcp/mcp.controller.ts`（端点、会话与限流）、`apps/server/src/core/mcp/mcp-tools.service.ts`（tool 清单与资源归属校验）、`apps/server/src/core/mcp/mcp-agent-user.service.ts`（Workspace Agent 用户）。
 
 ## 安全注意事项
 
