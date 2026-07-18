@@ -10,7 +10,6 @@ import {
   userAtom,
   currentUserAtom,
 } from "@/features/user/atoms/current-user-atom.ts";
-import PagePropertiesPanel from "@/features/page/components/page-properties-panel.tsx";
 import { PageEditMode } from "@/features/user/types/user.types.ts";
 import { pageForceEditAtom } from "@/features/editor/atoms/editor-atoms.ts";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom";
@@ -30,7 +29,6 @@ export interface FullEditorProps {
   renderedContent?: string;
   contentSize?: number;
   spaceSlug: string;
-  spaceId: string;
   editable: boolean;
 }
 
@@ -42,7 +40,6 @@ export function FullEditor({
   renderedContent,
   contentSize,
   spaceSlug,
-  spaceId,
   editable,
 }: FullEditorProps) {
   const [user] = useAtom(userAtom);
@@ -91,13 +88,7 @@ export function FullEditor({
       className={classes.editor}
     >
       {readMode ? (
-        <ReadonlyPageSnapshot title={title} renderedContent={renderedContent}>
-          <PagePropertiesPanel
-            pageId={pageId}
-            spaceId={spaceId}
-            editable={editable}
-          />
-        </ReadonlyPageSnapshot>
+        <ReadonlyPageSnapshot title={title} renderedContent={renderedContent} />
       ) : (
         <>
           <MemoizedTitleEditor
@@ -105,11 +96,6 @@ export function FullEditor({
             slugId={slugId}
             title={title}
             spaceSlug={spaceSlug}
-            editable={editable}
-          />
-          <PagePropertiesPanel
-            pageId={pageId}
-            spaceId={spaceId}
             editable={editable}
           />
           <MemoizedPageEditor
