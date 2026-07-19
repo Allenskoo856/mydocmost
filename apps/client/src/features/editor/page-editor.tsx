@@ -185,11 +185,38 @@ export default function PageEditor({
     isLocalSynced &&
     isRemoteSynced;
 
-  // Destroy providers only on final unmount
+  // Destroy providers and editor state. For large documents, destroying the
+  // Yjs document and Tiptap editor instance synchronously on unmount blocks
+  // the navigation render. Defer the teardown so the next page can paint first.
   useEffect(() => {
     return () => {
-      providers.remote.destroy();
-      providers.local.destroy();
+      const ydoc = ydocRef.current;
+      const { remote, local } = providers;
+
+      const teardown = () => {
+        try {
+          remote.destroy();
+        } catch {
+          // ignore
+        }
+        try {
+          local.destroy();
+        } catch {
+          // ignore
+        }
+        try {
+          ydoc?.destroy();
+        } catch {
+          // ignore
+        }
+        ydocRef.current = null;
+      };
+
+      if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+        window.requestIdleCallback(teardown, { timeout: 2000 });
+      } else {
+        setTimeout(teardown, 100);
+      }
     };
   }, [providers]);
 
@@ -301,6 +328,14 @@ export default function PageEditor({
     },
     [pageId, editable, remoteProvider, isLargeContent],
   );
+
+  // Reset the global editor atom when this editor unmounts so consumers
+  // (aside, comments, history) don't hold a reference to a destroyed editor.
+  useEffect(() => {
+    return () => {
+      setEditor(null);
+    };
+  }, [setEditor]);
 
   const editorIsEditable = useEditorState({
     editor,
