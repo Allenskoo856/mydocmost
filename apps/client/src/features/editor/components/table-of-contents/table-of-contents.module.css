@@ -11,49 +11,52 @@
   display: block;
   width: 100%;
   text-align: start;
-  word-wrap: break-word;
+  word-break: break-word;
   background-color: transparent;
-  color: var(--mantine-color-text);
-  font-size: var(--mantine-font-size-sm);
-  line-height: var(--mantine-line-height-sm);
-  padding: 6px;
-  border-top-right-radius: var(--mantine-radius-sm);
-  border-bottom-right-radius: var(--mantine-radius-sm);
+  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1));
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 5px 8px;
+  margin: 1px 0;
+  border-radius: 6px;
   border: none;
+  border-left: 2px solid transparent;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
   @mixin hover {
     background-color: light-dark(
-      var(--mantine-color-gray-2),
+      var(--mantine-color-gray-1),
       var(--mantine-color-dark-6)
     );
+    color: light-dark(var(--mantine-color-gray-9), var(--mantine-color-gray-0));
   }
 
   @media (max-width: $mantine-breakpoint-sm) {
     & {
-      border: none !important;
-      padding-left: 0px;
+      border-left: 2px solid transparent !important;
+      padding-left: 8px;
     }
   }
 }
 
 .linkActive {
-  font-weight: 500;
+  font-weight: 600;
   border-left-color: light-dark(
-    var(--mantine-color-grey-5),
-    var(--mantine-color-grey-3)
+    var(--mantine-color-blue-5),
+    var(--mantine-color-blue-4)
   );
-  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-1));
+  color: light-dark(var(--mantine-color-gray-9), var(--mantine-color-gray-0));
 
   &,
   &:hover {
     background-color: light-dark(
-      var(--mantine-color-gray-3),
-      var(--mantine-color-dark-5)
+      var(--mantine-color-blue-0),
+      rgba(51, 154, 240, 0.14)
     ) !important;
   }
 }
 
-
 .leftBorder {
-  border-left: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+  border-left: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
+  padding-left: 2px;
 }

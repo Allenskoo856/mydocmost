@@ -372,8 +372,8 @@
   "{{latestVersion}} is available": "{{latestVersion}} 已经可以使用",
   "Default page edit mode": "默认页面编辑模式",
   "Choose your preferred page edit mode. Avoid accidental edits.": "选择您偏好的页面编辑模式。避免意外编辑。",
-  "Open table of contents by default": "默认打开目录",
-  "Automatically expand the table of contents when opening pages.": "打开页面时自动展开目录。",
+  "Open table of contents by default": "默认展开目录",
+  "Automatically expand the table of contents when opening pages.": "打开页面时自动在右侧展开浮动目录。",
   "Toggle default table of contents": "切换默认目录展开",
   "Page properties": "页面属性",
   "Toggle page properties": "切换页面属性",
@@ -605,5 +605,7 @@
   "No answer available": "无可用答案",
   "Background color": "背景颜色",
   "Highlight color": "突出显示颜色",
-  "Remove color": "移除颜色"
+  "Remove color": "移除颜色",
+  "Close": "关闭",
+  "Close table of contents": "关闭目录"
 }

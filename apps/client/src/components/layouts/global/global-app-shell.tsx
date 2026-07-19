@@ -1,4 +1,4 @@
-import { AppShell, Container } from "@mantine/core";
+import { AppShell, Container, Transition } from "@mantine/core";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import SettingsSidebar from "@/components/settings/settings-sidebar.tsx";
@@ -24,7 +24,7 @@ export default function GlobalAppShell({
   const [mobileOpened] = useAtom(mobileSidebarAtom);
   const toggleMobile = useToggleSidebar(mobileSidebarAtom);
   const [desktopOpened] = useAtom(desktopSidebarAtom);
-  const [{ isAsideOpen }] = useAtom(asideStateAtom);
+  const [{ isAsideOpen, tab: asideTab }] = useAtom(asideStateAtom);
   const [sidebarWidth, setSidebarWidth] = useAtom(sidebarWidthAtom);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef(null);
@@ -75,6 +75,8 @@ export default function GlobalAppShell({
   const isSpacesRoute = location.pathname.endsWith("/spaces");
   const isPageRoute = location.pathname.includes("/p/");
   const hideSidebar = isHomeRoute || isSpacesRoute;
+  const isCommentsOpen = isPageRoute && isAsideOpen && asideTab === "comments";
+  const isTocOpen = isPageRoute && isAsideOpen && asideTab === "toc";
 
   return (
     <AppShell
@@ -90,11 +92,13 @@ export default function GlobalAppShell({
         }
       }
       aside={
-        isPageRoute && {
-          width: 350,
-          breakpoint: "sm",
-          collapsed: { mobile: !isAsideOpen, desktop: !isAsideOpen },
-        }
+        isCommentsOpen
+          ? {
+              width: 320,
+              breakpoint: "sm",
+              collapsed: { mobile: false, desktop: false },
+            }
+          : undefined
       }
       padding={isSpaceRoute ? 0 : "md"}
     >
@@ -122,11 +126,28 @@ export default function GlobalAppShell({
         )}
       </AppShell.Main>
 
-      {isPageRoute && (
-        <AppShell.Aside className={classes.aside} p="md" withBorder={false}>
+      {isCommentsOpen && (
+        <AppShell.Aside className={classes.aside} p={0} withBorder={false}>
           <Aside />
         </AppShell.Aside>
       )}
+
+      <Transition
+        mounted={isTocOpen}
+        transition="fade-left"
+        duration={160}
+        timingFunction="ease"
+      >
+        {(styles) => (
+          <aside
+            className={classes.tocPanel}
+            style={styles}
+            aria-label="Table of contents"
+          >
+            <Aside />
+          </aside>
+        )}
+      </Transition>
     </AppShell>
   );
 }

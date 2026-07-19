@@ -89,14 +89,7 @@ export default function ShareShell({
           },
         },
       })}
-      aside={{
-        width: 300,
-        breakpoint: "sm",
-        collapsed: {
-          mobile: !mobileTocOpened,
-          desktop: !tocOpened,
-        },
-      }}
+      aside={undefined}
       padding="md"
     >
       <AppShell.Header>
@@ -183,19 +176,20 @@ export default function ShareShell({
         {data && shareId && !data.hasLicenseKey && <ShareBranding />}
       </AppShell.Main>
 
-      <AppShell.Aside
-        p="md"
-        withBorder={mobileTocOpened}
-        className={classes.aside}
-      >
-        <ScrollArea style={{ height: "80vh" }} scrollbarSize={5} type="scroll">
-          <div style={{ paddingBottom: "50px" }}>
+      {(tocOpened || mobileTocOpened) && (
+        <aside className={classes.tocPanel} aria-label="Table of contents">
+          <ScrollArea
+            className={classes.tocScrollArea}
+            scrollbarSize={4}
+            type="hover"
+            offsetScrollbars
+          >
             {readOnlyEditor && (
               <TableOfContents isShare={true} editor={readOnlyEditor} />
             )}
-          </div>
-        </ScrollArea>
-      </AppShell.Aside>
+          </ScrollArea>
+        </aside>
+      )}
 
       <ShareSearchSpotlight shareId={shareId} />
     </AppShell>
