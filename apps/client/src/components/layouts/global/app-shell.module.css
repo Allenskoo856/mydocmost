@@ -21,7 +21,8 @@
   border: 0;
   padding: 0;
   margin: 0;
-  background: light-dark(rgba(15, 23, 42, 0.18), rgba(0, 0, 0, 0.45));
+  /* Fully transparent so underlying article text stays readable */
+  background: transparent;
   cursor: pointer;
 
   @media print {
@@ -36,19 +37,17 @@
   flex-direction: column;
   overflow: hidden;
   width: 252px;
-  max-height: calc(100vh - 80px);
-  border: 1px solid light-dark(rgba(15, 23, 42, 0.06), rgba(255, 255, 255, 0.08));
+  /* Explicit height is required so the body can scroll */
+  height: min(70vh, calc(100vh - 80px));
+  max-height: min(70vh, calc(100vh - 80px));
+  min-height: 180px;
+  border: 1px solid light-dark(rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0.1));
   border-radius: 10px;
-  background-color: light-dark(
-    rgba(255, 255, 255, 0.78),
-    rgba(24, 25, 28, 0.72)
-  );
-  box-shadow: light-dark(
-    0 6px 20px rgba(15, 23, 42, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.28)
-  );
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* Transparent panel surface so underlying text is still visible */
+  background-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 
   @media print {
     display: none !important;
@@ -56,18 +55,14 @@
 }
 
 .floatingTocGutter {
-  /* sits in free space to the right of the article column */
   box-shadow: none;
-  background-color: light-dark(
-    rgba(255, 255, 255, 0.62),
-    rgba(24, 25, 28, 0.55)
-  );
+  background-color: transparent;
 }
 
 .floatingTocOverlay {
-  /* fallback when gutter is not wide enough; never reflows content */
   right: 12px;
   top: calc(var(--app-shell-header-offset, 0rem) + 56px);
+  background-color: transparent;
 }
 
 .floatingTocDrawer {
@@ -77,8 +72,14 @@
   width: min(300px, 86vw) !important;
   height: 100vh !important;
   max-height: 100vh !important;
+  min-height: 100vh !important;
   border-radius: 0;
   border-right: none;
+  /* Drawer still keeps a light surface for usability on mobile */
+  background-color: light-dark(
+    rgba(255, 255, 255, 0.92),
+    rgba(24, 25, 28, 0.92)
+  );
   box-shadow: light-dark(
     -8px 0 28px rgba(15, 23, 42, 0.12),
     -8px 0 28px rgba(0, 0, 0, 0.4)
@@ -90,14 +91,32 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex: 0 0 auto;
   padding: 10px 10px 8px;
   border-bottom: 1px solid light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
+  background-color: transparent;
 }
 
 .floatingTocBody {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 6px 6px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.25)) transparent;
+}
+
+.floatingTocBody::-webkit-scrollbar {
+  width: 6px;
+}
+
+.floatingTocBody::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: light-dark(rgba(0, 0, 0, 0.22), rgba(255, 255, 255, 0.22));
 }
 
 .resizeHandle {

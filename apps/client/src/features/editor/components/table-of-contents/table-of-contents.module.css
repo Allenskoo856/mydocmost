@@ -13,22 +13,26 @@
   text-align: start;
   word-break: break-word;
   background-color: transparent;
-  color: light-dark(rgba(52, 58, 64, 0.86), rgba(233, 236, 239, 0.86));
+  color: light-dark(rgba(33, 37, 41, 0.92), rgba(248, 249, 250, 0.94));
   font-size: 12.5px;
   line-height: 1.35;
   padding: 4px 7px;
   margin: 1px 0;
   border-radius: 6px;
+  text-shadow: light-dark(
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 0 6px rgba(0, 0, 0, 0.75)
+  );
   border: none;
   border-left: 2px solid transparent;
   transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
   @mixin hover {
     background-color: light-dark(
-      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0.35),
       rgba(255, 255, 255, 0.08)
     );
-    color: light-dark(rgba(33, 37, 41, 0.96), rgba(248, 249, 250, 0.96));
+    color: light-dark(rgba(24, 28, 32, 0.98), rgba(255, 255, 255, 0.98));
   }
 
   @media (max-width: $mantine-breakpoint-sm) {
@@ -50,7 +54,7 @@
   &,
   &:hover {
     background-color: light-dark(
-      rgba(231, 245, 255, 0.72),
+      rgba(231, 245, 255, 0.42),
       rgba(51, 154, 240, 0.18)
     ) !important;
   }

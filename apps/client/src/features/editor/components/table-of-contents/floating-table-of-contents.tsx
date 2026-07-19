@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  ScrollArea,
   Text,
   Tooltip,
 } from "@mantine/core";
@@ -56,6 +55,7 @@ function measurePlacement(isMobile: boolean): Placement {
         right: 12,
         left: "auto",
         width: TOC_WIDTH,
+        height: maxHeight,
         maxHeight,
       },
     };
@@ -79,6 +79,7 @@ function measurePlacement(isMobile: boolean): Placement {
         left,
         right: "auto",
         width: TOC_WIDTH,
+        height: maxHeight,
         maxHeight,
       },
     };
@@ -92,6 +93,7 @@ function measurePlacement(isMobile: boolean): Placement {
       right: 12,
       left: "auto",
       width: TOC_WIDTH,
+      height: maxHeight,
       maxHeight,
     },
   };
@@ -193,14 +195,9 @@ export function FloatingTableOfContents({
           </Tooltip>
         </div>
 
-        <ScrollArea
-          className={classes.floatingTocBody}
-          type="scroll"
-          scrollbarSize={5}
-          offsetScrollbars
-        >
+        <div className={classes.floatingTocBody}>
           <TableOfContents editor={resolvedEditor} isShare={isShare} />
-        </ScrollArea>
+        </div>
       </div>
     </>
   );
