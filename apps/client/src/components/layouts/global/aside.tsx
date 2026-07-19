@@ -1,15 +1,18 @@
-import { Box, ScrollArea, Text } from "@mantine/core";
+import { ActionIcon, Box, Group, ScrollArea, Text, Tooltip } from "@mantine/core";
 import CommentListWithTabs from "@/features/comment/components/comment-list-with-tabs.tsx";
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
 import React, { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { TableOfContents } from "@/features/editor/components/table-of-contents/table-of-contents.tsx";
 import { useAtomValue } from "jotai";
 import { pageEditorAtom } from "@/features/editor/atoms/editor-atoms.ts";
+import { IconX } from "@tabler/icons-react";
+import classes from "./aside.module.css";
 
 export default function Aside() {
-  const [{ tab }] = useAtom(asideStateAtom);
+  const [{ tab, isAsideOpen }] = useAtom(asideStateAtom);
+  const setAsideState = useSetAtom(asideStateAtom);
   const { t } = useTranslation();
   const pageEditor = useAtomValue(pageEditorAtom);
 
@@ -30,26 +33,54 @@ export default function Aside() {
       title = null;
   }
 
-  return (
-    <Box p="md">
-      {component && (
-        <>
-          <Text mb="md" fw={500}>
-            {t(title)}
-          </Text>
+  if (!isAsideOpen || !component) {
+    return null;
+  }
 
-          {tab === "comments" ? (
-            <CommentListWithTabs />
-          ) : (
-            <ScrollArea
-              style={{ height: "85vh" }}
-              scrollbarSize={5}
-              type="scroll"
+  const isToc = tab === "toc";
+
+  const handleClose = () => {
+    setAsideState({ tab, isAsideOpen: false });
+  };
+
+  return (
+    <Box className={isToc ? classes.tocAside : classes.commentsAside}>
+      <Group
+        justify="space-between"
+        align="center"
+        mb={isToc ? "xs" : "md"}
+        wrap="nowrap"
+      >
+        <Text fw={600} size={isToc ? "sm" : "md"} className={classes.title}>
+          {t(title)}
+        </Text>
+
+        {isToc && (
+          <Tooltip label={t("Close")} openDelay={250} withArrow>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              onClick={handleClose}
+              aria-label={t("Close table of contents")}
             >
-              <div style={{ paddingBottom: "200px" }}>{component}</div>
-            </ScrollArea>
-          )}
-        </>
+              <IconX size={16} stroke={1.8} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+
+      {isToc ? (
+        <ScrollArea
+          className={classes.tocScrollArea}
+          scrollbarSize={4}
+          type="hover"
+          offsetScrollbars
+        >
+          {component}
+        </ScrollArea>
+      ) : (
+        component
       )}
     </Box>
   );

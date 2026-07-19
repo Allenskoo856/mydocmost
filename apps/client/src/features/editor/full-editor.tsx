@@ -5,7 +5,6 @@ import PageEditor from "@/features/editor/page-editor";
 import ReadonlyPageSnapshot from "@/features/editor/readonly-page-snapshot";
 import { Container } from "@mantine/core";
 import { useAtom } from "jotai";
-import { useMediaQuery } from "@mantine/hooks";
 import {
   userAtom,
   currentUserAtom,
@@ -50,7 +49,6 @@ export function FullEditor({
   const [, setAsideState] = useAtom(asideStateAtom);
   const [, setActiveCommentId] = useAtom(activeCommentIdAtom);
   const [, setShowCommentPopup] = useAtom(showCommentPopupAtom);
-  const isMobile = useMediaQuery("(max-width: 48em)");
   const userPageEditMode =
     currentUser?.user?.settings?.preferences?.pageEditMode ?? PageEditMode.Edit;
   const tocDefaultOpen =
@@ -67,12 +65,12 @@ export function FullEditor({
   useEffect(() => {
     setActiveCommentId(null);
     setShowCommentPopup(false);
-    if (!isMobile && tocDefaultOpen) {
+    if (tocDefaultOpen) {
       setAsideState({ tab: "toc", isAsideOpen: true });
       return;
     }
     setAsideState({ tab: "", isAsideOpen: false });
-  }, [pageId, isMobile, tocDefaultOpen]);
+  }, [pageId, tocDefaultOpen, setActiveCommentId, setShowCommentPopup, setAsideState]);
 
   // For large documents, default to static read mode even if the user prefers
   // edit mode. This avoids synchronously initializing the Yjs document,

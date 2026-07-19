@@ -18,3 +18,36 @@
     width: 350px;
   }
 }
+
+
+
+
+
+.tocPanel {
+  position: fixed;
+  top: 58px;
+  right: 14px;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  width: min(236px, calc(100vw - 28px));
+  max-height: min(72vh, calc(100vh - 78px));
+  overflow: hidden;
+  padding: 10px 8px 8px;
+  border: 1px solid light-dark(rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  background-color: light-dark(
+    rgba(255, 255, 255, 0.96),
+    rgba(32, 33, 36, 0.96)
+  );
+  box-shadow: light-dark(
+    0 8px 28px rgba(15, 23, 42, 0.10),
+    0 12px 32px rgba(0, 0, 0, 0.42)
+  );
+  backdrop-filter: blur(12px);
+}
+
+.tocScrollArea {
+  flex: 1;
+  min-height: 0;
+}
