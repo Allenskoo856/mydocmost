@@ -230,11 +230,7 @@ const replaceAll = (
     
     const marks = Array.from(marksSet);
     
-<<<<<<< HEAD
-    // Delete and insert with preserved marks
-=======
     // Delete the old text
->>>>>>> 3178cad7 (fix: handle empty replace term in search and replace functionality (#1562))
     tr.delete(from, to);
 
     // Only insert new text if replaceTerm is not empty (allows for deletion when replaceTerm is empty)
