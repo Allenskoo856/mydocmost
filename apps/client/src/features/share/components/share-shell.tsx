@@ -3,13 +3,12 @@ import {
   ActionIcon,
   AppShell,
   Group,
-  ScrollArea,
   Tooltip,
 } from "@mantine/core";
 import { useGetSharedPageTreeQuery } from "@/features/share/queries/share-query.ts";
 import { useParams } from "react-router-dom";
 import SharedTree from "@/features/share/components/shared-tree.tsx";
-import { TableOfContents } from "@/features/editor/components/table-of-contents/table-of-contents.tsx";
+import { FloatingTableOfContents } from "@/features/editor/components/table-of-contents/floating-table-of-contents.tsx";
 import { readOnlyEditorAtom } from "@/features/editor/atoms/editor-atoms.ts";
 import { ThemeToggle } from "@/components/theme-toggle.tsx";
 import { useAtomValue, useSetAtom } from "jotai";
@@ -55,6 +54,7 @@ export default function ShareShell({
   const [mobileTocOpened] = useAtom(mobileTableOfContentAsideAtom);
   const toggleTocMobile = useToggleToc(mobileTableOfContentAsideAtom);
   const toggleToc = useToggleToc(tableOfContentAsideAtom);
+  const isTocOpen = tocOpened || mobileTocOpened;
 
   const { shareId } = useParams();
   const { data } = useGetSharedPageTreeQuery(shareId);
@@ -89,14 +89,6 @@ export default function ShareShell({
           },
         },
       })}
-      aside={{
-        width: 300,
-        breakpoint: "sm",
-        collapsed: {
-          mobile: !mobileTocOpened,
-          desktop: !tocOpened,
-        },
-      }}
       padding="md"
     >
       <AppShell.Header>
@@ -183,19 +175,16 @@ export default function ShareShell({
         {data && shareId && !data.hasLicenseKey && <ShareBranding />}
       </AppShell.Main>
 
-      <AppShell.Aside
-        p="md"
-        withBorder={mobileTocOpened}
-        className={classes.aside}
-      >
-        <ScrollArea style={{ height: "80vh" }} scrollbarSize={5} type="scroll">
-          <div style={{ paddingBottom: "50px" }}>
-            {readOnlyEditor && (
-              <TableOfContents isShare={true} editor={readOnlyEditor} />
-            )}
-          </div>
-        </ScrollArea>
-      </AppShell.Aside>
+      {isTocOpen && readOnlyEditor && (
+        <FloatingTableOfContents
+          isShare
+          editor={readOnlyEditor}
+          onClose={() => {
+            if (mobileTocOpened) toggleTocMobile();
+            if (tocOpened) toggleToc();
+          }}
+        />
+      )}
 
       <ShareSearchSpotlight shareId={shareId} />
     </AppShell>

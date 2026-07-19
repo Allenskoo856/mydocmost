@@ -14,6 +14,91 @@
   }
 }
 
+.floatingTocBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 119;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: light-dark(rgba(15, 23, 42, 0.18), rgba(0, 0, 0, 0.45));
+  cursor: pointer;
+
+  @media print {
+    display: none !important;
+  }
+}
+
+.floatingToc {
+  position: fixed;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 252px;
+  max-height: calc(100vh - 80px);
+  border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+  border-radius: 8px;
+  background-color: light-dark(
+    rgba(255, 255, 255, 0.94),
+    rgba(37, 38, 43, 0.94)
+  );
+  box-shadow: light-dark(
+    0 10px 28px rgba(15, 23, 42, 0.1),
+    0 12px 28px rgba(0, 0, 0, 0.32)
+  );
+  backdrop-filter: blur(10px);
+
+  @media print {
+    display: none !important;
+  }
+}
+
+.floatingTocGutter {
+  /* sits in free space to the right of the article column */
+  box-shadow: none;
+  background-color: light-dark(
+    rgba(255, 255, 255, 0.82),
+    rgba(37, 38, 43, 0.78)
+  );
+}
+
+.floatingTocOverlay {
+  /* fallback when gutter is not wide enough; never reflows content */
+  right: 12px;
+  top: calc(var(--app-shell-header-offset, 0rem) + 56px);
+}
+
+.floatingTocDrawer {
+  top: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(300px, 86vw) !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0;
+  border-right: none;
+  box-shadow: light-dark(
+    -8px 0 28px rgba(15, 23, 42, 0.12),
+    -8px 0 28px rgba(0, 0, 0, 0.4)
+  );
+}
+
+.floatingTocHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+}
+
+.floatingTocBody {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 8px 12px;
+}
+
 .resizeHandle {
   width: 3px;
   cursor: col-resize;
@@ -27,5 +112,3 @@
     background: light-dark(var(--mantine-color-gray-4), var(--mantine-color-dark-5))
   }
 }
-
-

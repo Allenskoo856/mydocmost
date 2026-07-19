@@ -14,6 +14,7 @@ import { AppHeader } from "@/components/layouts/global/app-header.tsx";
 import Aside from "@/components/layouts/global/aside.tsx";
 import classes from "./app-shell.module.css";
 import { useToggleSidebar } from "@/components/layouts/global/hooks/hooks/use-toggle-sidebar.ts";
+import { FloatingTableOfContents } from "@/features/editor/components/table-of-contents/floating-table-of-contents.tsx";
 
 export default function GlobalAppShell({
   children,
@@ -24,7 +25,9 @@ export default function GlobalAppShell({
   const [mobileOpened] = useAtom(mobileSidebarAtom);
   const toggleMobile = useToggleSidebar(mobileSidebarAtom);
   const [desktopOpened] = useAtom(desktopSidebarAtom);
-  const [{ isAsideOpen }] = useAtom(asideStateAtom);
+  const [{ isAsideOpen, tab: asideTab }] = useAtom(asideStateAtom);
+  const isCommentsAsideOpen = isAsideOpen && asideTab === "comments";
+  const isTocFloatingOpen = isAsideOpen && asideTab === "toc";
   const [sidebarWidth, setSidebarWidth] = useAtom(sidebarWidthAtom);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef(null);
@@ -90,10 +93,11 @@ export default function GlobalAppShell({
         }
       }
       aside={
-        isPageRoute && {
+        isPageRoute &&
+        isCommentsAsideOpen && {
           width: 350,
           breakpoint: "sm",
-          collapsed: { mobile: !isAsideOpen, desktop: !isAsideOpen },
+          collapsed: { mobile: false, desktop: false },
         }
       }
       padding={isSpaceRoute ? 0 : "md"}
@@ -122,11 +126,13 @@ export default function GlobalAppShell({
         )}
       </AppShell.Main>
 
-      {isPageRoute && (
+      {isPageRoute && isCommentsAsideOpen && (
         <AppShell.Aside className={classes.aside} p="md" withBorder={false}>
           <Aside />
         </AppShell.Aside>
       )}
+
+      {isPageRoute && isTocFloatingOpen && <FloatingTableOfContents />}
     </AppShell>
   );
 }
