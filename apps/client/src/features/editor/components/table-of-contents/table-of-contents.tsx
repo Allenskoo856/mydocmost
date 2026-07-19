@@ -9,6 +9,19 @@ import { useDebouncedCallback } from "@mantine/hooks";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { Transaction } from "@tiptap/pm/state";
 
+const LARGE_DOC_HEADING_THRESHOLD = 100;
+
+function throttle<T extends (...args: any[]) => void>(fn: T, wait: number) {
+  let lastTime = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - lastTime >= wait) {
+      lastTime = now;
+      fn(...args);
+    }
+  };
+}
+
 type TableOfContentsProps = {
   editor: ReturnType<typeof useEditor> | null;
   isShare?: boolean;
@@ -173,23 +186,60 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   }, [props.editor, debouncedHandleUpdate]);
 
   useEffect(() => {
-    try {
-      const observeHandler = (entries: IntersectionObserverEntry[]) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveElement(entry.target as HTMLElement);
-          }
-        });
-      };
+    if (headingDOMNodes.length === 0) return;
 
-      let headerOffset = 0;
-      if (headerPaddingRef.current) {
-        headerOffset = parseInt(
+    const headerOffset = headerPaddingRef.current
+      ? parseInt(
           window
             .getComputedStyle(headerPaddingRef.current)
             .getPropertyValue("top"),
-        );
-      }
+        )
+      : 0;
+
+    // For large documents, observing thousands of headings with
+    // IntersectionObserver causes the TOC to re-render continuously while
+    // scrolling. Fall back to a throttled scroll-based scan instead.
+    if (headingDOMNodes.length > LARGE_DOC_HEADING_THRESHOLD) {
+      const findActiveHeading = () => {
+        let active: HTMLElement | null = null;
+        for (let i = 0; i < headingDOMNodes.length; i++) {
+          const rect = headingDOMNodes[i].getBoundingClientRect();
+          if (rect.top > headerOffset) {
+            active = i > 0 ? headingDOMNodes[i - 1] : headingDOMNodes[0];
+            break;
+          }
+        }
+        if (!active && headingDOMNodes.length > 0) {
+          active = headingDOMNodes[headingDOMNodes.length - 1];
+        }
+        setActiveElement((current) => (current === active ? current : active));
+      };
+
+      const throttledFind = throttle(findActiveHeading, 100);
+      window.addEventListener("scroll", throttledFind, { passive: true });
+      findActiveHeading();
+
+      return () => {
+        window.removeEventListener("scroll", throttledFind);
+      };
+    }
+
+    // Small/medium documents: keep the original IntersectionObserver behavior.
+    try {
+      const observeHandler = (entries: IntersectionObserverEntry[]) => {
+        let newActive: HTMLElement | null = null;
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            newActive = entry.target as HTMLElement;
+          }
+        });
+        if (newActive) {
+          setActiveElement((current) =>
+            current === newActive ? current : newActive,
+          );
+        }
+      };
+
       const observerOptions: IntersectionObserverInit = {
         rootMargin: `-${headerOffset}px 0px -85% 0px`,
         threshold: 0,
@@ -204,9 +254,7 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
         observer.observe(heading);
       });
       return () => {
-        headingDOMNodes.forEach((heading) => {
-          observer.unobserve(heading);
-        });
+        observer.disconnect();
       };
     } catch (err) {
       console.log(err);
