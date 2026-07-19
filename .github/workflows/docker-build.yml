@@ -30,11 +30,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -70,7 +65,9 @@ jobs:
           file: ./Dockerfile
           build-args: |
             BASE_PATH=/evadoc
-          platforms: linux/amd64,linux/arm64
+          # Native amd64 only. Multi-arch/arm64 was previously built via QEMU
+          # and routinely took 20-30+ minutes on GitHub-hosted runners.
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
