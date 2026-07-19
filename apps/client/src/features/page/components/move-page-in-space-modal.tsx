@@ -11,6 +11,7 @@ import { generateJitteredKeyBetween } from "fractional-indexing-jittered";
 import { useAtom } from "jotai";
 import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom";
 import { queryClient } from "@/main";
+import { updateCacheOnMovePage } from "@/features/page/queries/page-query";
 import { useQueryEmit } from "@/features/websocket/use-query-emit";
 import clsx from "clsx";
 import classes from "@/features/page/tree/styles/tree.module.css";
@@ -107,6 +108,25 @@ export default function MovePageInSpaceModal({
       await movePage(movePayload);
       console.log('[MoveInSpace] movePage API call succeeded');
 
+      const pageData = {
+        id: movedNode?.id ?? pageId,
+        slugId: movedNode?.slugId,
+        title: movedNode?.name,
+        icon: movedNode?.icon,
+        position,
+        spaceId: movedNode?.spaceId ?? spaceId,
+        parentPageId: targetParentId,
+        hasChildren: movedNode?.hasChildren,
+      };
+
+      updateCacheOnMovePage(
+        spaceId,
+        pageId,
+        currentParentId,
+        targetParentId,
+        pageData,
+      );
+
       // Update local tree data immediately (optimistic update after API success)
       console.log('[MoveInSpace] Updating local tree data');
       const updatedTree = moveNodeInTree(treeData, pageId, targetParentId, position);
@@ -118,11 +138,13 @@ export default function MovePageInSpaceModal({
         const wsPayload = {
           operation: "moveTreeNode" as const,
           spaceId,
-          payload: { 
+          payload: {
             id: pageId,
             parentId: targetParentId,
+            oldParentId: currentParentId,
             index: 0, // Not used for append operation
-            position 
+            position,
+            pageData,
           },
         };
         console.log('[MoveInSpace] Emitting WebSocket event:', wsPayload);

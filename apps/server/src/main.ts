@@ -14,12 +14,11 @@ import { WsRedisIoAdapter } from './ws/adapter/ws-redis.adapter';
 import { InternalLogFilter } from './common/logger/internal-log-filter';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyCookie from '@fastify/cookie';
+import fastifyIp from 'fastify-ip';
 import { EnvironmentService } from './integrations/environment/environment.service';
 import { getMcpControllerPath } from './core/mcp/mcp-path.util';
 import { envPath } from './common/helpers';
 import { existsSync } from 'node:fs';
-import fastifyIp from 'fastify-ip';
-import { InternalLogFilter } from './common/logger/internal-log-filter';
 
 async function bootstrap() {
   if (existsSync(envPath)) {

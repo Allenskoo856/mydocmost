@@ -15,11 +15,6 @@ import { ImportModule } from './integrations/import/import.module';
 import { SecurityModule } from './integrations/security/security.module';
 import { RedisModule } from '@nestjs-labs/nestjs-ioredis';
 import { RedisConfigService } from './integrations/redis/redis-config.service';
-import { CacheModule } from '@nestjs/cache-manager';
-import KeyvRedis from '@keyv/redis';
-import { LoggerModule } from './common/logger/logger.module';
-import { ClsModule } from 'nestjs-cls';
-import { NoopAuditModule } from './integrations/audit/audit.module';
 import { ThrottleModule } from './integrations/throttle/throttle.module';
 
 const enterpriseModules = [];
@@ -59,7 +54,6 @@ try {
     }),
     EventEmitterModule.forRoot(),
     SecurityModule,
-    TelemetryModule,
     ThrottleModule,
     ...enterpriseModules,
   ],
