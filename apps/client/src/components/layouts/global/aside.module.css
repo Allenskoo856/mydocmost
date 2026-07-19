@@ -4,7 +4,8 @@
   min-height: 0;
   height: 100%;
   max-height: inherit;
-  padding: 10px 8px 8px;
+  padding: 8px 6px 6px;
+  background: transparent;
 }
 
 .commentsAside {
@@ -18,7 +19,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: 0;
-  color: light-dark(var(--mantine-color-gray-8), var(--mantine-color-gray-1));
+  color: light-dark(rgba(33, 37, 41, 0.82), rgba(248, 249, 250, 0.88));
 }
 
 .tocScrollArea {
