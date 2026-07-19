@@ -14,6 +14,92 @@
   }
 }
 
+.floatingTocBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 119;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: light-dark(rgba(15, 23, 42, 0.18), rgba(0, 0, 0, 0.45));
+  cursor: pointer;
+
+  @media print {
+    display: none !important;
+  }
+}
+
+.floatingToc {
+  position: fixed;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 252px;
+  max-height: calc(100vh - 80px);
+  border: 1px solid light-dark(rgba(15, 23, 42, 0.06), rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  background-color: light-dark(
+    rgba(255, 255, 255, 0.78),
+    rgba(24, 25, 28, 0.72)
+  );
+  box-shadow: light-dark(
+    0 6px 20px rgba(15, 23, 42, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.28)
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  @media print {
+    display: none !important;
+  }
+}
+
+.floatingTocGutter {
+  /* sits in free space to the right of the article column */
+  box-shadow: none;
+  background-color: light-dark(
+    rgba(255, 255, 255, 0.62),
+    rgba(24, 25, 28, 0.55)
+  );
+}
+
+.floatingTocOverlay {
+  /* fallback when gutter is not wide enough; never reflows content */
+  right: 12px;
+  top: calc(var(--app-shell-header-offset, 0rem) + 56px);
+}
+
+.floatingTocDrawer {
+  top: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(300px, 86vw) !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0;
+  border-right: none;
+  box-shadow: light-dark(
+    -8px 0 28px rgba(15, 23, 42, 0.12),
+    -8px 0 28px rgba(0, 0, 0, 0.4)
+  );
+}
+
+.floatingTocHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
+}
+
+.floatingTocBody {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 6px 10px;
+}
+
 .resizeHandle {
   width: 3px;
   cursor: col-resize;
@@ -25,40 +111,5 @@
   &:hover, &:active {
     width: 5px;
     background: light-dark(var(--mantine-color-gray-4), var(--mantine-color-dark-5))
-  }
-}
-
-.tocPanel {
-  position: fixed;
-  top: 52px;
-  right: 12px;
-  z-index: 180;
-  display: flex;
-  flex-direction: column;
-  width: min(220px, calc(100vw - 24px));
-  /* Keep panel bounded so the inner list can scroll */
-  height: min(70vh, calc(100vh - 72px));
-  max-height: min(70vh, calc(100vh - 72px));
-  min-height: 180px;
-  overflow: hidden;
-  border: 1px solid light-dark(rgba(15, 23, 42, 0.06), rgba(255, 255, 255, 0.08));
-  border-radius: 10px;
-  background-color: light-dark(
-    rgba(255, 255, 255, 0.58),
-    rgba(24, 25, 28, 0.52)
-  );
-  box-shadow: light-dark(
-    0 6px 20px rgba(15, 23, 42, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.28)
-  );
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-
-  @media (max-width: $mantine-breakpoint-sm) {
-    top: 52px;
-    right: 8px;
-    width: min(230px, calc(100vw - 16px));
-    height: min(65vh, calc(100vh - 68px));
-    max-height: min(65vh, calc(100vh - 68px));
   }
 }

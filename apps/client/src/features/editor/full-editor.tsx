@@ -89,6 +89,7 @@ export function FullEditor({
       fluid={fullPageWidth}
       size={!fullPageWidth && 900}
       className={classes.editor}
+      data-page-content
     >
       {readMode ? (
         <ReadonlyPageSnapshot title={title} renderedContent={renderedContent} />

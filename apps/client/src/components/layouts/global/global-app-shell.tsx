@@ -1,4 +1,4 @@
-import { AppShell, Container, Transition } from "@mantine/core";
+import { AppShell, Container } from "@mantine/core";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import SettingsSidebar from "@/components/settings/settings-sidebar.tsx";
@@ -14,6 +14,7 @@ import { AppHeader } from "@/components/layouts/global/app-header.tsx";
 import Aside from "@/components/layouts/global/aside.tsx";
 import classes from "./app-shell.module.css";
 import { useToggleSidebar } from "@/components/layouts/global/hooks/hooks/use-toggle-sidebar.ts";
+import { FloatingTableOfContents } from "@/features/editor/components/table-of-contents/floating-table-of-contents.tsx";
 
 export default function GlobalAppShell({
   children,
@@ -132,22 +133,7 @@ export default function GlobalAppShell({
         </AppShell.Aside>
       )}
 
-      <Transition
-        mounted={isTocOpen}
-        transition="fade-left"
-        duration={160}
-        timingFunction="ease"
-      >
-        {(styles) => (
-          <aside
-            className={classes.tocPanel}
-            style={styles}
-            aria-label="Table of contents"
-          >
-            <Aside />
-          </aside>
-        )}
-      </Transition>
+      {isTocOpen && <FloatingTableOfContents />}
     </AppShell>
   );
 }
