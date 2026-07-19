@@ -1,6 +1,6 @@
 import { NodePos, useEditor } from "@tiptap/react";
 import { TextSelection } from "@tiptap/pm/state";
-import React, { FC, useEffect, useRef, useState } from "react";
+import React, { FC, useEffect, useLayoutEffect, useRef, useState } from "react";
 import classes from "./table-of-contents.module.css";
 import clsx from "clsx";
 import { Box, Text } from "@mantine/core";
@@ -122,6 +122,7 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   const [activeElement, setActiveElement] = useState<HTMLElement | null>(null);
   const [activeTocIndex, setActiveTocIndex] = useState<number | null>(null);
   const headerPaddingRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const outlineRef = useRef<SnapshotOutlineItem[]>(getLastSnapshotOutline());
 
   const handleScrollToHeading = (item: HeadingLink) => {
@@ -362,6 +363,55 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
     return () => window.removeEventListener("scroll", throttledFind);
   }, [headingDOMNodes, links, props.editor]);
 
+  // Keep the active TOC entry visible inside the floating panel while the
+  // page scrolls. Without this, the highlight moves but the panel stays put.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const activeButton = list.querySelector<HTMLElement>(
+      '[data-toc-active="true"]',
+    );
+    if (!activeButton) return;
+
+    const scrollParent =
+      (activeButton.closest(
+        '[class*="floatingTocBody"], [class*="tocScrollArea"]',
+      ) as HTMLElement | null) ||
+      (list.parentElement as HTMLElement | null);
+
+    if (!scrollParent) {
+      activeButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+      return;
+    }
+
+    const parentRect = scrollParent.getBoundingClientRect();
+    const itemRect = activeButton.getBoundingClientRect();
+    const padding = 12;
+    const fullyAbove = itemRect.bottom < parentRect.top;
+    const fullyBelow = itemRect.top > parentRect.bottom;
+
+    // Large jumps (e.g. 5.2 -> chapter 10) center the active item so users
+    // immediately see where they are in the outline.
+    if (fullyAbove || fullyBelow) {
+      const delta =
+        itemRect.top -
+        parentRect.top -
+        (parentRect.height / 2 - itemRect.height / 2);
+      scrollParent.scrollTop += delta;
+      return;
+    }
+
+    if (itemRect.top < parentRect.top + padding) {
+      scrollParent.scrollTop -= parentRect.top + padding - itemRect.top;
+      return;
+    }
+
+    if (itemRect.bottom > parentRect.bottom - padding) {
+      scrollParent.scrollTop += itemRect.bottom - (parentRect.bottom - padding);
+    }
+  }, [activeElement, activeTocIndex, links.length]);
+
   if (!links.length) {
     return (
       <>
@@ -382,7 +432,10 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
 
   return (
     <>
-      <div className={props.isShare ? classes.leftBorder : ""}>
+      <div
+        ref={listRef}
+        className={props.isShare ? classes.leftBorder : ""}
+      >
         {links.map((item, idx) => {
           const isActive = props.editor
             ? item.element === activeElement
@@ -392,6 +445,7 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
               component="button"
               onClick={() => handleScrollToHeading(item)}
               key={item.tocIndex ?? idx}
+              data-toc-active={isActive ? "true" : undefined}
               className={clsx(classes.link, {
                 [classes.linkActive]: isActive,
               })}
