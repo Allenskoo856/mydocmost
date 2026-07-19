@@ -14,11 +14,13 @@ import { useTranslation } from "react-i18next";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom.ts";
 import { PageEditMode } from "@/features/user/types/user.types.ts";
 import { pageForceEditAtom } from "@/features/editor/atoms/editor-atoms.ts";
+import { isLargeDocumentSize } from "@/features/editor/utils/large-document";
 
 interface Props {
   readOnly?: boolean;
+  contentSize?: number;
 }
-export default function PageHeader({ readOnly }: Props) {
+export default function PageHeader({ readOnly, contentSize }: Props) {
   const { t } = useTranslation();
   const [mobileOpened] = useAtom(mobileSidebarAtom);
   const toggleMobile = useToggleSidebar(mobileSidebarAtom);
@@ -28,10 +30,13 @@ export default function PageHeader({ readOnly }: Props) {
   const [forceEdit, setForceEdit] = useAtom(pageForceEditAtom);
   const userPageEditMode =
     currentUser?.user?.settings?.preferences?.pageEditMode ?? PageEditMode.Edit;
-  // In static read mode (read preference) with edit permission, offer an
-  // explicit switch to the full collaborative editor.
+  const isLargeDocument = isLargeDocumentSize(contentSize);
+  // In static read mode (read preference or large document) with edit
+  // permission, offer an explicit switch to the full collaborative editor.
   const showEditButton =
-    !readOnly && userPageEditMode === PageEditMode.Read && !forceEdit;
+    !readOnly &&
+    !forceEdit &&
+    (userPageEditMode === PageEditMode.Read || isLargeDocument);
 
   return (
     <div className={classes.header}>
