@@ -104,6 +104,14 @@ export function TitleEditor({
     },
   });
 
+  // Reset the global title editor atom when this component unmounts so the
+  // next page doesn't briefly read a destroyed editor instance.
+  useEffect(() => {
+    return () => {
+      setTitleEditor(null);
+    };
+  }, [setTitleEditor]);
+
   useEffect(() => {
     const anchorId = window.location.hash
       ? window.location.hash.substring(1)
@@ -167,7 +175,7 @@ export function TitleEditor({
       // force-save title on navigation
       saveTitle();
     };
-  }, [pageId]);
+  }, []);
 
   // forceEdit (clicking "Edit" in static read mode) overrides the read
   // preference.
