@@ -3,7 +3,6 @@ import {
   ActionIcon,
   AppShell,
   Group,
-  ScrollArea,
   Tooltip,
 } from "@mantine/core";
 import { useGetSharedPageTreeQuery } from "@/features/share/queries/share-query.ts";
@@ -178,16 +177,11 @@ export default function ShareShell({
 
       {(tocOpened || mobileTocOpened) && (
         <aside className={classes.tocPanel} aria-label="Table of contents">
-          <ScrollArea
-            className={classes.tocScrollArea}
-            scrollbarSize={4}
-            type="hover"
-            offsetScrollbars
-          >
+          <div className={classes.tocScrollArea}>
             {readOnlyEditor && (
               <TableOfContents isShare={true} editor={readOnlyEditor} />
             )}
-          </ScrollArea>
+          </div>
         </aside>
       )}
 

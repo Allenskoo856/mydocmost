@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Group, ScrollArea, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Box, Group, Text, Tooltip } from "@mantine/core";
 import CommentListWithTabs from "@/features/comment/components/comment-list-with-tabs.tsx";
 import { useAtom, useSetAtom } from "jotai";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
@@ -48,8 +48,9 @@ export default function Aside() {
       <Group
         justify="space-between"
         align="center"
-        mb={isToc ? "xs" : "md"}
+        mb={isToc ? 6 : "md"}
         wrap="nowrap"
+        className={isToc ? classes.tocHeader : undefined}
       >
         <Text fw={600} size={isToc ? "sm" : "md"} className={classes.title}>
           {t(title)}
@@ -71,14 +72,7 @@ export default function Aside() {
       </Group>
 
       {isToc ? (
-        <ScrollArea
-          className={classes.tocScrollArea}
-          scrollbarSize={4}
-          type="hover"
-          offsetScrollbars
-        >
-          {component}
-        </ScrollArea>
+        <div className={classes.tocScrollArea}>{component}</div>
       ) : (
         component
       )}
