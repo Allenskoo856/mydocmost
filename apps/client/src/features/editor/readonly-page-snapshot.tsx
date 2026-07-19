@@ -1,5 +1,5 @@
 import "@/features/editor/styles/index.css";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import {
   pageEditorAtom,
@@ -7,6 +7,13 @@ import {
 } from "@/features/editor/atoms/editor-atoms";
 
 const SNAPSHOT_RENDERED_EVENT = "PAGE_SNAPSHOT_RENDERED";
+
+// Number of top-level blocks to render in the first paint. Large documents
+// are rendered incrementally to avoid blocking the main thread with a huge
+// DOM parse/layout pass.
+const INITIAL_CHUNK_COUNT = 50;
+const CHUNK_SIZE = 30;
+const CHUNK_ROOT_MARGIN = "200px";
 
 interface PageContentSnapshotProps {
   renderedContent?: string;
@@ -16,7 +23,160 @@ export function PageContentSnapshot({
   renderedContent,
 }: PageContentSnapshotProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const chunksRef = useRef<Element[]>([]);
+  const renderedCountRef = useRef(0);
+  const chunkIndexByIdRef = useRef<Map<string, number>>(new Map());
+  const [isComplete, setIsComplete] = useState(false);
 
+  const scrollToHash = useCallback(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    if (target) {
+      target.scrollIntoView({ block: "start" });
+    }
+  }, []);
+
+  const appendChunks = useCallback(
+    (count: number, targetIndex: number = -1) => {
+      const container = rootRef.current;
+      const chunks = chunksRef.current;
+      if (!container || chunks.length === 0) return false;
+
+      // If a hash target is requested, render at least up to that chunk so the
+      // anchored element exists in the DOM.
+      let end = renderedCountRef.current + count;
+      if (targetIndex >= 0) {
+        end = Math.max(end, targetIndex + 1);
+      }
+      end = Math.min(end, chunks.length);
+
+      if (end <= renderedCountRef.current) {
+        return renderedCountRef.current >= chunks.length;
+      }
+
+      const fragment = document.createDocumentFragment();
+      for (let i = renderedCountRef.current; i < end; i++) {
+        fragment.appendChild(chunks[i]);
+      }
+      container.appendChild(fragment);
+      renderedCountRef.current = end;
+
+      const complete = renderedCountRef.current >= chunks.length;
+      if (complete) {
+        setIsComplete(true);
+        document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
+      }
+
+      return complete;
+    },
+    [],
+  );
+
+  // Parse renderedContent into top-level chunks and render the initial batch.
+  // Remaining chunks are loaded when the sentinel approaches the viewport.
+  useEffect(() => {
+    const container = rootRef.current;
+    if (!container) return;
+
+    container.replaceChildren();
+    chunksRef.current = [];
+    renderedCountRef.current = 0;
+    chunkIndexByIdRef.current = new Map();
+
+    if (!renderedContent) {
+      setIsComplete(true);
+      document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
+      return;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(renderedContent, "text/html");
+    const chunks = Array.from(doc.body.children);
+    chunksRef.current = chunks;
+    setIsComplete(false);
+
+    chunks.forEach((chunk, index) => {
+      const id = chunk.id;
+      if (id) {
+        chunkIndexByIdRef.current.set(id, index);
+      }
+      chunk.querySelectorAll("[id]").forEach((element) => {
+        if (!chunkIndexByIdRef.current.has(element.id)) {
+          chunkIndexByIdRef.current.set(element.id, index);
+        }
+      });
+    });
+
+    // Prefer rendering far enough for the current hash target so deep links
+    // still land on the right heading after the first paint.
+    const hash = window.location.hash.slice(1);
+    const hashIndex = hash ? (chunkIndexByIdRef.current.get(hash) ?? -1) : -1;
+
+    if (chunks.length === 0) {
+      setIsComplete(true);
+      document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
+      return;
+    }
+
+    if (chunks.length <= INITIAL_CHUNK_COUNT) {
+      appendChunks(chunks.length);
+    } else {
+      appendChunks(INITIAL_CHUNK_COUNT, hashIndex);
+    }
+
+    // Defer the scroll until after the initial batch is in the DOM.
+    if (hashIndex >= 0) {
+      requestAnimationFrame(() => {
+        scrollToHash();
+      });
+    } else if (chunks.length > INITIAL_CHUNK_COUNT) {
+      // First paint completed for large docs; remaining content is lazy.
+      // Small docs already fire SNAPSHOT_RENDERED_EVENT inside appendChunks.
+      document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
+    }
+  }, [renderedContent, appendChunks, scrollToHash]);
+
+  // Sentinel-based lazy loading for the remaining chunks.
+  useEffect(() => {
+    if (isComplete) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        appendChunks(CHUNK_SIZE);
+      },
+      { rootMargin: CHUNK_ROOT_MARGIN },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [isComplete, appendChunks, renderedContent]);
+
+  // If the user navigates to an in-page anchor, ensure the target chunk is
+  // rendered even if it is currently outside the lazy-loaded viewport.
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      const targetIndex = chunkIndexByIdRef.current.get(hash);
+      if (targetIndex === undefined) return;
+      if (targetIndex >= renderedCountRef.current) {
+        appendChunks(0, targetIndex);
+      }
+      requestAnimationFrame(() => {
+        scrollToHash();
+      });
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [appendChunks, scrollToHash]);
+
+  // Comment click handling: the snapshot HTML may contain elements annotated
+  // with data-comment-id; clicking them opens the comment sidebar.
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -40,31 +200,27 @@ export function PageContentSnapshot({
     };
 
     root.addEventListener("click", handleCommentClick);
-
-    const frame = requestAnimationFrame(() => {
-      document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
-      const hash = window.location.hash.slice(1);
-      if (hash) {
-        document.getElementById(hash)?.scrollIntoView({ block: "start" });
-      }
-    });
-
     return () => {
-      cancelAnimationFrame(frame);
       root.removeEventListener("click", handleCommentClick);
     };
   }, [renderedContent]);
 
   return (
-    <div
-      ref={rootRef}
-      className="ProseMirror page-readonly-snapshot"
-      data-page-snapshot
-      role="document"
-      // The HTML is produced by the server's ProseMirror schema serializer,
-      // not from arbitrary client input.
-      dangerouslySetInnerHTML={{ __html: renderedContent || "" }}
-    />
+    <div>
+      <div
+        ref={rootRef}
+        className="ProseMirror page-readonly-snapshot"
+        data-page-snapshot
+        role="document"
+      />
+      {!isComplete && (
+        <div
+          ref={sentinelRef}
+          aria-hidden="true"
+          style={{ height: 1, width: "100%" }}
+        />
+      )}
+    </div>
   );
 }
 

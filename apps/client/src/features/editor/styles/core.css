@@ -236,10 +236,12 @@
   }
 }
 
-/* Static page snapshots can skip layout and paint for off-screen blocks. */
+/* Static page snapshots can skip layout and paint for off-screen blocks.
+   Use a larger fallback intrinsic size for large documents so the initial
+   scrollbar estimate is closer to reality and avoids jank on first scroll. */
 .page-readonly-snapshot > * {
   content-visibility: auto;
-  contain-intrinsic-size: auto 48px;
+  contain-intrinsic-size: auto 200px;
 }
 
 .actionIconGroup {

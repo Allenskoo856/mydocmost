@@ -17,6 +17,7 @@ import {
   activeCommentIdAtom,
   showCommentPopupAtom,
 } from "@/features/comment/atoms/comment-atom";
+import { isLargeDocumentSize } from "@/features/editor/utils/large-document";
 
 const MemoizedTitleEditor = React.memo(TitleEditor);
 const MemoizedPageEditor = React.memo(PageEditor);
@@ -73,13 +74,17 @@ export function FullEditor({
     setAsideState({ tab: "", isAsideOpen: false });
   }, [pageId, isMobile, tocDefaultOpen]);
 
-  // Static read mode: render the document without the collaborative stack
-  // (no Yjs document, WebSocket connection or IndexedDB sync), saving a full
-  // document parse + sync cycle. Users without edit permission always take
-  // this path; users with the "read" default mode upgrade to the full collab
-  // editor via the header "Edit" button.
+  // For large documents, default to static read mode even if the user prefers
+  // edit mode. This avoids synchronously initializing the Yjs document,
+  // IndexedDB persistence, WebSocket provider and Tiptap editor while the page
+  // is still showing the server-rendered snapshot, which blocks the main
+  // thread for multi-megabyte documents. Users can still click "Edit" to enter
+  // the full collaborative editor when needed.
+  const isLargeDocument = isLargeDocumentSize(contentSize);
   const readMode =
-    !editable || (userPageEditMode === PageEditMode.Read && !forceEdit);
+    !editable ||
+    (userPageEditMode === PageEditMode.Read && !forceEdit) ||
+    (isLargeDocument && !forceEdit);
 
   return (
     <Container

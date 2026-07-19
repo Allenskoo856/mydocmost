@@ -60,6 +60,7 @@ export default function Page() {
             SpaceCaslAction.Manage,
             SpaceCaslSubject.Page,
           )}
+          contentSize={page.contentSize}
         />
 
         <MemoizedFullEditor
