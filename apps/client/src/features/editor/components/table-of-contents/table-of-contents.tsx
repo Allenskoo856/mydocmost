@@ -9,6 +9,7 @@ import { useDebouncedCallback } from "@mantine/hooks";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { Transaction } from "@tiptap/pm/state";
 import {
+  getLastSnapshotOutline,
   SNAPSHOT_ENSURE_TOC_EVENT,
   SNAPSHOT_OUTLINE_EVENT,
   SNAPSHOT_RENDERED_EVENT,
@@ -121,10 +122,12 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   const [activeElement, setActiveElement] = useState<HTMLElement | null>(null);
   const [activeTocIndex, setActiveTocIndex] = useState<number | null>(null);
   const headerPaddingRef = useRef<HTMLDivElement | null>(null);
-  const outlineRef = useRef<SnapshotOutlineItem[]>([]);
+  const outlineRef = useRef<SnapshotOutlineItem[]>(getLastSnapshotOutline());
 
   const handleScrollToHeading = (item: HeadingLink) => {
-    // Snapshot/lazy mode: ask the snapshot renderer to mount the target chunk.
+    // Snapshot/lazy mode: ask the snapshot renderer to mount/scroll target.
+    // Do this for every outline item, including already-mounted headings,
+    // so read mode uses one reliable scroll path.
     if (!props.editor || item.position === undefined) {
       if (item.tocIndex !== undefined) {
         document.dispatchEvent(
@@ -134,7 +137,16 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
         );
         return;
       }
-      item.element?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      // Fallback if outline metadata is missing.
+      if (item.element) {
+        const headerOffset = 72;
+        const top =
+          item.element.getBoundingClientRect().top +
+          window.scrollY -
+          headerOffset;
+        window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      }
       return;
     }
 
@@ -168,6 +180,10 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
       setHeadingDOMNodes(result.nodes);
       setActiveTocIndex(null);
       return;
+    }
+
+    if (outlineRef.current.length === 0) {
+      outlineRef.current = getLastSnapshotOutline();
     }
 
     // Prefer the complete outline extracted from the full snapshot HTML.

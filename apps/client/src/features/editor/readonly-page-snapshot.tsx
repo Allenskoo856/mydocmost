@@ -25,6 +25,45 @@ export type SnapshotOutlineItem = {
   id?: string;
 };
 
+// Keep the latest outline outside React so TOC can read it when it mounts
+// after the initial PAGE_SNAPSHOT_OUTLINE event has already fired.
+let lastSnapshotOutline: SnapshotOutlineItem[] = [];
+
+export function getLastSnapshotOutline() {
+  return lastSnapshotOutline;
+}
+
+function scrollToTocTarget(tocIndex: number, id?: string) {
+  const target =
+    document.querySelector<HTMLElement>(
+      `[data-page-snapshot] [data-toc-index="${tocIndex}"]`,
+    ) || (id ? document.getElementById(id) : null);
+
+  if (!target) return false;
+
+  // Prefer window scroll with header offset; scrollIntoView alone often feels
+  // like a no-op when a fixed page header covers the heading.
+  const headerOffset = 72;
+  const top =
+    target.getBoundingClientRect().top + window.scrollY - headerOffset;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  return true;
+}
+
+function ensureTocTargetVisible(tocIndex: number, id?: string) {
+  if (scrollToTocTarget(tocIndex, id)) return;
+
+  // Newly appended chunks may not be laid out for one or more frames.
+  let attempts = 0;
+  const maxAttempts = 12;
+  const tick = () => {
+    attempts += 1;
+    if (scrollToTocTarget(tocIndex, id) || attempts >= maxAttempts) return;
+    window.setTimeout(tick, attempts < 4 ? 16 : 50);
+  };
+  requestAnimationFrame(tick);
+}
+
 interface PageContentSnapshotProps {
   renderedContent?: string;
 }
@@ -50,6 +89,7 @@ export function PageContentSnapshot({
   }, []);
 
   const publishOutline = useCallback(() => {
+    lastSnapshotOutline = outlineRef.current;
     document.dispatchEvent(
       new CustomEvent(SNAPSHOT_OUTLINE_EVENT, {
         detail: { outline: outlineRef.current },
@@ -105,6 +145,7 @@ export function PageContentSnapshot({
     renderedCountRef.current = 0;
     chunkIndexByIdRef.current = new Map();
     outlineRef.current = [];
+    lastSnapshotOutline = [];
 
     if (!renderedContent) {
       setIsComplete(true);
@@ -227,14 +268,9 @@ export function PageContentSnapshot({
         appendChunks(0, item.chunkIndex);
       }
 
-      requestAnimationFrame(() => {
-        const target =
-          document.querySelector<HTMLElement>(
-            `[data-page-snapshot] [data-toc-index="${tocIndex}"]`,
-          ) ||
-          (item.id ? document.getElementById(item.id) : null);
-        target?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      // Scroll after mount/layout. Works for both already-rendered headings
+      // and headings that were just appended from lazy chunks.
+      ensureTocTargetVisible(tocIndex, item.id);
     };
 
     document.addEventListener(SNAPSHOT_ENSURE_TOC_EVENT, handleEnsureToc);
