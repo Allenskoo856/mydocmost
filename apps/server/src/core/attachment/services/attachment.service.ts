@@ -115,9 +115,28 @@ export class AttachmentService {
           pageId,
         });
       }
+    } catch (err) {
+      this.logger.error(err);
+      // New uploads leave orphan objects if DB persistence fails.
+      // For overwrite flows the object already replaced the previous binary.
+      if (!isUpdate) {
+        await this.deleteRedundantFile(filePath);
+      }
+      if (
+        err instanceof BadRequestException ||
+        err instanceof NotFoundException
+      ) {
+        throw err;
+      }
+      throw new BadRequestException('Error uploading file');
+    }
 
-      // Only index PDFs and DOCX files
-      if (['.pdf', '.docx'].includes(attachment.fileExt.toLowerCase())) {
+    // Indexing is best-effort and must not fail an otherwise successful upload.
+    if (
+      attachment &&
+      ['.pdf', '.docx'].includes(attachment.fileExt.toLowerCase())
+    ) {
+      try {
         await this.attachmentQueue.add(
           QueueJob.ATTACHMENT_INDEX_CONTENT,
           {
@@ -131,10 +150,12 @@ export class AttachmentService {
             },
           },
         );
+      } catch (err) {
+        this.logger.error(
+          `Failed to enqueue attachment indexing for ${attachmentId}`,
+          err,
+        );
       }
-    } catch (err) {
-      // delete uploaded file on error
-      this.logger.error(err);
     }
 
     return attachment;

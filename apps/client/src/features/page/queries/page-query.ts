@@ -45,6 +45,46 @@ import { SimpleTree } from "react-arborist";
 import { SpaceTreeNode } from "@/features/page/tree/types";
 import { useQueryEmit } from "@/features/websocket/use-query-emit";
 
+
+function getSidebarPagesQueryKey(
+  params: Pick<SidebarPagesParams, "pageId" | "spaceId">,
+): QueryKey {
+  return [
+    "sidebar-pages",
+    {
+      ...(params.pageId ? { pageId: params.pageId } : {}),
+      ...(params.spaceId ? { spaceId: params.spaceId } : {}),
+    },
+  ];
+}
+
+function getSidebarPagesQueryKeys(
+  pageId: string | null | undefined,
+  spaceId?: string | null,
+): QueryKey[] {
+  if (!pageId) {
+    return [];
+  }
+
+  const keys: QueryKey[] = [getSidebarPagesQueryKey({ pageId })];
+  if (spaceId) {
+    keys.push(getSidebarPagesQueryKey({ pageId, spaceId }));
+  }
+  return keys;
+}
+
+function updateSidebarPagesCaches(
+  pageId: string | null | undefined,
+  spaceId: string | null | undefined,
+  updater: (
+    old: InfiniteData<IPagination<IPage>> | undefined,
+  ) => InfiniteData<IPagination<IPage>> | undefined,
+) {
+  for (const queryKey of getSidebarPagesQueryKeys(pageId, spaceId)) {
+    queryClient.setQueryData<InfiniteData<IPagination<IPage>>>(queryKey, updater);
+  }
+}
+
 export function usePageQuery(
   pageInput: Partial<IPageInput>,
 ): UseQueryResult<IPage, Error> {
@@ -293,7 +333,10 @@ export function useGetSidebarPagesQuery(
   data: SidebarPagesParams | null,
 ): UseInfiniteQueryResult<InfiniteData<IPagination<IPage>, unknown>> {
   return useInfiniteQuery({
-    queryKey: ["sidebar-pages", data],
+    queryKey: getSidebarPagesQueryKey({
+      pageId: data?.pageId,
+      spaceId: data?.spaceId,
+    }),
     enabled: !!data?.pageId || !!data?.spaceId,
     queryFn: ({ pageParam }) => getSidebarPages({ ...data, page: pageParam }),
     initialPageParam: 1,
@@ -331,7 +374,10 @@ export function usePageBreadcrumbsQuery(
 export async function fetchAllAncestorChildren(params: SidebarPagesParams) {
   // not using a hook here, so we can call it inside a useEffect hook
   const response = await queryClient.fetchQuery({
-    queryKey: ["sidebar-pages", params],
+    queryKey: getSidebarPagesQueryKey({
+      pageId: params.pageId,
+      spaceId: params.spaceId,
+    }),
     queryFn: () => getAllSidebarPages(params),
     staleTime: 30 * 60 * 1000,
   });
@@ -377,35 +423,41 @@ export function invalidateOnCreatePage(data: Partial<IPage>) {
     title: data.title,
   };
 
-  let queryKey: QueryKey = null;
-  if (data.parentPageId === null) {
-    queryKey = ["root-sidebar-pages", data.spaceId];
-  } else {
-    queryKey = [
-      "sidebar-pages",
-      { pageId: data.parentPageId, spaceId: data.spaceId },
-    ];
-  }
+  const appendCreatedPage = (
+    old: InfiniteData<IPagination<Partial<IPage>>> | undefined,
+  ) => {
+    if (!old) return old;
+    return {
+      ...old,
+      pages: old.pages.map((page, index) => {
+        if (index === old.pages.length - 1) {
+          return {
+            ...page,
+            items: [...page.items, newPage],
+          };
+        }
+        return page;
+      }),
+    };
+  };
 
   //update all sidebar pages
-  queryClient.setQueryData<InfiniteData<IPagination<Partial<IPage>>>>(
-    queryKey,
-    (old) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pages: old.pages.map((page, index) => {
-          if (index === old.pages.length - 1) {
-            return {
-              ...page,
-              items: [...page.items, newPage],
-            };
-          }
-          return page;
-        }),
-      };
-    },
-  );
+  if (data.parentPageId === null) {
+    queryClient.setQueryData<InfiniteData<IPagination<Partial<IPage>>>>(
+      ["root-sidebar-pages", data.spaceId],
+      appendCreatedPage,
+    );
+  } else {
+    for (const queryKey of getSidebarPagesQueryKeys(
+      data.parentPageId,
+      data.spaceId,
+    )) {
+      queryClient.setQueryData<InfiniteData<IPagination<Partial<IPage>>>>(
+        queryKey,
+        appendCreatedPage,
+      );
+    }
+  }
 
   //update sidebar haschildren
   if (data.parentPageId !== null) {
@@ -469,30 +521,32 @@ export function invalidateOnUpdatePage(
   title: string,
   icon: string,
 ) {
-  let queryKey: QueryKey = null;
-  if (parentPageId === null) {
-    queryKey = ["root-sidebar-pages", spaceId];
-  } else {
-    queryKey = ["sidebar-pages", { pageId: parentPageId, spaceId: spaceId }];
-  }
+  const updateCachedPage = (
+    old: InfiniteData<IPagination<IPage>> | undefined,
+  ) => {
+    if (!old) return old;
+    return {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        items: page.items.map((sidebarPage: IPage) =>
+          sidebarPage.id === id
+            ? { ...sidebarPage, title: title, icon: icon }
+            : sidebarPage,
+        ),
+      })),
+    };
+  };
+
   //update all sidebar pages
-  queryClient.setQueryData<InfiniteData<IPagination<IPage>>>(
-    queryKey,
-    (old) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pages: old.pages.map((page) => ({
-          ...page,
-          items: page.items.map((sidebarPage: IPage) =>
-            sidebarPage.id === id
-              ? { ...sidebarPage, title: title, icon: icon }
-              : sidebarPage,
-          ),
-        })),
-      };
-    },
-  );
+  if (parentPageId === null) {
+    queryClient.setQueryData<InfiniteData<IPagination<IPage>>>(
+      ["root-sidebar-pages", spaceId],
+      updateCachedPage,
+    );
+  } else {
+    updateSidebarPagesCaches(parentPageId, spaceId, updateCachedPage);
+  }
 
   //update recent changes
   queryClient.invalidateQueries({
@@ -507,34 +561,44 @@ export function updateCacheOnMovePage(
   newParentId: string | null,
   pageData: Partial<IPage>,
 ) {
-  // Remove page from old parent's cache
-  const oldQueryKey =
-    oldParentId === null
-      ? ["root-sidebar-pages", spaceId]
-      : ["sidebar-pages", { pageId: oldParentId, spaceId }];
+  const removeFromCache = (
+    old: InfiniteData<IPagination<IPage>> | undefined,
+  ) => {
+    if (!old) return old;
+    return {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        items: page.items.filter((item) => item.id !== pageId),
+      })),
+    };
+  };
 
-  queryClient.setQueryData<InfiniteData<IPagination<IPage>>>(
-    oldQueryKey,
-    (old) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pages: old.pages.map((page) => ({
-          ...page,
-          items: page.items.filter((item) => item.id !== pageId),
-        })),
-      };
-    },
-  );
+  // Remove page from old parent's cache (cover both key shapes used by callers)
+  if (oldParentId === null) {
+    queryClient.setQueryData<InfiniteData<IPagination<IPage>>>(
+      ["root-sidebar-pages", spaceId],
+      removeFromCache,
+    );
+  } else {
+    updateSidebarPagesCaches(oldParentId, spaceId, removeFromCache);
+  }
 
   // Update old parent's hasChildren flag if it has no more children
   if (oldParentId !== null) {
-    const oldParentCache = queryClient.getQueryData<
-      InfiniteData<IPagination<IPage>>
-    >(["sidebar-pages", { pageId: oldParentId, spaceId }]);
+    const oldParentCaches = getSidebarPagesQueryKeys(oldParentId, spaceId)
+      .map((key) =>
+        queryClient.getQueryData<InfiniteData<IPagination<IPage>>>(key),
+      )
+      .filter(Boolean) as InfiniteData<IPagination<IPage>>[];
 
-    const remainingChildren =
-      oldParentCache?.pages.flatMap((p) => p.items).length ?? 0;
+    const remainingChildren = oldParentCaches.length
+      ? Math.min(
+          ...oldParentCaches.map(
+            (cache) => cache.pages.flatMap((p) => p.items).length,
+          ),
+        )
+      : null;
 
     if (remainingChildren === 0) {
       // Update hasChildren in all caches where old parent appears
@@ -566,37 +630,45 @@ export function updateCacheOnMovePage(
     }
   }
 
+  const addToCache = (
+    old: InfiniteData<IPagination<Partial<IPage>>> | undefined,
+  ) => {
+    if (!old) return old;
+
+    // Check if page already exists in new location
+    const exists = old.pages.some((page) =>
+      page.items.some((item) => item.id === pageId),
+    );
+    if (exists) return old;
+
+    return {
+      ...old,
+      pages: old.pages.map((page, index) => {
+        if (index === old.pages.length - 1) {
+          return {
+            ...page,
+            items: [...page.items, pageData],
+          };
+        }
+        return page;
+      }),
+    };
+  };
+
   // Add page to new parent's cache
-  const newQueryKey =
-    newParentId === null
-      ? ["root-sidebar-pages", spaceId]
-      : ["sidebar-pages", { pageId: newParentId, spaceId }];
-
-  queryClient.setQueryData<InfiniteData<IPagination<Partial<IPage>>>>(
-    newQueryKey,
-    (old) => {
-      if (!old) return old;
-
-      // Check if page already exists in new location
-      const exists = old.pages.some((page) =>
-        page.items.some((item) => item.id === pageId),
+  if (newParentId === null) {
+    queryClient.setQueryData<InfiniteData<IPagination<Partial<IPage>>>>(
+      ["root-sidebar-pages", spaceId],
+      addToCache,
+    );
+  } else {
+    for (const queryKey of getSidebarPagesQueryKeys(newParentId, spaceId)) {
+      queryClient.setQueryData<InfiniteData<IPagination<Partial<IPage>>>>(
+        queryKey,
+        addToCache,
       );
-      if (exists) return old;
-
-      return {
-        ...old,
-        pages: old.pages.map((page, index) => {
-          if (index === old.pages.length - 1) {
-            return {
-              ...page,
-              items: [...page.items, pageData],
-            };
-          }
-          return page;
-        }),
-      };
-    },
-  );
+    }
+  }
 
   // Update new parent's hasChildren flag
   if (newParentId !== null) {

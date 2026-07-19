@@ -151,38 +151,40 @@ export default function MovePageInSpaceModal({
         emit(wsPayload);
       }, 50);
 
-      // Refetch queries to refresh tree immediately
-      console.log('[MoveInSpace] Refetching queries:', { 
-        rootQuery: ["root-sidebar-pages", spaceId],
-        currentParentQuery: currentParentId ? ["sidebar-pages", currentParentId] : null,
-        targetParentQuery: targetParentId ? ["sidebar-pages", targetParentId] : null 
-      });
-      
-      const queriesToRefetch = [
-        queryClient.refetchQueries({
+      // Invalidate related sidebar caches as a safety net for any stale query key shapes.
+      const queriesToInvalidate = [
+        queryClient.invalidateQueries({
           queryKey: ["root-sidebar-pages", spaceId],
         }),
       ];
-      
-      // Refetch current parent's children query
+
       if (currentParentId) {
-        queriesToRefetch.push(
-          queryClient.refetchQueries({
-            queryKey: ["sidebar-pages", currentParentId],
-          })
+        queriesToInvalidate.push(
+          queryClient.invalidateQueries({
+            predicate: (query) =>
+              query.queryKey[0] === "sidebar-pages" &&
+              typeof query.queryKey[1] === "object" &&
+              query.queryKey[1] !== null &&
+              (query.queryKey[1] as { pageId?: string }).pageId ===
+                currentParentId,
+          }),
         );
       }
-      
-      // Refetch target parent's children query
+
       if (targetParentId) {
-        queriesToRefetch.push(
-          queryClient.refetchQueries({
-            queryKey: ["sidebar-pages", targetParentId],
-          })
+        queriesToInvalidate.push(
+          queryClient.invalidateQueries({
+            predicate: (query) =>
+              query.queryKey[0] === "sidebar-pages" &&
+              typeof query.queryKey[1] === "object" &&
+              query.queryKey[1] !== null &&
+              (query.queryKey[1] as { pageId?: string }).pageId ===
+                targetParentId,
+          }),
         );
       }
-      
-      await Promise.all(queriesToRefetch);
+
+      await Promise.all(queriesToInvalidate);
       
       console.log('[MoveInSpace] Query refetch complete');
 
