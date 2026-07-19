@@ -4,7 +4,7 @@
 
 .navbar, .aside {
   @media (max-width: $mantine-breakpoint-sm) {
-    width: 350px;
+    width: 320px;
   }
 }
 
@@ -31,23 +31,24 @@
 
 .floatingToc {
   position: fixed;
-  z-index: 120;
+  z-index: 180;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   width: 252px;
   max-height: calc(100vh - 80px);
-  border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
-  border-radius: 8px;
+  border: 1px solid light-dark(rgba(15, 23, 42, 0.06), rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
   background-color: light-dark(
-    rgba(255, 255, 255, 0.94),
-    rgba(37, 38, 43, 0.94)
+    rgba(255, 255, 255, 0.78),
+    rgba(24, 25, 28, 0.72)
   );
   box-shadow: light-dark(
-    0 10px 28px rgba(15, 23, 42, 0.1),
-    0 12px 28px rgba(0, 0, 0, 0.32)
+    0 6px 20px rgba(15, 23, 42, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.28)
   );
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 
   @media print {
     display: none !important;
@@ -58,8 +59,8 @@
   /* sits in free space to the right of the article column */
   box-shadow: none;
   background-color: light-dark(
-    rgba(255, 255, 255, 0.82),
-    rgba(37, 38, 43, 0.78)
+    rgba(255, 255, 255, 0.62),
+    rgba(24, 25, 28, 0.55)
   );
 }
 
@@ -89,14 +90,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 12px 8px;
-  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
 }
 
 .floatingTocBody {
   flex: 1;
   min-height: 0;
-  padding: 8px 8px 12px;
+  padding: 6px 6px 10px;
 }
 
 .resizeHandle {

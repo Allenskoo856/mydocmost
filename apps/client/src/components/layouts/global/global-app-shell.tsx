@@ -26,8 +26,6 @@ export default function GlobalAppShell({
   const toggleMobile = useToggleSidebar(mobileSidebarAtom);
   const [desktopOpened] = useAtom(desktopSidebarAtom);
   const [{ isAsideOpen, tab: asideTab }] = useAtom(asideStateAtom);
-  const isCommentsAsideOpen = isAsideOpen && asideTab === "comments";
-  const isTocFloatingOpen = isAsideOpen && asideTab === "toc";
   const [sidebarWidth, setSidebarWidth] = useAtom(sidebarWidthAtom);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef(null);
@@ -78,6 +76,8 @@ export default function GlobalAppShell({
   const isSpacesRoute = location.pathname.endsWith("/spaces");
   const isPageRoute = location.pathname.includes("/p/");
   const hideSidebar = isHomeRoute || isSpacesRoute;
+  const isCommentsOpen = isPageRoute && isAsideOpen && asideTab === "comments";
+  const isTocOpen = isPageRoute && isAsideOpen && asideTab === "toc";
 
   return (
     <AppShell
@@ -93,12 +93,13 @@ export default function GlobalAppShell({
         }
       }
       aside={
-        isPageRoute &&
-        isCommentsAsideOpen && {
-          width: 350,
-          breakpoint: "sm",
-          collapsed: { mobile: false, desktop: false },
-        }
+        isCommentsOpen
+          ? {
+              width: 320,
+              breakpoint: "sm",
+              collapsed: { mobile: false, desktop: false },
+            }
+          : undefined
       }
       padding={isSpaceRoute ? 0 : "md"}
     >
@@ -126,13 +127,13 @@ export default function GlobalAppShell({
         )}
       </AppShell.Main>
 
-      {isPageRoute && isCommentsAsideOpen && (
-        <AppShell.Aside className={classes.aside} p="md" withBorder={false}>
+      {isCommentsOpen && (
+        <AppShell.Aside className={classes.aside} p={0} withBorder={false}>
           <Aside />
         </AppShell.Aside>
       )}
 
-      {isPageRoute && isTocFloatingOpen && <FloatingTableOfContents />}
+      {isTocOpen && <FloatingTableOfContents />}
     </AppShell>
   );
 }

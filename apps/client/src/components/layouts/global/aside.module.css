@@ -1,0 +1,52 @@
+.tocAside {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  height: 100%;
+  padding: 8px 6px 6px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.commentsAside {
+  height: 100%;
+  padding: var(--mantine-spacing-md);
+}
+
+.tocHeader {
+  flex: 0 0 auto;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
+  color: light-dark(rgba(33, 37, 41, 0.82), rgba(248, 249, 250, 0.88));
+}
+
+.tocScrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+  margin-top: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.25)) transparent;
+}
+
+.tocScrollArea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tocScrollArea::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: light-dark(rgba(0, 0, 0, 0.22), rgba(255, 255, 255, 0.22));
+}

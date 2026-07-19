@@ -3,17 +3,18 @@ import CommentListWithTabs from "@/features/comment/components/comment-list-with
 import { useAtom } from "jotai";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
 import { useTranslation } from "react-i18next";
+import classes from "./aside.module.css";
 
 export default function Aside() {
-  const [{ tab }] = useAtom(asideStateAtom);
+  const [{ tab, isAsideOpen }] = useAtom(asideStateAtom);
   const { t } = useTranslation();
 
-  if (tab !== "comments") {
+  if (!isAsideOpen || tab !== "comments") {
     return null;
   }
 
   return (
-    <Box p="md">
+    <Box className={classes.commentsAside}>
       <Text mb="md" fw={500}>
         {t("Comments")}
       </Text>

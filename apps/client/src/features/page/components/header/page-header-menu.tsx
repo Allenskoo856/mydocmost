@@ -16,6 +16,7 @@ import {
 import React from "react";
 import useToggleAside from "@/hooks/use-toggle-aside.tsx";
 import { useAtom } from "jotai";
+import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
 import { historyAtoms } from "@/features/page-history/atoms/history-atoms.ts";
 import {
   getHotkeyHandler,
@@ -51,7 +52,10 @@ interface PageHeaderMenuProps {
 export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
   const { t } = useTranslation();
   const toggleAside = useToggleAside();
+  const [{ tab: asideTab, isAsideOpen }] = useAtom(asideStateAtom);
   const [yjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
+  const isTocOpen = isAsideOpen && asideTab === "toc";
+  const isCommentsOpen = isAsideOpen && asideTab === "comments";
 
   useHotkeys(
     [
@@ -93,9 +97,10 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
 
       <Tooltip label={t("Comments")} openDelay={250} withArrow>
         <ActionIcon
-          variant="default"
+          variant={isCommentsOpen ? "light" : "default"}
           style={{ border: "none" }}
           onClick={() => toggleAside("comments")}
+          aria-pressed={isCommentsOpen}
         >
           <IconMessage size={20} stroke={2} />
         </ActionIcon>
@@ -103,9 +108,10 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
 
       <Tooltip label={t("Table of contents")} openDelay={250} withArrow>
         <ActionIcon
-          variant="default"
+          variant={isTocOpen ? "light" : "default"}
           style={{ border: "none" }}
           onClick={() => toggleAside("toc")}
+          aria-pressed={isTocOpen}
         >
           <IconList size={20} stroke={2} />
         </ActionIcon>
