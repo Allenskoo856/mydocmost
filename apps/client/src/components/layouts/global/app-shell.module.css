@@ -37,9 +37,9 @@
   flex-direction: column;
   overflow: hidden;
   width: 252px;
-  /* Explicit height is required so the body can scroll */
-  height: min(70vh, calc(100vh - 80px));
-  max-height: min(70vh, calc(100vh - 80px));
+  /* Fixed panel height so long outlines scroll inside the body */
+  height: 420px;
+  max-height: 420px;
   min-height: 180px;
   border: 1px solid light-dark(rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0.1));
   border-radius: 10px;
@@ -48,6 +48,11 @@
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    height: min(420px, calc(100vh - 96px));
+    max-height: min(420px, calc(100vh - 96px));
+  }
 
   @media print {
     display: none !important;

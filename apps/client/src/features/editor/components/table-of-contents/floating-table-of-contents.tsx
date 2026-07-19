@@ -45,7 +45,8 @@ function measurePlacement(isMobile: boolean): Placement {
 
   const headerOffset = 56;
   const top = headerOffset;
-  const maxHeight = `calc(100vh - ${headerOffset + 16}px)`;
+  // Keep the floating panel compact; overflow scrolls inside the body.
+  const maxHeight = 420;
 
   if (!content) {
     return {

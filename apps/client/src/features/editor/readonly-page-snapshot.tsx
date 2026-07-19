@@ -6,7 +6,9 @@ import {
   readOnlyEditorAtom,
 } from "@/features/editor/atoms/editor-atoms";
 
-const SNAPSHOT_RENDERED_EVENT = "PAGE_SNAPSHOT_RENDERED";
+export const SNAPSHOT_RENDERED_EVENT = "PAGE_SNAPSHOT_RENDERED";
+export const SNAPSHOT_OUTLINE_EVENT = "PAGE_SNAPSHOT_OUTLINE";
+export const SNAPSHOT_ENSURE_TOC_EVENT = "PAGE_SNAPSHOT_ENSURE_TOC";
 
 // Number of top-level blocks to render in the first paint. Large documents
 // are rendered incrementally to avoid blocking the main thread with a huge
@@ -14,6 +16,14 @@ const SNAPSHOT_RENDERED_EVENT = "PAGE_SNAPSHOT_RENDERED";
 const INITIAL_CHUNK_COUNT = 50;
 const CHUNK_SIZE = 30;
 const CHUNK_ROOT_MARGIN = "200px";
+
+export type SnapshotOutlineItem = {
+  label: string;
+  level: number;
+  tocIndex: number;
+  chunkIndex: number;
+  id?: string;
+};
 
 interface PageContentSnapshotProps {
   renderedContent?: string;
@@ -27,6 +37,7 @@ export function PageContentSnapshot({
   const chunksRef = useRef<Element[]>([]);
   const renderedCountRef = useRef(0);
   const chunkIndexByIdRef = useRef<Map<string, number>>(new Map());
+  const outlineRef = useRef<SnapshotOutlineItem[]>([]);
   const [isComplete, setIsComplete] = useState(false);
 
   const scrollToHash = useCallback(() => {
@@ -36,6 +47,14 @@ export function PageContentSnapshot({
     if (target) {
       target.scrollIntoView({ block: "start" });
     }
+  }, []);
+
+  const publishOutline = useCallback(() => {
+    document.dispatchEvent(
+      new CustomEvent(SNAPSHOT_OUTLINE_EVENT, {
+        detail: { outline: outlineRef.current },
+      }),
+    );
   }, []);
 
   const appendChunks = useCallback(
@@ -66,9 +85,10 @@ export function PageContentSnapshot({
       const complete = renderedCountRef.current >= chunks.length;
       if (complete) {
         setIsComplete(true);
-        document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
       }
 
+      // Notify TOC whenever newly mounted headings become available.
+      document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
       return complete;
     },
     [],
@@ -84,9 +104,11 @@ export function PageContentSnapshot({
     chunksRef.current = [];
     renderedCountRef.current = 0;
     chunkIndexByIdRef.current = new Map();
+    outlineRef.current = [];
 
     if (!renderedContent) {
       setIsComplete(true);
+      publishOutline();
       document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
       return;
     }
@@ -97,17 +119,37 @@ export function PageContentSnapshot({
     chunksRef.current = chunks;
     setIsComplete(false);
 
-    chunks.forEach((chunk, index) => {
+    const outline: SnapshotOutlineItem[] = [];
+    chunks.forEach((chunk, chunkIndex) => {
       const id = chunk.id;
       if (id) {
-        chunkIndexByIdRef.current.set(id, index);
+        chunkIndexByIdRef.current.set(id, chunkIndex);
       }
       chunk.querySelectorAll("[id]").forEach((element) => {
         if (!chunkIndexByIdRef.current.has(element.id)) {
-          chunkIndexByIdRef.current.set(element.id, index);
+          chunkIndexByIdRef.current.set(element.id, chunkIndex);
         }
       });
+
+      // Build the full outline from the complete HTML, not only the currently
+      // mounted DOM. Large pages lazy-load body chunks, so scanning the live
+      // snapshot alone would truncate the TOC.
+      chunk.querySelectorAll("h1, h2, h3").forEach((heading) => {
+        const label = heading.textContent?.trim();
+        if (!label) return;
+        const tocIndex = outline.length;
+        heading.setAttribute("data-toc-index", String(tocIndex));
+        outline.push({
+          label,
+          level: Number(heading.tagName.slice(1)),
+          tocIndex,
+          chunkIndex,
+          id: heading.id || undefined,
+        });
+      });
     });
+    outlineRef.current = outline;
+    publishOutline();
 
     // Prefer rendering far enough for the current hash target so deep links
     // still land on the right heading after the first paint.
@@ -131,12 +173,8 @@ export function PageContentSnapshot({
       requestAnimationFrame(() => {
         scrollToHash();
       });
-    } else if (chunks.length > INITIAL_CHUNK_COUNT) {
-      // First paint completed for large docs; remaining content is lazy.
-      // Small docs already fire SNAPSHOT_RENDERED_EVENT inside appendChunks.
-      document.dispatchEvent(new CustomEvent(SNAPSHOT_RENDERED_EVENT));
     }
-  }, [renderedContent, appendChunks, scrollToHash]);
+  }, [renderedContent, appendChunks, scrollToHash, publishOutline]);
 
   // Sentinel-based lazy loading for the remaining chunks.
   useEffect(() => {
@@ -174,6 +212,36 @@ export function PageContentSnapshot({
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, [appendChunks, scrollToHash]);
+
+  // TOC clicks for not-yet-mounted headings request the corresponding chunk.
+  useEffect(() => {
+    const handleEnsureToc = (event: Event) => {
+      const detail = (event as CustomEvent<{ tocIndex?: number }>).detail;
+      const tocIndex = detail?.tocIndex;
+      if (tocIndex === undefined) return;
+
+      const item = outlineRef.current[tocIndex];
+      if (!item) return;
+
+      if (item.chunkIndex >= renderedCountRef.current) {
+        appendChunks(0, item.chunkIndex);
+      }
+
+      requestAnimationFrame(() => {
+        const target =
+          document.querySelector<HTMLElement>(
+            `[data-page-snapshot] [data-toc-index="${tocIndex}"]`,
+          ) ||
+          (item.id ? document.getElementById(item.id) : null);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+
+    document.addEventListener(SNAPSHOT_ENSURE_TOC_EVENT, handleEnsureToc);
+    return () => {
+      document.removeEventListener(SNAPSHOT_ENSURE_TOC_EVENT, handleEnsureToc);
+    };
+  }, [appendChunks]);
 
   // Comment click handling: the snapshot HTML may contain elements annotated
   // with data-comment-id; clicking them opens the comment sidebar.

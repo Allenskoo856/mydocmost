@@ -8,6 +8,12 @@ import { useTranslation } from "react-i18next";
 import { useDebouncedCallback } from "@mantine/hooks";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { Transaction } from "@tiptap/pm/state";
+import {
+  SNAPSHOT_ENSURE_TOC_EVENT,
+  SNAPSHOT_OUTLINE_EVENT,
+  SNAPSHOT_RENDERED_EVENT,
+  type SnapshotOutlineItem,
+} from "@/features/editor/readonly-page-snapshot";
 
 const LARGE_DOC_HEADING_THRESHOLD = 100;
 
@@ -30,8 +36,9 @@ type TableOfContentsProps = {
 export type HeadingLink = {
   label: string;
   level: number;
-  element: HTMLElement;
+  element?: HTMLElement | null;
   position?: number;
+  tocIndex?: number;
 };
 
 const recalculateLinks = (nodePos: NodePos[]) => {
@@ -58,21 +65,13 @@ const recalculateLinks = (nodePos: NodePos[]) => {
   return { links, nodes };
 };
 
-const recalculateSnapshotLinks = () => {
-  const elements = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      "[data-page-snapshot] h1, [data-page-snapshot] h2, [data-page-snapshot] h3",
-    ),
-  );
-  const links = elements
-    .filter((element) => element.textContent?.trim())
-    .map((element) => ({
-      label: element.textContent.trim(),
-      level: Number(element.tagName.slice(1)),
-      element,
-    }));
-
-  return { links, nodes: elements };
+const resolveSnapshotElement = (item: SnapshotOutlineItem | HeadingLink) => {
+  if ("tocIndex" in item && item.tocIndex !== undefined) {
+    return document.querySelector<HTMLElement>(
+      `[data-page-snapshot] [data-toc-index="${item.tocIndex}"]`,
+    );
+  }
+  return null;
 };
 
 const rangeContainsHeading = (
@@ -120,11 +119,22 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   const [links, setLinks] = useState<HeadingLink[]>([]);
   const [headingDOMNodes, setHeadingDOMNodes] = useState<HTMLElement[]>([]);
   const [activeElement, setActiveElement] = useState<HTMLElement | null>(null);
+  const [activeTocIndex, setActiveTocIndex] = useState<number | null>(null);
   const headerPaddingRef = useRef<HTMLDivElement | null>(null);
+  const outlineRef = useRef<SnapshotOutlineItem[]>([]);
 
   const handleScrollToHeading = (item: HeadingLink) => {
+    // Snapshot/lazy mode: ask the snapshot renderer to mount the target chunk.
     if (!props.editor || item.position === undefined) {
-      item.element.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (item.tocIndex !== undefined) {
+        document.dispatchEvent(
+          new CustomEvent(SNAPSHOT_ENSURE_TOC_EVENT, {
+            detail: { tocIndex: item.tocIndex },
+          }),
+        );
+        return;
+      }
+      item.element?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -152,12 +162,47 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   };
 
   const handleUpdate = () => {
-    const result = props.editor
-      ? recalculateLinks(props.editor.$nodes("heading"))
-      : recalculateSnapshotLinks();
+    if (props.editor) {
+      const result = recalculateLinks(props.editor.$nodes("heading") || []);
+      setLinks(result.links);
+      setHeadingDOMNodes(result.nodes);
+      setActiveTocIndex(null);
+      return;
+    }
 
-    setLinks(result.links);
-    setHeadingDOMNodes(result.nodes);
+    // Prefer the complete outline extracted from the full snapshot HTML.
+    if (outlineRef.current.length > 0) {
+      const nextLinks = outlineRef.current.map((item) => ({
+        label: item.label,
+        level: item.level,
+        tocIndex: item.tocIndex,
+        element: resolveSnapshotElement(item),
+      }));
+      setLinks(nextLinks);
+      setHeadingDOMNodes(
+        nextLinks
+          .map((item) => item.element)
+          .filter((element): element is HTMLElement => !!element),
+      );
+      return;
+    }
+
+    // Fallback for older snapshot markup that only has live DOM headings.
+    const elements = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "[data-page-snapshot] h1, [data-page-snapshot] h2, [data-page-snapshot] h3",
+      ),
+    );
+    const nextLinks = elements
+      .filter((element) => element.textContent?.trim())
+      .map((element, index) => ({
+        label: element.textContent.trim(),
+        level: Number(element.tagName.slice(1)),
+        element,
+        tocIndex: index,
+      }));
+    setLinks(nextLinks);
+    setHeadingDOMNodes(elements);
   };
 
   // A heading rescan walks the whole document; debounce it so collab sync
@@ -174,19 +219,97 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   };
 
   useEffect(() => {
+    const handleOutline = (event: Event) => {
+      const detail = (event as CustomEvent<{ outline?: SnapshotOutlineItem[] }>)
+        .detail;
+      outlineRef.current = detail?.outline || [];
+      handleUpdate();
+    };
+
     props.editor?.on("update", handleEditorUpdate);
-    document.addEventListener("PAGE_SNAPSHOT_RENDERED", handleUpdate);
+    document.addEventListener(SNAPSHOT_RENDERED_EVENT, handleUpdate);
+    document.addEventListener(SNAPSHOT_OUTLINE_EVENT, handleOutline);
     const frame = requestAnimationFrame(handleUpdate);
 
     return () => {
       cancelAnimationFrame(frame);
       props.editor?.off("update", handleEditorUpdate);
-      document.removeEventListener("PAGE_SNAPSHOT_RENDERED", handleUpdate);
+      document.removeEventListener(SNAPSHOT_RENDERED_EVENT, handleUpdate);
+      document.removeEventListener(SNAPSHOT_OUTLINE_EVENT, handleOutline);
     };
   }, [props.editor, debouncedHandleUpdate]);
 
   useEffect(() => {
-    if (headingDOMNodes.length === 0) return;
+    if (props.editor) {
+      // Editor mode uses live DOM nodes for active-heading tracking.
+      if (headingDOMNodes.length === 0) return;
+
+      const headerOffset = headerPaddingRef.current
+        ? parseInt(
+            window
+              .getComputedStyle(headerPaddingRef.current)
+              .getPropertyValue("top"),
+          )
+        : 0;
+
+      if (headingDOMNodes.length > LARGE_DOC_HEADING_THRESHOLD) {
+        const findActiveHeading = () => {
+          let active: HTMLElement | null = null;
+          for (let i = 0; i < headingDOMNodes.length; i++) {
+            const rect = headingDOMNodes[i].getBoundingClientRect();
+            if (rect.top > headerOffset) {
+              active = i > 0 ? headingDOMNodes[i - 1] : headingDOMNodes[0];
+              break;
+            }
+          }
+          if (!active && headingDOMNodes.length > 0) {
+            active = headingDOMNodes[headingDOMNodes.length - 1];
+          }
+          setActiveElement((current) => (current === active ? current : active));
+        };
+
+        const throttledFind = throttle(findActiveHeading, 100);
+        window.addEventListener("scroll", throttledFind, { passive: true });
+        findActiveHeading();
+        return () => window.removeEventListener("scroll", throttledFind);
+      }
+
+      try {
+        const observeHandler = (entries: IntersectionObserverEntry[]) => {
+          let newActive: HTMLElement | null = null;
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              newActive = entry.target as HTMLElement;
+            }
+          });
+          if (newActive) {
+            setActiveElement((current) =>
+              current === newActive ? current : newActive,
+            );
+          }
+        };
+
+        const observerOptions: IntersectionObserverInit = {
+          rootMargin: `-${headerOffset}px 0px -85% 0px`,
+          threshold: 0,
+          root: null,
+        };
+        const observer = new IntersectionObserver(
+          observeHandler,
+          observerOptions,
+        );
+
+        headingDOMNodes.forEach((heading) => observer.observe(heading));
+        return () => observer.disconnect();
+      } catch (err) {
+        console.log(err);
+      }
+      return;
+    }
+
+    // Snapshot mode: track active item by outline index so lazy-mounted
+    // headings still highlight correctly once they appear.
+    if (links.length === 0) return;
 
     const headerOffset = headerPaddingRef.current
       ? parseInt(
@@ -196,70 +319,32 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
         )
       : 0;
 
-    // For large documents, observing thousands of headings with
-    // IntersectionObserver causes the TOC to re-render continuously while
-    // scrolling. Fall back to a throttled scroll-based scan instead.
-    if (headingDOMNodes.length > LARGE_DOC_HEADING_THRESHOLD) {
-      const findActiveHeading = () => {
-        let active: HTMLElement | null = null;
-        for (let i = 0; i < headingDOMNodes.length; i++) {
-          const rect = headingDOMNodes[i].getBoundingClientRect();
-          if (rect.top > headerOffset) {
-            active = i > 0 ? headingDOMNodes[i - 1] : headingDOMNodes[0];
-            break;
-          }
-        }
-        if (!active && headingDOMNodes.length > 0) {
-          active = headingDOMNodes[headingDOMNodes.length - 1];
-        }
-        setActiveElement((current) => (current === active ? current : active));
-      };
-
-      const throttledFind = throttle(findActiveHeading, 100);
-      window.addEventListener("scroll", throttledFind, { passive: true });
-      findActiveHeading();
-
-      return () => {
-        window.removeEventListener("scroll", throttledFind);
-      };
-    }
-
-    // Small/medium documents: keep the original IntersectionObserver behavior.
-    try {
-      const observeHandler = (entries: IntersectionObserverEntry[]) => {
-        let newActive: HTMLElement | null = null;
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            newActive = entry.target as HTMLElement;
-          }
-        });
-        if (newActive) {
-          setActiveElement((current) =>
-            current === newActive ? current : newActive,
+    const findActiveFromOutline = () => {
+      let activeIndex: number | null = null;
+      for (let i = 0; i < links.length; i++) {
+        const element =
+          links[i].element ||
+          document.querySelector<HTMLElement>(
+            `[data-page-snapshot] [data-toc-index="${links[i].tocIndex}"]`,
           );
+        if (!element) continue;
+        const rect = element.getBoundingClientRect();
+        if (rect.top > headerOffset) {
+          activeIndex = i > 0 ? (links[i - 1].tocIndex ?? i - 1) : (links[i].tocIndex ?? i);
+          break;
         }
-      };
-
-      const observerOptions: IntersectionObserverInit = {
-        rootMargin: `-${headerOffset}px 0px -85% 0px`,
-        threshold: 0,
-        root: null,
-      };
-      const observer = new IntersectionObserver(
-        observeHandler,
-        observerOptions,
+        activeIndex = links[i].tocIndex ?? i;
+      }
+      setActiveTocIndex((current) =>
+        current === activeIndex ? current : activeIndex,
       );
+    };
 
-      headingDOMNodes.forEach((heading) => {
-        observer.observe(heading);
-      });
-      return () => {
-        observer.disconnect();
-      };
-    } catch (err) {
-      console.log(err);
-    }
-  }, [headingDOMNodes, props.editor]);
+    const throttledFind = throttle(findActiveFromOutline, 100);
+    window.addEventListener("scroll", throttledFind, { passive: true });
+    findActiveFromOutline();
+    return () => window.removeEventListener("scroll", throttledFind);
+  }, [headingDOMNodes, links, props.editor]);
 
   if (!links.length) {
     return (
@@ -282,21 +367,26 @@ export const TableOfContents: FC<TableOfContentsProps> = (props) => {
   return (
     <>
       <div className={props.isShare ? classes.leftBorder : ""}>
-        {links.map((item, idx) => (
-          <Box<"button">
-            component="button"
-            onClick={() => handleScrollToHeading(item)}
-            key={idx}
-            className={clsx(classes.link, {
-              [classes.linkActive]: item.element === activeElement,
-            })}
-            style={{
-              paddingLeft: `calc(8px + ${(item.level - 1) * 12}px)`,
-            }}
-          >
-            {item.label}
-          </Box>
-        ))}
+        {links.map((item, idx) => {
+          const isActive = props.editor
+            ? item.element === activeElement
+            : item.tocIndex === activeTocIndex;
+          return (
+            <Box<"button">
+              component="button"
+              onClick={() => handleScrollToHeading(item)}
+              key={item.tocIndex ?? idx}
+              className={clsx(classes.link, {
+                [classes.linkActive]: isActive,
+              })}
+              style={{
+                paddingLeft: `calc(8px + ${(item.level - 1) * 12}px)`,
+              }}
+            >
+              {item.label}
+            </Box>
+          );
+        })}
       </div>
       <div ref={headerPaddingRef} className={classes.headerPadding} />
     </>
