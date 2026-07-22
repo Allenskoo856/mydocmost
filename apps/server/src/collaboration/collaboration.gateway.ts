@@ -1,4 +1,8 @@
-import { Hocuspocus, Server as HocuspocusServer } from '@hocuspocus/server';
+import {
+  DirectConnection,
+  Hocuspocus,
+  Server as HocuspocusServer,
+} from '@hocuspocus/server';
 import { IncomingMessage } from 'http';
 import WebSocket from 'ws';
 import { AuthenticationExtension } from './extensions/authentication.extension';
@@ -62,6 +66,13 @@ export class CollaborationGateway {
 
   getDocumentCount() {
     return this.hocuspocus.getDocumentsCount();
+  }
+
+  openDirectConnection(
+    documentName: string,
+    context?: Record<string, unknown>,
+  ): Promise<DirectConnection> {
+    return this.hocuspocus.openDirectConnection(documentName, context);
   }
 
   async destroy(): Promise<void> {

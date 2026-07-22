@@ -8,8 +8,9 @@ import {
 } from 'class-validator';
 
 export class McpCreateSpaceDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
   @IsString()
   @MinLength(2)

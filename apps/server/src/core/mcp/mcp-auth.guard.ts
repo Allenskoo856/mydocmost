@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -28,6 +29,11 @@ export class McpAuthGuard implements CanActivate {
 
     if (!this.timingSafeEqual(token, expectedToken)) {
       throw new UnauthorizedException('Invalid MCP API token');
+    }
+
+    const origin = request.headers.origin;
+    if (origin && !this.environmentService.getMcpAllowedOrigins().includes(origin)) {
+      throw new ForbiddenException('Origin is not allowed for MCP');
     }
 
     return true;

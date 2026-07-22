@@ -290,4 +290,22 @@ export class EnvironmentService {
     );
     return Number.isFinite(value) && value > 0 ? value : 10;
   }
+
+  getMcpMaxSessions(): number {
+    const value = parseInt(
+      this.configService.get<string>('MCP_MAX_SESSIONS', '100'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 100;
+  }
+
+  getMcpAllowedOrigins(): string[] {
+    const configured = this.configService
+      .get<string>('MCP_ALLOWED_ORIGINS', '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+
+    return Array.from(new Set([this.getAppUrl(), ...configured]));
+  }
 }

@@ -51,6 +51,10 @@ async function bootstrap() {
       'robots.txt',
       'share/:shareId/p/:pageSlug',
       {
+        path: getMcpControllerPath(basePath),
+        method: RequestMethod.ALL,
+      },
+      {
         path: `${getMcpControllerPath(basePath)}/(.*)`,
         method: RequestMethod.ALL,
       },

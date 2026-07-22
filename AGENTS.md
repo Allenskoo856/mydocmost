@@ -130,21 +130,50 @@ pnpm --filter ./apps/server run format   # Prettier（后端）
 
 ## MCP Agent 接口
 
-后端在配置 `MCP_API_TOKEN` 后提供 MCP 2024-11 SSE 接口；未配置时端点保持存在，但统一返回 401。相关环境变量：
+后端在配置 `MCP_API_TOKEN` 后提供 MCP Streamable HTTP 接口，协议版本由当前 SDK 协商（SDK 1.29.0 支持的最新稳定版本为 `2025-11-25`）；未配置时端点保持存在，但统一返回 401。旧 SSE 端点继续保留，用于兼容已有客户端。相关环境变量：
 
 | 变量                   | 默认值                | 说明                                                           |
 | ---------------------- | --------------------- | -------------------------------------------------------------- |
 | `MCP_API_TOKEN`        | 空                    | Bearer Token，启用时至少 32 字符；生产环境建议使用随机长字符串 |
 | `MCP_AGENT_USER_EMAIL` | `agent@docmost.local` | 每个 Workspace 内系统 Agent 用户的邮箱                         |
-| `MCP_RATE_LIMIT_RPS`   | `10`                  | 每个 MCP 会话每秒允许的 messages 请求数，必须为正整数          |
+| `MCP_RATE_LIMIT_RPS`   | `10`                  | 每个 MCP 会话每秒允许的请求数                                   |
+| `MCP_MAX_SESSIONS`     | `100`                 | 全进程 MCP 会话总数上限（旧 SSE 与 Streamable HTTP 共用）       |
+| `MCP_ALLOWED_ORIGINS`  | 空                    | 逗号分隔的 Origin 白名单；`APP_URL` 的 Origin 会自动加入       |
 
-- SSE 连接：`GET {BASE_PATH}/mcp/sse`
-- 消息投递：`POST {BASE_PATH}/mcp/messages?sessionId=<id>`
-- 两个端点都必须携带 `Authorization: Bearer <MCP_API_TOKEN>`。
-- 支持 `list_workspaces`、`create_space`、`insert_page_tree`、`create_page`、`update_page`、`move_page`、`list_space_pages`、`get_page_markdown`、`analyze_page_tree` 共 9 个 tools。
-- 页面写入内容使用 Markdown；服务端同步生成 ProseMirror JSON、纯文本和 Ydoc。`insert_page_tree` 单次最多 100 个页面节点。
+### 传输端点
+
+- 推荐：`POST/GET/DELETE {BASE_PATH}/mcp`，使用 Streamable HTTP 和 `Mcp-Session-Id` 会话头。
+- 兼容旧客户端：`GET {BASE_PATH}/mcp/sse` 建立 SSE 连接，`POST {BASE_PATH}/mcp/messages?sessionId=<id>` 投递消息。
+- 所有端点都必须携带 `Authorization: Bearer <MCP_API_TOKEN>`；带有 `Origin` 的请求还必须命中允许列表。无 `Origin` 的命令行客户端可以访问。
+- Streamable HTTP 新会话必须先发送 MCP initialize 请求；已有会话后续请求必须携带 `Mcp-Session-Id`。
+
+### Workspace 与工具
+
+- `workspaceId` 为可选参数：只有一个 Workspace 时自动使用；多个 Workspace 且未传入时返回 `WORKSPACE_AMBIGUOUS`。建议客户端先调用 `get_context`，再按需调用 `list_workspaces`。
+- Space 支持 UUID 或 slug；Page 支持 UUID 或 `slugId`，返回结果包含 canonical UUID。
+- 当前提供 12 个 tools：`get_context`、`list_workspaces`、`list_spaces`、`search_pages`、`create_space`、`insert_page_tree`、`create_page`、`update_page`、`move_page`、`list_space_pages`、`get_page_markdown`、`analyze_page_tree`。
+- `list_spaces` 用于查询 Space，`search_pages` 用于在 Workspace（可限定 Space）内搜索页面标题和正文，解决后续接口需要先取得 `spaceId` 的问题。
+- 页面树最大 100 个写入节点、最大深度 10；`list_space_pages` 的 tree 模式返回完整树，不接受分页片段，完整树上限为 1000 个节点。Markdown 单页面最大 1 MiB，标题最大 255 字符。
+- `update_page` 更新正文时必须传入读取时的 `expectedUpdatedAt`，服务端会检测并发修改；冲突时返回 `[PAGE_CONFLICT]`，避免覆盖在线协同编辑内容。
+- 页面写入内容使用 Markdown，并通过协同层持久化、广播和索引链路处理。
 
 通用 MCP Client 配置示例（具体字段名以客户端版本为准）：
+
+```json
+{
+  "mcpServers": {
+    "docmost": {
+      "type": "http",
+      "url": "https://docs.internal.example/docmost/mcp",
+      "headers": {
+        "Authorization": "Bearer REPLACE_WITH_MCP_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+已有 SSE 客户端可继续使用：
 
 ```json
 {
@@ -160,7 +189,7 @@ pnpm --filter ./apps/server run format   # Prettier（后端）
 }
 ```
 
-实现依据：`apps/server/src/core/mcp/mcp.controller.ts`（端点、会话与限流）、`apps/server/src/core/mcp/mcp-tools.service.ts`（tool 清单与资源归属校验）、`apps/server/src/core/mcp/mcp-agent-user.service.ts`（Workspace Agent 用户）。
+实现依据：`apps/server/src/core/mcp/mcp.controller.ts`（端点、会话与限流）、`apps/server/src/core/mcp/mcp-tools.service.ts`（tool 清单与资源归属校验）、`apps/server/src/core/mcp/mcp-context.service.ts`（Workspace/Space 解析）、`apps/server/src/core/mcp/mcp-agent-user.service.ts`（Workspace Agent 用户）。
 
 ## 安全注意事项
 

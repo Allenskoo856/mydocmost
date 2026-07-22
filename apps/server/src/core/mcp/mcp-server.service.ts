@@ -12,11 +12,11 @@ export class McpServerService {
 
   createServer(): Server {
     const server = new Server(
-      { name: 'docmost-mcp-server', version: '1.0.0' },
+      { name: 'docmost-mcp-server', version: '1.1.0' },
       {
         capabilities: { tools: {} },
         instructions:
-          'Use list_workspaces first, then pass workspaceId to all workspace-scoped tools.',
+          'Use get_context first. In a single-workspace deployment, workspaceId may be omitted. Use list_spaces to discover space IDs or slugs before calling page tools.',
       },
     );
 

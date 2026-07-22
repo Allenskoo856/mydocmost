@@ -1,18 +1,27 @@
-import { IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class McpCreatePageDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
-  @IsUUID()
+  @IsString()
   spaceId: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   parentPageId?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   title?: string;
 
   @IsString()
@@ -24,14 +33,16 @@ export class McpCreatePageDto {
 }
 
 export class McpUpdatePageDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
-  @IsUUID()
+  @IsString()
   pageId: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   title?: string;
 
   @IsOptional()
@@ -41,21 +52,26 @@ export class McpUpdatePageDto {
   @IsOptional()
   @IsString()
   icon?: string;
+
+  @IsOptional()
+  @IsDateString()
+  expectedUpdatedAt?: string;
 }
 
 export class McpMovePageDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
-  @IsUUID()
+  @IsString()
   pageId: string;
 
   @IsOptional()
   @ValidateIf((_object, value) => value !== null)
-  @IsUUID()
+  @IsString()
   targetParentPageId?: string | null;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   targetSpaceId?: string;
 }

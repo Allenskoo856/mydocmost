@@ -18,6 +18,7 @@ import {
 
 export class McpTreePageNodeDto {
   @IsString()
+  @MaxLength(255)
   title: string;
 
   @IsString()
@@ -36,11 +37,12 @@ export class McpTreePageNodeDto {
 }
 
 export class McpInsertPageTreeDto {
-  @IsUUID()
-  workspaceId: string;
-
   @IsOptional()
   @IsUUID()
+  workspaceId?: string;
+
+  @IsOptional()
+  @IsString()
   spaceId?: string;
 
   @IsOptional()
@@ -57,20 +59,22 @@ export class McpInsertPageTreeDto {
   spaceSlug?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   parentPageId?: string;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => McpTreePageNodeDto)
   pages: McpTreePageNodeDto[];
 }
 
 export class McpListSpacePagesDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
-  @IsUUID()
+  @IsString()
   spaceId: string;
 
   @IsOptional()
@@ -85,7 +89,7 @@ export class McpListSpacePagesDto {
   @IsInt()
   @Min(1)
   @Max(1000)
-  limit = 100;
+  limit?: number;
 
   @IsOptional()
   @IsInt()
@@ -94,17 +98,19 @@ export class McpListSpacePagesDto {
 }
 
 export class McpAnalyzePageTreeDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
-  @IsUUID()
+  @IsString()
   spaceId: string;
 }
 
 export class McpGetPageMarkdownDto {
+  @IsOptional()
   @IsUUID()
-  workspaceId: string;
+  workspaceId?: string;
 
-  @IsUUID()
+  @IsString()
   pageId: string;
 }

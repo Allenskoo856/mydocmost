@@ -169,6 +169,15 @@ export class EnvironmentVariables {
   @IsString()
   @Matches(/^\d+$/)
   MCP_RATE_LIMIT_RPS: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d+$/)
+  MCP_MAX_SESSIONS: string;
+
+  @IsOptional()
+  @IsString()
+  MCP_ALLOWED_ORIGINS: string;
 }
 
 export function validate(config: Record<string, any>) {
