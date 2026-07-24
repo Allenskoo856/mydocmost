@@ -6,6 +6,7 @@ jest.mock('./mcp-tools.service', () => ({
 }));
 
 import { McpServerService } from './mcp-server.service';
+import { McpSessionStateService } from './mcp-session-state.service';
 import type { McpToolsService } from './mcp-tools.service';
 
 describe('McpServerService', () => {
@@ -22,7 +23,10 @@ describe('McpServerService', () => {
         content: [{ type: 'text', text: '{"ok":true}' }],
       }),
     } as unknown as McpToolsService;
-    const service = new McpServerService(toolsService);
+    const service = new McpServerService(
+      toolsService,
+      new McpSessionStateService(),
+    );
     const server = service.createServer();
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     const [clientTransport, serverTransport] =
@@ -41,9 +45,16 @@ describe('McpServerService', () => {
     ).resolves.toMatchObject({
       content: [{ type: 'text', text: '{"ok":true}' }],
     });
-    expect(toolsService.call).toHaveBeenCalledWith('example_tool', {
-      value: 1,
-    });
+    expect(toolsService.call).toHaveBeenCalledWith(
+      'example_tool',
+      { value: 1 },
+      expect.objectContaining({}),
+    );
+
+    await client.callTool({ name: 'example_tool', arguments: { value: 2 } });
+    const firstContext = jest.mocked(toolsService.call).mock.calls[0][2];
+    const secondContext = jest.mocked(toolsService.call).mock.calls[1][2];
+    expect(secondContext).toBe(firstContext);
 
     await client.close();
     await server.close();

@@ -8,6 +8,7 @@ import { McpAuthGuard } from './mcp-auth.guard';
 import { McpContextService } from './mcp-context.service';
 import { McpController } from './mcp.controller';
 import { McpServerService } from './mcp-server.service';
+import { McpSessionStateService } from './mcp-session-state.service';
 import { McpToolsService } from './mcp-tools.service';
 
 @Module({
@@ -18,6 +19,7 @@ import { McpToolsService } from './mcp-tools.service';
     McpAuthGuard,
     McpAgentUserService,
     McpContextService,
+    McpSessionStateService,
     McpToolsService,
   ],
 })

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { InjectKysely } from 'nestjs-kysely';
 import {
   CallToolResult,
@@ -22,6 +23,11 @@ import { Page, Space, Workspace } from '@docmost/db/types/entity.types';
 import { KyselyDB, KyselyTransaction } from '@docmost/db/types/kysely.types';
 import { McpCreateSpaceDto } from './dto/create-space.dto';
 import {
+  McpApplyPageChangesDto,
+  McpPageChangeOperationDto,
+  McpPlanPageChangesDto,
+} from './dto/changes.dto';
+import {
   McpCreatePageDto,
   McpMovePageDto,
   McpUpdatePageDto,
@@ -35,11 +41,21 @@ import {
 } from './dto/tree.dto';
 import {
   McpGetContextDto,
+  McpGetPageDto,
   McpListSpacesDto,
   McpSearchPagesDto,
 } from './dto/discovery.dto';
 import { McpContextService } from './mcp-context.service';
-import { formatMcpError, McpToolError } from './utils/mcp-error.util';
+import {
+  McpPlannedOperation,
+  McpSessionContext,
+  McpSessionStateService,
+} from './mcp-session-state.service';
+import {
+  formatMcpError,
+  formatMcpToolError,
+  McpToolError,
+} from './utils/mcp-error.util';
 import {
   markdownToPageContent,
   McpPageContent,
@@ -50,6 +66,7 @@ const MAX_TREE_NODES = 100;
 const MAX_TREE_DEPTH = 10;
 const MAX_PAGE_CONTENT_BYTES = 1024 * 1024;
 const MAX_TREE_RESULT_NODES = 1000;
+const MAX_BATCH_OPERATIONS = 100;
 
 interface PreparedTreeNode {
   title: string;
@@ -102,6 +119,7 @@ export class McpToolsService {
     private readonly exportService: ExportService,
     private readonly collaborationGateway: CollaborationGateway,
     private readonly environmentService: EnvironmentService,
+    private readonly sessionStateService: McpSessionStateService,
     @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
@@ -125,7 +143,7 @@ export class McpToolsService {
       {
         name: 'get_context',
         description:
-          'Return the resolved workspace, supported transports, and MCP limits. When multiple workspaces exist, pass workspaceId or use list_workspaces.',
+          'Return and bind the resolved workspace, supported transports, and MCP limits for this session. When multiple workspaces exist, pass workspaceId or use list_workspaces.',
         inputSchema: {
           type: 'object',
           properties: { workspaceId: workspaceIdSchema },
@@ -134,11 +152,20 @@ export class McpToolsService {
         outputSchema: objectOutput(
           {
             workspace: { anyOf: [{ type: 'object' }, { type: 'null' }] },
+            workspaceBound: { type: 'boolean' },
+            boundWorkspaceId: {
+              anyOf: [{ type: 'string' }, { type: 'null' }],
+            },
             workspaceSelectionRequired: { type: 'boolean' },
             transports: { type: 'array', items: { type: 'string' } },
             limits: { type: 'object' },
           },
-          ['workspaceSelectionRequired', 'transports', 'limits'],
+          [
+            'workspaceBound',
+            'workspaceSelectionRequired',
+            'transports',
+            'limits',
+          ],
         ),
         annotations: {
           title: 'Get MCP context',
@@ -468,6 +495,36 @@ export class McpToolsService {
         },
       },
       {
+        name: 'get_page',
+        description:
+          'Return complete page context: Markdown, version, breadcrumb, children, space, and permissions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workspaceId: workspaceIdSchema,
+            pageId: { type: 'string', description: 'Page UUID or slugId.' },
+          },
+          required: ['pageId'],
+          additionalProperties: false,
+        },
+        outputSchema: objectOutput(
+          {
+            page: { type: 'object' },
+            breadcrumb: { type: 'array', items: { type: 'object' } },
+            children: { type: 'array', items: { type: 'object' } },
+            permissions: { type: 'object' },
+          },
+          ['page', 'breadcrumb', 'children', 'permissions'],
+        ),
+        annotations: {
+          title: 'Get page context',
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
         name: 'get_page_markdown',
         description:
           'Return the latest collaborative page state as Markdown. Use updatedAt with update_page.',
@@ -528,55 +585,166 @@ export class McpToolsService {
           openWorldHint: false,
         },
       },
+      {
+        name: 'plan_page_changes',
+        description:
+          'Plan a batch of create/update/move operations without applying them. Returns conflicts and requiresApproval.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workspaceId: workspaceIdSchema,
+            operations: {
+              type: 'array',
+              minItems: 1,
+              maxItems: MAX_BATCH_OPERATIONS,
+              items: {
+                type: 'object',
+                properties: {
+                  clientId: { type: 'string' },
+                  type: { type: 'string', enum: ['create', 'update', 'move'] },
+                  pageId: { type: 'string' },
+                  spaceId: { type: 'string' },
+                  parentPageId: {
+                    anyOf: [{ type: 'string' }, { type: 'null' }],
+                  },
+                  targetParentPageId: {
+                    anyOf: [{ type: 'string' }, { type: 'null' }],
+                  },
+                  targetSpaceId: { type: 'string' },
+                  title: { type: 'string', maxLength: 255 },
+                  content: { type: 'string' },
+                  icon: { type: 'string' },
+                  expectedUpdatedAt: { type: 'string', format: 'date-time' },
+                },
+                required: ['type'],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ['operations'],
+          additionalProperties: false,
+        },
+        outputSchema: objectOutput(
+          {
+            planId: { type: 'string' },
+            summary: { type: 'object' },
+            requiresApproval: { type: 'boolean' },
+            operations: { type: 'array', items: { type: 'object' } },
+          },
+          ['planId', 'summary', 'requiresApproval', 'operations'],
+        ),
+        annotations: {
+          title: 'Plan page changes',
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: 'apply_page_changes',
+        description:
+          'Apply a previously planned batch of page changes. Use the same idempotencyKey to safely retry.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workspaceId: workspaceIdSchema,
+            planId: { type: 'string' },
+            idempotencyKey: { type: 'string', minLength: 1, maxLength: 200 },
+          },
+          required: ['planId', 'idempotencyKey'],
+          additionalProperties: false,
+        },
+        outputSchema: objectOutput(
+          {
+            operationId: { type: 'string' },
+            status: { type: 'string' },
+            summary: { type: 'object' },
+            items: { type: 'array', items: { type: 'object' } },
+          },
+          ['operationId', 'status', 'summary', 'items'],
+        ),
+        annotations: {
+          title: 'Apply page changes',
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
     ];
   }
 
-  async call(name: string, args: unknown): Promise<CallToolResult> {
+  async call(
+    name: string,
+    args: unknown,
+    sessionContext: McpSessionContext = {},
+  ): Promise<CallToolResult> {
     try {
       switch (name) {
         case 'get_context':
-          return await this.getContext(args);
+          return await this.getContext(args, sessionContext);
         case 'list_workspaces':
           return await this.listWorkspaces();
         case 'list_spaces':
-          return await this.listSpaces(args);
+          return await this.listSpaces(args, sessionContext);
         case 'search_pages':
-          return await this.searchPages(args);
+          return await this.searchPages(args, sessionContext);
         case 'create_space':
-          return await this.createSpace(args);
+          return await this.createSpace(args, sessionContext);
         case 'insert_page_tree':
-          return await this.insertPageTree(args);
+          return await this.insertPageTree(args, sessionContext);
         case 'create_page':
-          return await this.createPage(args);
+          return await this.createPage(args, sessionContext);
         case 'update_page':
-          return await this.updatePage(args);
+          return await this.updatePage(args, sessionContext);
         case 'move_page':
-          return await this.movePage(args);
+          return await this.movePage(args, sessionContext);
         case 'list_space_pages':
-          return await this.listSpacePages(args);
+          return await this.listSpacePages(args, sessionContext);
+        case 'get_page':
+          return await this.getPage(args, sessionContext);
         case 'get_page_markdown':
-          return await this.getPageMarkdown(args);
+          return await this.getPageMarkdown(args, sessionContext);
         case 'analyze_page_tree':
-          return await this.analyzePageTree(args);
+          return await this.analyzePageTree(args, sessionContext);
+        case 'plan_page_changes':
+          return await this.planPageChanges(args, sessionContext);
+        case 'apply_page_changes':
+          return await this.applyPageChanges(args, sessionContext);
         default:
           throw new McpToolError('UNKNOWN_TOOL', `Unknown tool: ${name}`);
       }
     } catch (error) {
-      const normalized = this.normalizeError(error);
-      if (normalized.code === 'INTERNAL_ERROR') {
-        this.logger.error(`MCP tool ${name} failed`, error);
+      if (error instanceof McpToolError) {
+        if (error.code === 'INTERNAL_ERROR') {
+          this.logger.error(`MCP tool ${name} failed`, error);
+        }
+        return formatMcpToolError(error);
       }
-      return formatMcpError(normalized.code, normalized.message);
+      this.logger.error(`MCP tool ${name} failed`, error);
+      return formatMcpError('INTERNAL_ERROR', 'Tool execution failed');
     }
   }
 
-  private async getContext(args: unknown): Promise<CallToolResult> {
+  private async getContext(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpGetContextDto, args);
+    this.assertWorkspaceContext(sessionContext, dto.workspaceId);
     const workspaces = await this.contextService.listWorkspaces();
     let workspace: Workspace | null = null;
 
-    if (dto.workspaceId || workspaces.length === 1) {
-      workspace = await this.contextService.resolveWorkspace(dto.workspaceId);
+    if (
+      dto.workspaceId ||
+      sessionContext.workspaceId ||
+      workspaces.length === 1
+    ) {
+      workspace = await this.contextService.resolveWorkspace(
+        dto.workspaceId ?? sessionContext.workspaceId,
+      );
+      this.sessionStateService.bindWorkspace(sessionContext, workspace.id);
     } else if (workspaces.length === 0) {
       throw new McpToolError('WORKSPACE_NOT_FOUND', 'Workspace not found');
     }
@@ -584,10 +752,12 @@ export class McpToolsService {
     return this.success({
       server: {
         name: 'docmost-mcp-server',
-        version: '1.1.0',
+        version: '1.2.0',
         protocolVersion: LATEST_PROTOCOL_VERSION,
       },
       workspace: workspace ? this.workspaceSummary(workspace) : null,
+      workspaceBound: Boolean(sessionContext.workspaceId),
+      boundWorkspaceId: sessionContext.workspaceId ?? null,
       workspaceSelectionRequired: workspaces.length > 1 && !workspace,
       workspaces: workspaces.map((entry) => this.workspaceSummary(entry)),
       transports: ['streamable-http', 'legacy-sse'],
@@ -596,6 +766,7 @@ export class McpToolsService {
         maxTreeDepth: MAX_TREE_DEPTH,
         maxPageContentBytes: MAX_PAGE_CONTENT_BYTES,
         maxTreeResultNodes: MAX_TREE_RESULT_NODES,
+        maxBatchOperations: MAX_BATCH_OPERATIONS,
         maxSessions: this.environmentService.getMcpMaxSessions(),
         rateLimitRps: this.environmentService.getMcpRateLimitRps(),
       },
@@ -609,9 +780,15 @@ export class McpToolsService {
     return this.success({ workspaces });
   }
 
-  private async listSpaces(args: unknown): Promise<CallToolResult> {
+  private async listSpaces(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpListSpacesDto, args);
-    const { workspace } = await this.loadContext(dto.workspaceId);
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const pattern = dto.query?.trim() ? `%${dto.query.trim()}%` : undefined;
 
     let baseQuery = this.db
@@ -660,16 +837,26 @@ export class McpToolsService {
         .execute(),
     ]);
 
+    const total = Number(count);
+    const items = spaces.map((space) => this.spaceSummary(space as Space));
     return this.success({
       workspaceId: workspace.id,
-      total: Number(count),
-      spaces: spaces.map((space) => this.spaceSummary(space as Space)),
+      total,
+      spaces: items,
+      items,
+      pageInfo: this.pageInfo(dto.offset, dto.limit, total, items.length),
     });
   }
 
-  private async searchPages(args: unknown): Promise<CallToolResult> {
+  private async searchPages(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpSearchPagesDto, args);
-    const { workspace } = await this.loadContext(dto.workspaceId);
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const space = dto.spaceId
       ? await this.requireSpace(dto.spaceId, workspace.id)
       : undefined;
@@ -731,30 +918,40 @@ export class McpToolsService {
         .execute(),
     ]);
 
+    const total = Number(count);
+    const items = pages.map((page) => ({
+      id: page.id,
+      slugId: page.slugId,
+      title: page.title,
+      icon: page.icon,
+      highlight: page.highlight?.replace(/\s+/g, ' ').trim() ?? '',
+      parentPageId: page.parentPageId,
+      space: {
+        id: page.spaceId,
+        name: page.spaceName,
+        slug: page.spaceSlug,
+      },
+      createdAt: page.createdAt,
+      updatedAt: page.updatedAt,
+    }));
     return this.success({
-      total: Number(count),
-      pages: pages.map((page) => ({
-        id: page.id,
-        slugId: page.slugId,
-        title: page.title,
-        icon: page.icon,
-        highlight: page.highlight?.replace(/\s+/g, ' ').trim() ?? '',
-        parentPageId: page.parentPageId,
-        space: {
-          id: page.spaceId,
-          name: page.spaceName,
-          slug: page.spaceSlug,
-        },
-        createdAt: page.createdAt,
-        updatedAt: page.updatedAt,
-      })),
+      total,
+      pages: items,
+      items,
+      pageInfo: this.pageInfo(dto.offset, dto.limit, total, items.length),
     });
   }
 
-  private async createSpace(args: unknown): Promise<CallToolResult> {
+  private async createSpace(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpCreateSpaceDto, args);
     const { workspaceId: _workspaceId, ...createDto } = dto;
-    const { user, workspace } = await this.loadContext(dto.workspaceId);
+    const { user, workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const space = await this.spaceService.createSpace(
       user,
       workspace.id,
@@ -763,7 +960,10 @@ export class McpToolsService {
     return this.success(this.spaceSummary(space));
   }
 
-  private async insertPageTree(args: unknown): Promise<CallToolResult> {
+  private async insertPageTree(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpInsertPageTreeDto, args);
     const nodeCount = this.countTreeNodes(dto.pages);
     if (nodeCount > MAX_TREE_NODES) {
@@ -790,7 +990,10 @@ export class McpToolsService {
       );
     }
 
-    const { user, workspace } = await this.loadContext(dto.workspaceId);
+    const { user, workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const preparedPages = await this.prepareTreeNodes(dto.pages);
 
     const result = await this.db.transaction().execute(async (trx) => {
@@ -845,10 +1048,16 @@ export class McpToolsService {
     return this.success(result);
   }
 
-  private async createPage(args: unknown): Promise<CallToolResult> {
+  private async createPage(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpCreatePageDto, args);
     this.assertContentSize(dto.content);
-    const { user, workspace } = await this.loadContext(dto.workspaceId);
+    const { user, workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const pageContent = await markdownToPageContent(dto.content);
 
     const page = await this.db.transaction().execute(async (trx) => {
@@ -886,9 +1095,15 @@ export class McpToolsService {
     return this.success(this.pageSummary(page));
   }
 
-  private async updatePage(args: unknown): Promise<CallToolResult> {
+  private async updatePage(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpUpdatePageDto, args);
-    const { user, workspace } = await this.loadContext(dto.workspaceId);
+    const { user, workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     let page = await this.requirePage(dto.pageId, workspace.id);
     if (
       dto.title === undefined &&
@@ -958,9 +1173,15 @@ export class McpToolsService {
     );
   }
 
-  private async movePage(args: unknown): Promise<CallToolResult> {
+  private async movePage(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpMovePageDto, args);
-    const { workspace } = await this.loadContext(dto.workspaceId);
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     let page = await this.requirePage(dto.pageId, workspace.id);
     const descendants = await this.pageRepo.getPageAndDescendants(page.id, {
       includeContent: false,
@@ -1020,9 +1241,15 @@ export class McpToolsService {
     );
   }
 
-  private async listSpacePages(args: unknown): Promise<CallToolResult> {
+  private async listSpacePages(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpListSpacePagesDto, args);
-    const { workspace } = await this.loadContext(dto.workspaceId);
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const space = await this.requireSpace(dto.spaceId, workspace.id);
     const isTree = dto.format === 'tree';
     if (isTree && dto.offset !== 0) {
@@ -1089,9 +1316,15 @@ export class McpToolsService {
     });
   }
 
-  private async getPageMarkdown(args: unknown): Promise<CallToolResult> {
+  private async getPageMarkdown(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpGetPageMarkdownDto, args);
-    const { user, workspace } = await this.loadContext(dto.workspaceId);
+    const { user, workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     let page = await this.requirePage(dto.pageId, workspace.id);
     const connection = await this.collaborationGateway.openDirectConnection(
       `page.${page.id}`,
@@ -1124,9 +1357,15 @@ export class McpToolsService {
     });
   }
 
-  private async analyzePageTree(args: unknown): Promise<CallToolResult> {
+  private async analyzePageTree(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
     const dto = await validateMcpDto(McpAnalyzePageTreeDto, args);
-    const { workspace } = await this.loadContext(dto.workspaceId);
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
     const space = await this.requireSpace(dto.spaceId, workspace.id);
 
     const pages = await this.db
@@ -1180,9 +1419,553 @@ export class McpToolsService {
     });
   }
 
-  private async loadContext(workspaceId?: string) {
+  private async getPage(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
+    const dto = await validateMcpDto(McpGetPageDto, args);
+    const { user, workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
+    let page = await this.requirePage(dto.pageId, workspace.id);
+    page = await this.refreshCollaborativePage(page, user);
+    const space = await this.requireSpace(page.spaceId, workspace.id);
+    const markdown = await this.exportService.exportPage(
+      'markdown',
+      page,
+      true,
+    );
+    const breadcrumb = await this.buildBreadcrumb(page, workspace.id);
+    const children = await this.pageRepo.findActiveChildren(page.id);
+
+    return this.success({
+      page: {
+        id: page.id,
+        slugId: page.slugId,
+        title: page.title,
+        markdown,
+        updatedAt: page.updatedAt,
+        version: page.updatedAt,
+        spaceId: page.spaceId,
+        parentPageId: page.parentPageId,
+        icon: page.icon,
+        isLocked: page.isLocked ?? false,
+      },
+      breadcrumb,
+      children: children.map((child) => ({
+        id: child.id,
+        slugId: child.slugId,
+        title: child.title,
+        icon: child.icon,
+        parentPageId: child.parentPageId,
+        spaceId: child.spaceId,
+        updatedAt: child.updatedAt,
+      })),
+      space: this.spaceSummary(space),
+      permissions: {
+        canRead: true,
+        canUpdate: true,
+        canMove: true,
+        canDelete: true,
+      },
+    });
+  }
+
+  private async planPageChanges(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
+    const dto = await validateMcpDto(McpPlanPageChangesDto, args);
+    if (dto.operations.length > MAX_BATCH_OPERATIONS) {
+      throw new McpToolError(
+        'BATCH_TOO_LARGE',
+        `plan_page_changes supports at most ${MAX_BATCH_OPERATIONS} operations`,
+      );
+    }
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
+
+    const planned: McpPlannedOperation[] = [];
+    for (const [index, operation] of dto.operations.entries()) {
+      planned.push(
+        await this.planSingleOperation(operation, workspace.id, index),
+      );
+    }
+
+    const plan = this.sessionStateService.createPlan(workspace.id, planned);
+    return this.success({
+      planId: plan.planId,
+      workspaceId: plan.workspaceId,
+      requiresApproval: plan.requiresApproval,
+      summary: plan.summary,
+      operations: plan.operations.map((item) => ({
+        clientId: item.clientId,
+        type: item.type,
+        status: item.status,
+        page: item.page,
+        error: item.error,
+      })),
+    });
+  }
+
+  private async applyPageChanges(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
+    const dto = await validateMcpDto(McpApplyPageChangesDto, args);
+    const plan = this.sessionStateService.getPlan(dto.planId);
+    if (!plan) {
+      throw new McpToolError(
+        'PLAN_NOT_FOUND',
+        'Change plan not found or expired',
+        {},
+        false,
+        'Create a new plan with plan_page_changes',
+      );
+    }
+
+    this.assertWorkspaceContext(
+      sessionContext,
+      dto.workspaceId ?? plan.workspaceId,
+    );
+    if (dto.workspaceId && dto.workspaceId !== plan.workspaceId) {
+      throw new McpToolError(
+        'WORKSPACE_CONTEXT_MISMATCH',
+        'workspaceId does not match the planned workspace',
+        {
+          boundWorkspaceId: sessionContext.workspaceId ?? plan.workspaceId,
+          requestedWorkspaceId: dto.workspaceId,
+        },
+        false,
+        'Use the workspace bound to this session or recreate the plan',
+      );
+    }
+
+    const existing = this.sessionStateService.getApplyResult(
+      dto.planId,
+      dto.idempotencyKey,
+    );
+    if (existing) {
+      return this.success(existing as unknown as Record<string, unknown>);
+    }
+
+    const { user, workspace } = await this.loadContext(
+      plan.workspaceId,
+      sessionContext,
+    );
+    if (workspace.id !== plan.workspaceId) {
+      throw new McpToolError(
+        'WORKSPACE_CONTEXT_MISMATCH',
+        'Resolved workspace does not match the planned workspace',
+      );
+    }
+
+    const items: Array<Record<string, unknown>> = [];
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const operation of plan.operations) {
+      if (operation.status !== 'ready') {
+        skipped += 1;
+        items.push({
+          clientId: operation.clientId,
+          type: operation.type,
+          status: 'skipped',
+          error: operation.error,
+        });
+        continue;
+      }
+
+      try {
+        const applied = await this.applySingleOperation(
+          operation,
+          user.id,
+          workspace.id,
+        );
+        succeeded += 1;
+        items.push({
+          clientId: operation.clientId,
+          type: operation.type,
+          status: 'succeeded',
+          page: applied,
+        });
+      } catch (error) {
+        failed += 1;
+        const normalized =
+          error instanceof McpToolError
+            ? { code: error.code, message: error.message }
+            : { code: 'INTERNAL_ERROR', message: 'Operation failed' };
+        items.push({
+          clientId: operation.clientId,
+          type: operation.type,
+          status: 'failed',
+          error: normalized,
+        });
+      }
+    }
+
+    const status =
+      failed === 0 && skipped === 0
+        ? 'success'
+        : succeeded > 0
+          ? 'partial_success'
+          : 'failed';
+
+    const result = this.sessionStateService.saveApplyResult(
+      dto.planId,
+      dto.idempotencyKey,
+      {
+        operationId: randomUUID(),
+        planId: dto.planId,
+        status,
+        summary: {
+          total: plan.operations.length,
+          succeeded,
+          failed,
+          skipped,
+        },
+        items,
+      },
+    );
+
+    return this.success(result as unknown as Record<string, unknown>);
+  }
+
+  private async planSingleOperation(
+    operation: McpPageChangeOperationDto,
+    workspaceId: string,
+    index: number,
+  ): Promise<McpPlannedOperation> {
+    const clientId = operation.clientId || `op-${index + 1}`;
     try {
-      return await this.contextService.load(workspaceId);
+      if (operation.type === 'create') {
+        if (!operation.spaceId || operation.content === undefined) {
+          throw new McpToolError(
+            'VALIDATION_ERROR',
+            'create requires spaceId and content',
+          );
+        }
+        this.assertContentSize(operation.content);
+        const space = await this.requireSpace(operation.spaceId, workspaceId);
+        if (operation.parentPageId) {
+          const parent = await this.requirePage(
+            operation.parentPageId,
+            workspaceId,
+          );
+          if (parent.spaceId !== space.id) {
+            throw new McpToolError(
+              'PARENT_NOT_FOUND',
+              'Parent page is not in the target space',
+            );
+          }
+        }
+        return {
+          clientId,
+          type: 'create',
+          status: 'ready',
+          input: operation,
+        };
+      }
+
+      if (operation.type === 'update') {
+        if (!operation.pageId) {
+          throw new McpToolError('VALIDATION_ERROR', 'update requires pageId');
+        }
+        if (
+          operation.title === undefined &&
+          operation.icon === undefined &&
+          operation.content === undefined
+        ) {
+          throw new McpToolError(
+            'VALIDATION_ERROR',
+            'Provide at least one of title, icon, or content',
+          );
+        }
+        if (operation.content !== undefined) {
+          this.assertContentSize(operation.content);
+          if (!operation.expectedUpdatedAt) {
+            throw new McpToolError(
+              'VERSION_REQUIRED',
+              'expectedUpdatedAt is required when updating content',
+            );
+          }
+        }
+        const page = await this.requirePage(operation.pageId, workspaceId);
+        if (
+          operation.expectedUpdatedAt &&
+          !this.sameTimestamp(page.updatedAt, operation.expectedUpdatedAt)
+        ) {
+          return {
+            clientId,
+            type: 'update',
+            status: 'conflict',
+            input: operation,
+            page: {
+              id: page.id,
+              slugId: page.slugId,
+              title: page.title,
+              spaceId: page.spaceId,
+              parentPageId: page.parentPageId,
+              updatedAt: page.updatedAt,
+            },
+            error: {
+              code: 'PAGE_CONFLICT',
+              message: 'Page changed after it was read',
+            },
+          };
+        }
+        return {
+          clientId,
+          type: 'update',
+          status: 'ready',
+          input: operation,
+          page: {
+            id: page.id,
+            slugId: page.slugId,
+            title: page.title,
+            spaceId: page.spaceId,
+            parentPageId: page.parentPageId,
+            updatedAt: page.updatedAt,
+          },
+        };
+      }
+
+      if (operation.type === 'move') {
+        if (!operation.pageId) {
+          throw new McpToolError('VALIDATION_ERROR', 'move requires pageId');
+        }
+        const page = await this.requirePage(operation.pageId, workspaceId);
+        if (operation.targetParentPageId) {
+          const targetParent = await this.requirePage(
+            operation.targetParentPageId,
+            workspaceId,
+          );
+          const descendants = await this.pageRepo.getPageAndDescendants(
+            page.id,
+            { includeContent: false },
+          );
+          if (descendants.some((entry) => entry.id === targetParent.id)) {
+            throw new McpToolError(
+              'INVALID_MOVE',
+              'A page cannot be moved below itself or one of its descendants',
+            );
+          }
+        }
+        if (operation.targetSpaceId) {
+          await this.requireSpace(operation.targetSpaceId, workspaceId);
+        }
+        return {
+          clientId,
+          type: 'move',
+          status: 'ready',
+          input: operation,
+          page: {
+            id: page.id,
+            slugId: page.slugId,
+            title: page.title,
+            spaceId: page.spaceId,
+            parentPageId: page.parentPageId,
+            updatedAt: page.updatedAt,
+          },
+        };
+      }
+
+      throw new McpToolError('VALIDATION_ERROR', 'Unsupported operation type');
+    } catch (error) {
+      const normalized =
+        error instanceof McpToolError
+          ? { code: error.code, message: error.message }
+          : { code: 'INTERNAL_ERROR', message: 'Unable to plan operation' };
+      return {
+        clientId,
+        type: operation.type,
+        status: normalized.code === 'PAGE_CONFLICT' ? 'conflict' : 'invalid',
+        input: operation,
+        error: normalized,
+      };
+    }
+  }
+
+  private async applySingleOperation(
+    operation: McpPlannedOperation,
+    userId: string,
+    workspaceId: string,
+  ): Promise<Record<string, unknown>> {
+    if (operation.type === 'create') {
+      const pageContent = await markdownToPageContent(operation.input.content!);
+      const page = await this.db.transaction().execute(async (trx) => {
+        const space = await this.requireSpace(
+          operation.input.spaceId!,
+          workspaceId,
+          trx,
+        );
+        let parentPageId: string | null = null;
+        if (operation.input.parentPageId) {
+          const parent = await this.requirePage(
+            operation.input.parentPageId,
+            workspaceId,
+            trx,
+          );
+          if (parent.spaceId !== space.id) {
+            throw new McpToolError(
+              'PARENT_NOT_FOUND',
+              'Parent page is not in the target space',
+            );
+          }
+          parentPageId = parent.id;
+        }
+        return this.insertPageRecord(
+          {
+            title: operation.input.title ?? pageContent.title ?? 'Untitled',
+            icon: operation.input.icon,
+            pageContent,
+          },
+          space.id,
+          parentPageId,
+          userId,
+          workspaceId,
+          trx,
+        );
+      });
+      return this.pageSummary(page);
+    }
+
+    if (operation.type === 'update') {
+      const result = await this.updatePage(
+        {
+          workspaceId,
+          pageId: operation.input.pageId,
+          title: operation.input.title,
+          content: operation.input.content,
+          icon: operation.input.icon,
+          expectedUpdatedAt: operation.input.expectedUpdatedAt,
+        },
+        { workspaceId },
+      );
+      if (result.isError) {
+        const content = result.content[0];
+        throw new McpToolError(
+          'UPDATE_FAILED',
+          content?.type === 'text' ? content.text : 'Update failed',
+        );
+      }
+      return result.structuredContent as Record<string, unknown>;
+    }
+
+    if (operation.type === 'move') {
+      const result = await this.movePage(
+        {
+          workspaceId,
+          pageId: operation.input.pageId,
+          targetParentPageId: operation.input.targetParentPageId,
+          targetSpaceId: operation.input.targetSpaceId,
+        },
+        { workspaceId },
+      );
+      if (result.isError) {
+        const content = result.content[0];
+        throw new McpToolError(
+          'MOVE_FAILED',
+          content?.type === 'text' ? content.text : 'Move failed',
+        );
+      }
+      return result.structuredContent as Record<string, unknown>;
+    }
+
+    throw new McpToolError('VALIDATION_ERROR', 'Unsupported operation type');
+  }
+
+  private async refreshCollaborativePage(
+    page: Page,
+    user: { id: string },
+  ): Promise<Page> {
+    const connection = await this.collaborationGateway.openDirectConnection(
+      `page.${page.id}`,
+      { user },
+    );
+    try {
+      await connection.transact(() => undefined);
+    } finally {
+      await connection.disconnect();
+    }
+
+    const refreshed = await this.pageRepo.findById(page.id, {
+      includeContent: true,
+    });
+    if (
+      !refreshed ||
+      refreshed.workspaceId !== page.workspaceId ||
+      refreshed.deletedAt
+    ) {
+      throw new McpToolError('PAGE_NOT_FOUND', 'Page not found');
+    }
+    return refreshed;
+  }
+
+  private async buildBreadcrumb(page: Page, workspaceId: string) {
+    const breadcrumb: Array<{
+      id: string;
+      slugId: string;
+      title: string | null;
+    }> = [];
+    let currentParentId = page.parentPageId;
+    const visited = new Set<string>();
+    while (currentParentId && !visited.has(currentParentId)) {
+      visited.add(currentParentId);
+      const parent = await this.pageRepo.findById(currentParentId);
+      if (!parent || parent.workspaceId !== workspaceId || parent.deletedAt) {
+        break;
+      }
+      breadcrumb.unshift({
+        id: parent.id,
+        slugId: parent.slugId,
+        title: parent.title,
+      });
+      currentParentId = parent.parentPageId;
+    }
+    return breadcrumb;
+  }
+
+  private assertWorkspaceContext(
+    sessionContext: McpSessionContext,
+    requestedWorkspaceId?: string,
+  ): void {
+    if (
+      sessionContext.workspaceId &&
+      requestedWorkspaceId &&
+      sessionContext.workspaceId !== requestedWorkspaceId
+    ) {
+      throw new McpToolError(
+        'WORKSPACE_CONTEXT_MISMATCH',
+        'workspaceId does not match the workspace bound to this MCP session',
+        {
+          boundWorkspaceId: sessionContext.workspaceId,
+          requestedWorkspaceId,
+        },
+        false,
+        'Omit workspaceId or call get_context again in a new session',
+      );
+    }
+  }
+
+  private async loadContext(
+    workspaceId?: string,
+    sessionContext: McpSessionContext = {},
+  ) {
+    this.assertWorkspaceContext(sessionContext, workspaceId);
+    try {
+      const context = await this.contextService.load(
+        workspaceId ?? sessionContext.workspaceId,
+      );
+      this.sessionStateService.bindWorkspace(
+        sessionContext,
+        context.workspace.id,
+      );
+      return context;
     } catch (error) {
       if (error instanceof McpToolError) throw error;
       if (
@@ -1440,6 +2223,23 @@ export class McpToolsService {
       return { code: 'VALIDATION_ERROR', message: error.message };
     }
     return { code: 'INTERNAL_ERROR', message: 'Tool execution failed' };
+  }
+
+  private pageInfo(
+    offset: number,
+    limit: number,
+    total: number,
+    returned: number,
+  ) {
+    const nextOffset = offset + returned;
+    return {
+      offset,
+      limit,
+      total,
+      hasNextPage: nextOffset < total,
+      nextOffset: nextOffset < total ? nextOffset : null,
+      nextCursor: nextOffset < total ? String(nextOffset) : null,
+    };
   }
 
   private success(value: Record<string, unknown>): CallToolResult {

@@ -149,9 +149,13 @@ pnpm --filter ./apps/server run format   # Prettier（后端）
 
 ### Workspace 与工具
 
-- `workspaceId` 为可选参数：只有一个 Workspace 时自动使用；多个 Workspace 且未传入时返回 `WORKSPACE_AMBIGUOUS`。建议客户端先调用 `get_context`，再按需调用 `list_workspaces`。
+- `workspaceId` 为可选参数：只有一个 Workspace 时自动使用；多个 Workspace 且未传入时返回 `WORKSPACE_AMBIGUOUS`。建议客户端先调用 `get_context` 绑定会话 Workspace，再按需调用 `list_workspaces`。
 - Space 支持 UUID 或 slug；Page 支持 UUID 或 `slugId`，返回结果包含 canonical UUID。
-- 当前提供 12 个 tools：`get_context`、`list_workspaces`、`list_spaces`、`search_pages`、`create_space`、`insert_page_tree`、`create_page`、`update_page`、`move_page`、`list_space_pages`、`get_page_markdown`、`analyze_page_tree`。
+- 当前提供 15 个 tools：`get_context`、`list_workspaces`、`list_spaces`、`search_pages`、`create_space`、`insert_page_tree`、`create_page`、`update_page`、`move_page`、`list_space_pages`、`get_page`、`get_page_markdown`、`analyze_page_tree`、`plan_page_changes`、`apply_page_changes`。
+- `get_context` 会把当前 MCP 会话绑定到解析出的 Workspace；后续工具若显式传入不同 `workspaceId` 会返回 `WORKSPACE_CONTEXT_MISMATCH`。
+- `get_page` 返回页面 Markdown、version/updatedAt、breadcrumb、children、space 和权限摘要。
+- `plan_page_changes` + `apply_page_changes` 支持 create/update/move 批量变更；`apply_page_changes` 需要 `idempotencyKey`，同一 key 可安全重试。
+- 列表类工具返回 `items` 与 `pageInfo`（offset/limit/total/hasNextPage/nextCursor）。
 - `list_spaces` 用于查询 Space，`search_pages` 用于在 Workspace（可限定 Space）内搜索页面标题和正文，解决后续接口需要先取得 `spaceId` 的问题。
 - 页面树最大 100 个写入节点、最大深度 10；`list_space_pages` 的 tree 模式返回完整树，不接受分页片段，完整树上限为 1000 个节点。Markdown 单页面最大 1 MiB，标题最大 255 字符。
 - `update_page` 更新正文时必须传入读取时的 `expectedUpdatedAt`，服务端会检测并发修改；冲突时返回 `[PAGE_CONFLICT]`，避免覆盖在线协同编辑内容。

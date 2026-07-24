@@ -416,6 +416,16 @@ export class PageRepo {
       .as('hasChildren');
   }
 
+  async findActiveChildren(parentPageId: string): Promise<Page[]> {
+    return this.db
+      .selectFrom('pages')
+      .select(this.baseFields)
+      .where('parentPageId', '=', parentPageId)
+      .where('deletedAt', 'is', null)
+      .orderBy('position', (order) => order.collate('C').asc())
+      .execute();
+  }
+
   async getPageAndDescendants(
     parentPageId: string,
     opts: { includeContent: boolean },

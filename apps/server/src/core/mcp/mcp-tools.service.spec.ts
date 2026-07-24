@@ -15,6 +15,7 @@ import * as Y from 'yjs';
 import { Page, Workspace } from '@docmost/db/types/entity.types';
 import { markdownToPageContent } from './utils/markdown-to-page-content.util';
 import { McpContextService } from './mcp-context.service';
+import { McpSessionStateService } from './mcp-session-state.service';
 import { McpToolsService } from './mcp-tools.service';
 
 const WORKSPACE_ID = 'd9428888-122b-11e1-b85c-61cd3cbb3210';
@@ -26,8 +27,20 @@ describe('McpToolsService', () => {
     listWorkspaces: jest.fn(),
     resolveWorkspace: jest.fn(),
   } as unknown as jest.Mocked<McpContextService>;
+  const workspaceRepo = {};
+  const spaceRepo = {
+    findById: jest.fn(),
+  };
   const pageRepo = {
     findById: jest.fn(),
+    findActiveChildren: jest.fn(),
+    getPageAndDescendants: jest.fn(),
+    updatePage: jest.fn(),
+  };
+  const spaceService = {};
+  const pageService = {};
+  const exportService = {
+    exportPage: jest.fn(),
   };
   const collaborationGateway = {
     openDirectConnection: jest.fn(),
@@ -36,16 +49,18 @@ describe('McpToolsService', () => {
     getMcpMaxSessions: jest.fn().mockReturnValue(100),
     getMcpRateLimitRps: jest.fn().mockReturnValue(10),
   };
+  const sessionStateService = new McpSessionStateService();
   const service = new McpToolsService(
     contextService,
-    undefined as never,
-    undefined as never,
+    workspaceRepo as never,
+    spaceRepo as never,
     pageRepo as never,
-    undefined as never,
-    undefined as never,
-    undefined as never,
+    spaceService as never,
+    pageService as never,
+    exportService as never,
     collaborationGateway as never,
     environmentService as never,
+    sessionStateService,
     undefined as never,
   );
 
@@ -66,14 +81,19 @@ describe('McpToolsService', () => {
       'update_page',
       'move_page',
       'list_space_pages',
+      'get_page',
       'get_page_markdown',
       'analyze_page_tree',
+      'plan_page_changes',
+      'apply_page_changes',
     ]);
   });
 
   it('marks workspaceId optional on workspace-scoped tools', () => {
     const tools = service.getTools();
-    for (const tool of tools.filter((entry) => entry.name !== 'list_workspaces')) {
+    for (const tool of tools.filter(
+      (entry) => entry.name !== 'list_workspaces',
+    )) {
       expect(tool.inputSchema.required ?? []).not.toContain('workspaceId');
     }
   });
@@ -120,6 +140,135 @@ describe('McpToolsService', () => {
       workspaceSelectionRequired: false,
       transports: ['streamable-http', 'legacy-sse'],
     });
+  });
+
+  it('binds the resolved workspace to the MCP session context', async () => {
+    const workspace = {
+      id: WORKSPACE_ID,
+      name: 'Workspace',
+      hostname: 'docs.internal',
+      defaultSpaceId: SPACE_ID,
+      createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    } as Workspace;
+    contextService.listWorkspaces.mockResolvedValue([workspace]);
+    contextService.resolveWorkspace.mockResolvedValue(workspace);
+    const sessionContext: Record<string, unknown> = {};
+
+    const result = await service.call('get_context', {}, sessionContext);
+
+    expect(sessionContext).toEqual({ workspaceId: WORKSPACE_ID });
+    expect(readPayload(result)).toMatchObject({
+      workspaceBound: true,
+      boundWorkspaceId: WORKSPACE_ID,
+    });
+  });
+
+  it('rejects an explicit workspace that conflicts with the bound session', async () => {
+    const result = await service.call(
+      'get_context',
+      { workspaceId: 'd9428888-122b-11e1-b85c-61cd3cbb3299' },
+      { workspaceId: WORKSPACE_ID },
+    );
+
+    expect(readText(result)).toContain('[WORKSPACE_CONTEXT_MISMATCH]');
+    expect(result.structuredContent).toMatchObject({
+      error: {
+        code: 'WORKSPACE_CONTEXT_MISMATCH',
+        retryable: false,
+      },
+    });
+  });
+
+  it('returns a complete page context with breadcrumb, children, and version', async () => {
+    const page = createPage();
+    const parent = {
+      ...createPage(),
+      id: 'd9428888-122b-11e1-b85c-61cd3cbb3213',
+      slugId: 'parent-page',
+      title: 'Parent',
+    } as Page;
+    page.parentPageId = parent.id;
+    const child = {
+      ...createPage(),
+      id: 'd9428888-122b-11e1-b85c-61cd3cbb3214',
+      slugId: 'child-page',
+      title: 'Child',
+      parentPageId: page.id,
+    } as Page;
+    contextService.load.mockResolvedValue({
+      workspace: { id: WORKSPACE_ID },
+      user: { id: 'agent-user' },
+    } as never);
+    pageRepo.findById
+      .mockResolvedValueOnce(page)
+      .mockResolvedValueOnce(page)
+      .mockResolvedValueOnce(parent);
+    pageRepo.findActiveChildren.mockResolvedValue([child]);
+    spaceRepo.findById.mockResolvedValue({
+      id: SPACE_ID,
+      slug: 'docs',
+      workspaceId: WORKSPACE_ID,
+      deletedAt: null,
+    });
+    collaborationGateway.openDirectConnection.mockResolvedValue(
+      createDirectConnection(),
+    );
+    exportService.exportPage.mockResolvedValue('# Page');
+
+    const result = await service.call('get_page', { pageId: page.id });
+    const payload = readPayload(result);
+
+    expect(payload).toMatchObject({
+      page: {
+        id: page.id,
+        markdown: '# Page',
+        version: page.updatedAt.toISOString(),
+      },
+      breadcrumb: [{ id: parent.id, title: parent.title }],
+      children: [{ id: child.id, title: child.title }],
+    });
+  });
+
+  it('plans and idempotently applies a batch page update', async () => {
+    const page = createPage();
+    contextService.load.mockResolvedValue({
+      workspace: { id: WORKSPACE_ID },
+      user: { id: 'agent-user' },
+    } as never);
+    pageRepo.findById.mockResolvedValue(page);
+    pageRepo.updatePage.mockResolvedValue(undefined);
+
+    const planResult = await service.call('plan_page_changes', {
+      operations: [
+        {
+          clientId: 'rename-page',
+          type: 'update',
+          pageId: page.id,
+          title: 'Renamed',
+        },
+      ],
+    });
+    const plan = readPayload(planResult);
+    expect(plan).toMatchObject({
+      summary: { ready: 1, conflicts: 0, invalid: 0 },
+      requiresApproval: true,
+    });
+
+    const first = await service.call('apply_page_changes', {
+      planId: plan.planId,
+      idempotencyKey: 'rename-page-once',
+    });
+    const second = await service.call('apply_page_changes', {
+      planId: plan.planId,
+      idempotencyKey: 'rename-page-once',
+    });
+
+    expect(readPayload(first)).toMatchObject({
+      status: 'success',
+      summary: { succeeded: 1, failed: 0 },
+    });
+    expect(readPayload(second)).toEqual(readPayload(first));
+    expect(pageRepo.updatePage).toHaveBeenCalledTimes(1);
   });
 
   it('rejects page trees larger than 100 nodes before loading context', async () => {
@@ -241,7 +390,7 @@ describe('McpToolsService', () => {
 
     expect(result.isError).toBe(true);
     expect(readText(result)).toContain('[UNKNOWN_TOOL]');
-    expect(result.structuredContent).toEqual({
+    expect(result.structuredContent).toMatchObject({
       error: { code: 'UNKNOWN_TOOL', message: 'Unknown tool: missing_tool' },
     });
   });

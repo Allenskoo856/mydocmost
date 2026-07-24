@@ -59,3 +59,12 @@ export class McpSearchPagesDto {
   @Min(0)
   offset = 0;
 }
+
+export class McpGetPageDto {
+  @IsOptional()
+  @IsUUID()
+  workspaceId?: string;
+
+  @IsString()
+  pageId: string;
+}

@@ -10,6 +10,7 @@ import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { McpController } from './mcp.controller';
 import { McpAuthGuard } from './mcp-auth.guard';
 import { McpServerService } from './mcp-server.service';
+import { McpSessionStateService } from './mcp-session-state.service';
 import { EnvironmentService } from '../../integrations/environment/environment.service';
 
 const TOKEN = 'valid-token-32-chars-long-minimum';
@@ -32,7 +33,10 @@ describe('McpController transports', () => {
         structuredContent: { ok: true },
       }),
     };
-    const serverService = new McpServerService(toolsService as never);
+    const serverService = new McpServerService(
+      toolsService as never,
+      new McpSessionStateService(),
+    );
     const environmentService = {
       getMcpApiToken: jest.fn().mockReturnValue(TOKEN),
       getMcpAllowedOrigins: jest.fn().mockReturnValue(['http://127.0.0.1']),
