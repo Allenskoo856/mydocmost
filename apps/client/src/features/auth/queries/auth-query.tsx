@@ -19,8 +19,10 @@ export function useCollabToken(): UseQueryResult<ICollabToken, Error> {
     queryKey: ["collab-token"],
     queryFn: () => getCollabToken(),
     staleTime: 20 * 60 * 60 * 1000, //20hrs
-    //refetchInterval: 12 * 60 * 60 * 1000, // 12hrs
-    //refetchIntervalInBackground: true,
+    // Safe now: page-editor keeps the provider alive and only swaps the token
+    // via a ref, so a proactive refresh no longer rebuilds the collab editor.
+    refetchInterval: 12 * 60 * 60 * 1000, // 12hrs
+    refetchIntervalInBackground: true,
     refetchOnMount: true,
     //@ts-ignore
     retry: (failureCount, error) => {

@@ -10,7 +10,6 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import {
   HocuspocusProvider,
-  onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
 import {
@@ -107,12 +106,20 @@ export default function PageEditor({
   const ydoc = ydocRef.current;
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
-  const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
+  const [, setYjsConnectionStatus] = useAtom(
     yjsConnectionStatusAtom,
   );
   const menuContainerRef = useRef(null);
   const documentName = `page.${pageId}`;
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
+  // Keep the latest collab JWT in a ref so the provider can always authenticate
+  // with a fresh token without being recreated (recreation rebuilds the editor).
+  const collabTokenRef = useRef<string | undefined>(collabQuery?.token);
+  if (collabQuery?.token) {
+    collabTokenRef.current = collabQuery.token;
+  }
+  const isRefreshingTokenRef = useRef(false);
+  const authRefreshAttemptsRef = useRef(0);
   const { isIdle, resetIdle } = useIdle(FIVE_MINUTES, { initialState: false });
   const documentState = useDocumentVisibility();
   const { pageSlug } = useParams();
@@ -146,29 +153,55 @@ export default function PageEditor({
       name: documentName,
       url: collaborationURL,
       document: ydoc,
-      token: collabQuery?.token,
-      connect: true,
-      preserveConnection: false,
-      onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-        const payload = jwtDecode(collabQuery?.token);
-        const now = Date.now().valueOf() / 1000;
-        const isTokenExpired = now >= payload.exp;
-        if (isTokenExpired) {
-          refetchCollabToken().then((result) => {
-            if (result.data?.token) {
-              remote.disconnect();
-              setTimeout(() => {
-                remote.configuration.token = result.data.token;
-                remote.connect();
-              }, 100);
-            }
-          });
+      // Resolve the token at auth time. Creating the provider with a stale or
+      // missing token (common on first paint) used to permanently stop reconnects
+      // after Hocuspocus denied authentication (shouldConnect = false).
+      token: async () => {
+        if (!collabTokenRef.current) {
+          throw new Error("Collab token is not ready");
         }
+        return collabTokenRef.current;
+      },
+      // Connect only after a token is available (see visibility/token effect).
+      connect: false,
+      preserveConnection: false,
+      onAuthenticationFailed: () => {
+        // Auth failure always closes the socket with shouldConnect=false.
+        // Refresh the JWT and reconnect, regardless of why auth failed
+        // (missing token, expired token, or server-side rejection). Cap retries
+        // so a permanently invalid session does not hammer /auth/collab-token.
+        if (isRefreshingTokenRef.current) {
+          return;
+        }
+        if (authRefreshAttemptsRef.current >= 5) {
+          setYjsConnectionStatus(WebSocketStatus.Disconnected);
+          return;
+        }
+        isRefreshingTokenRef.current = true;
+        authRefreshAttemptsRef.current += 1;
+        setYjsConnectionStatus(WebSocketStatus.Disconnected);
+        void refetchCollabToken()
+          .then((result) => {
+            const nextToken = result.data?.token;
+            if (!nextToken) {
+              return;
+            }
+            collabTokenRef.current = nextToken;
+            setTimeout(() => {
+              remote.connect();
+            }, 150);
+          })
+          .finally(() => {
+            isRefreshingTokenRef.current = false;
+          });
       },
       onStatus: (status) => {
-        if (status.status === "connected") {
-          setYjsConnectionStatus(status.status);
+        // Mirror every provider status so the header "lost signal" icon stays
+        // accurate during reconnects (not only the connected state).
+        if (status.status === WebSocketStatus.Connected) {
+          authRefreshAttemptsRef.current = 0;
         }
+        setYjsConnectionStatus(status.status);
       },
     });
     remote.on("synced", ({ state }) => setRemoteSynced(state));
@@ -220,6 +253,11 @@ export default function PageEditor({
     };
   }, [providers]);
 
+  // Clear the global connection badge when leaving the editor page.
+  useEffect(() => {
+    return () => setYjsConnectionStatus("");
+  }, [setYjsConnectionStatus]);
+
   /*
   useEffect(() => {
     // Handle token updates by reconnecting with new token
@@ -235,13 +273,42 @@ export default function PageEditor({
   }, [collabQuery?.token]);
    */
 
-  // Only connect/disconnect on tab/idle, not destroy
+  // Proactively refresh the collab JWT ~1 hour before expiry so long editing
+  // sessions do not hit an auth wall mid-edit.
+  useEffect(() => {
+    if (!collabQuery?.token) {
+      return;
+    }
+
+    try {
+      const payload = jwtDecode<{ exp?: number }>(collabQuery.token);
+      if (!payload.exp) {
+        return;
+      }
+
+      const msUntilExpiry = payload.exp * 1000 - Date.now();
+      // Refresh 1h before expiry; if already closer than that, refresh soon.
+      const refreshIn = Math.max(msUntilExpiry - 60 * 60 * 1000, 30_000);
+      const timer = window.setTimeout(() => {
+        void refetchCollabToken();
+      }, refreshIn);
+
+      return () => window.clearTimeout(timer);
+    } catch {
+      return;
+    }
+  }, [collabQuery?.token, refetchCollabToken]);
+
+  // Connect once a token is ready; disconnect only when the tab is both idle
+  // and hidden. Destroy still happens in the unmount cleanup above.
   useEffect(() => {
     if (!remoteProvider) return;
+    if (!collabTokenRef.current) return;
+
     if (
       isIdle &&
       documentState === "hidden" &&
-      remoteProvider.status === WebSocketStatus.Connected
+      remoteProvider.status !== WebSocketStatus.Disconnected
     ) {
       remoteProvider.disconnect();
       return;
@@ -253,7 +320,7 @@ export default function PageEditor({
       resetIdle();
       remoteProvider.connect();
     }
-  }, [isIdle, documentState, remoteProvider, resetIdle]);
+  }, [isIdle, documentState, remoteProvider, resetIdle, collabQuery?.token]);
 
   const extensions = useMemo(() => {
     if (!remoteProvider || !currentUser?.user) return baseExtensions;
@@ -391,8 +458,27 @@ export default function PageEditor({
   useEffect(() => {
     if (remoteProvider?.status === WebSocketStatus.Connecting) {
       const timeout = setTimeout(() => {
+        // Stuck in "connecting" usually means the socket never opened or the
+        // auth handshake hung. Force a clean reconnect instead of only flipping
+        // the UI badge.
+        if (remoteProvider.status !== WebSocketStatus.Connecting) {
+          return;
+        }
         setYjsConnectionStatus(WebSocketStatus.Disconnected);
-      }, 5000);
+        try {
+          remoteProvider.disconnect();
+        } catch {
+          // ignore
+        }
+        if (!collabTokenRef.current) {
+          return;
+        }
+        window.setTimeout(() => {
+          if (document.visibilityState === "visible") {
+            remoteProvider.connect();
+          }
+        }, 250);
+      }, 8000);
       return () => clearTimeout(timeout);
     }
   }, [remoteProvider?.status]);
