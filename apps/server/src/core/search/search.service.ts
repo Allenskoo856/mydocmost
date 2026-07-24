@@ -7,9 +7,20 @@ import { sql } from 'kysely';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 import { ShareRepo } from '@docmost/db/repos/share/share.repo';
+import {
+  SEARCH_TEXT_INDEX_CHARS,
+  buildSubstringHighlight,
+  clampSearchLimit,
+  normalizeHighlight,
+  prepareSearchQuery,
+} from './utils/search-query.util';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const tsquery = require('pg-tsquery')();
+type HybridSearchRow = SearchResponseDto & {
+  titleMatch?: number | string | boolean | null;
+  ftsRank?: number | null;
+  bodySnippet?: string | null;
+  ftsHighlight?: string | null;
+};
 
 @Injectable()
 export class SearchService {
@@ -27,12 +38,28 @@ export class SearchService {
       workspaceId: string;
     },
   ): Promise<SearchResponseDto[]> {
-    const { query } = searchParams;
-
-    if (query.length < 1) {
-      return;
+    const prepared = prepareSearchQuery(searchParams.query);
+    if (!prepared.ok) {
+      return [];
     }
-    const searchQuery = tsquery(query.trim() + '*');
+
+    const { query, ilikePattern, tsQuery } = prepared;
+    const limit = clampSearchLimit(searchParams.limit);
+    const offset = searchParams.offset || 0;
+
+    // Hybrid match expressions must stay aligned with trgm indexes:
+    // pages_title_trgm_idx / pages_text_content_trgm_idx
+    const titleMatchExpr = sql<boolean>`
+      f_unaccent(coalesce(pages.title, ''))
+      ILIKE f_unaccent(${ilikePattern}) ESCAPE '!'
+    `;
+    const bodyMatchExpr = sql<boolean>`
+      f_unaccent(left(coalesce(pages.text_content, ''), ${sql.lit(SEARCH_TEXT_INDEX_CHARS)}))
+      ILIKE f_unaccent(${ilikePattern}) ESCAPE '!'
+    `;
+    const ftsMatchExpr = tsQuery
+      ? sql<boolean>`pages.tsv @@ to_tsquery('english', f_unaccent(${tsQuery}))`
+      : null;
 
     let queryResults = this.db
       .selectFrom('pages')
@@ -50,18 +77,39 @@ export class SearchService {
         'propertyPriority',
         'propertyDueAt',
         'propertyTags',
-        sql<number>`ts_rank(tsv, to_tsquery('english', f_unaccent(${searchQuery})))`.as(
-          'rank',
+        // Cheap window around first case-insensitive match; avoids shipping full body.
+        sql<string>`
+          case
+            when strpos(lower(coalesce(pages.text_content, '')), lower(${query})) > 0 then
+              substring(
+                coalesce(pages.text_content, '')
+                from greatest(1, strpos(lower(coalesce(pages.text_content, '')), lower(${query})) - 40)
+                for 120
+              )
+            else null
+          end
+        `.as('bodySnippet'),
+        sql<number>`case when ${titleMatchExpr} then 1 else 0 end`.as(
+          'titleMatch',
         ),
-        sql<string>`ts_headline('english', text_content, to_tsquery('english', f_unaccent(${searchQuery})),'MinWords=9, MaxWords=10, MaxFragments=3')`.as(
-          'highlight',
-        ),
+        tsQuery
+          ? sql<number>`ts_rank(pages.tsv, to_tsquery('english', f_unaccent(${tsQuery})))`.as(
+              'ftsRank',
+            )
+          : sql<number>`0`.as('ftsRank'),
+        tsQuery
+          ? sql<string>`ts_headline('english', coalesce(pages.text_content, ''), to_tsquery('english', f_unaccent(${tsQuery})),'MinWords=9, MaxWords=10, MaxFragments=3')`.as(
+              'ftsHighlight',
+            )
+          : sql<string>`null`.as('ftsHighlight'),
       ])
-      .where(
-        'tsv',
-        '@@',
-        sql<string>`to_tsquery('english', f_unaccent(${searchQuery}))`,
-      )
+      .where((eb) => {
+        const conditions = [titleMatchExpr, bodyMatchExpr];
+        if (ftsMatchExpr) {
+          conditions.push(ftsMatchExpr);
+        }
+        return eb.or(conditions);
+      })
       .$if(Boolean(searchParams.creatorId), (qb) =>
         qb.where('creatorId', '=', searchParams.creatorId),
       )
@@ -75,9 +123,11 @@ export class SearchService {
         qb.where('propertyOwnerId', 'in', searchParams.ownerIds),
       )
       .where('deletedAt', 'is', null)
-      .orderBy('rank', 'desc')
-      .limit(searchParams.limit | 25)
-      .offset(searchParams.offset || 0);
+      .orderBy('titleMatch', 'desc')
+      .orderBy('ftsRank', 'desc')
+      .orderBy('updatedAt', 'desc')
+      .limit(limit)
+      .offset(offset);
 
     if (searchParams.tags?.length) {
       const normalizedTags = searchParams.tags
@@ -159,20 +209,38 @@ export class SearchService {
       return [];
     }
 
-    //@ts-ignore
-    queryResults = await queryResults.execute();
+    const rows = (await queryResults.execute()) as unknown as HybridSearchRow[];
 
-    //@ts-ignore
-    const searchResults = queryResults.map((result: SearchResponseDto) => {
-      if (result.highlight) {
-        result.highlight = result.highlight
-          .replace(/\r\n|\r|\n/g, ' ')
-          .replace(/\s+/g, ' ');
+    return rows.map((result) => {
+      const titleMatch = Number(result.titleMatch) === 1;
+      const ftsRank = Number(result.ftsRank) || 0;
+      let highlight = normalizeHighlight(result.ftsHighlight);
+
+      if (!highlight) {
+        highlight = buildSubstringHighlight(result.bodySnippet, query);
       }
-      return result;
-    });
+      if (!highlight && titleMatch) {
+        highlight = buildSubstringHighlight(result.title, query);
+      }
 
-    return searchResults;
+      // Prefer title hits in the exposed rank so clients that sort client-side
+      // still surface Chinese title matches above weak FTS scores.
+      const rank = titleMatch ? Math.max(ftsRank, 1) + 10 : ftsRank > 0 ? ftsRank : 1;
+
+      const {
+        titleMatch: _titleMatch,
+        ftsRank: _ftsRank,
+        bodySnippet: _bodySnippet,
+        ftsHighlight: _ftsHighlight,
+        ...rest
+      } = result;
+
+      return {
+        ...rest,
+        rank,
+        highlight,
+      } as SearchResponseDto;
+    });
   }
 
   async searchSuggestions(
