@@ -1,23 +1,35 @@
 import { Spotlight } from "@mantine/spotlight";
 import { IconSearch } from "@tabler/icons-react";
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useTranslation } from "react-i18next";
+import { Group, Kbd, Text } from "@mantine/core";
 import { searchSpotlightStore } from "../constants.ts";
 import { SearchSpotlightFilters } from "./search-spotlight-filters.tsx";
 import { useUnifiedSearch } from "../hooks/use-unified-search.ts";
 import { SearchResultItem } from "./search-result-item.tsx";
 import { isCloud } from "@/lib/config.ts";
-
-// EE功能已移除 - AI搜索不可用
+import {
+  filterCommands,
+  useCommandPaletteActions,
+} from "@/features/search/hooks/use-command-palette-actions";
+import type { CommandGroupId } from "@/features/search/commands/types";
 
 interface SearchSpotlightProps {
   spaceId?: string;
 }
+
+const GROUP_ORDER: CommandGroupId[] = ["page", "agent", "navigation"];
+
 export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [debouncedSearchQuery] = useDebouncedValue(query, 300);
+  const commands = useCommandPaletteActions();
+  const filteredCommands = useMemo(
+    () => filterCommands(commands, query),
+    [commands, query],
+  );
   const [filters, setFilters] = useState<{
     spaceId?: string | null;
     contentType?: string;
@@ -33,7 +45,6 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
     contentType: "page",
   });
 
-  // Build unified search params
   const searchParams = useMemo(() => {
     const params: any = {
       query: debouncedSearchQuery,
@@ -64,7 +75,6 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
 
   const { data: searchResults, isLoading } = useUnifiedSearch(searchParams);
 
-  // Determine result type for rendering
   const isAttachmentSearch =
     filters.contentType === "attachment" && isCloud();
 
@@ -81,6 +91,28 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
     setFilters(newFilters);
   };
 
+  const groupLabel = (group: CommandGroupId) => {
+    switch (group) {
+      case "page":
+        return t("Page actions");
+      case "agent":
+        return t("Agent");
+      case "navigation":
+        return t("Navigation");
+      default:
+        return group;
+    }
+  };
+
+  const hasQuery = query.trim().length > 0;
+  const showSearchSection = hasQuery;
+  const showCommandSection = filteredCommands.length > 0;
+  const noResults =
+    hasQuery &&
+    !isLoading &&
+    filteredCommands.length === 0 &&
+    resultItems.length === 0;
+
   return (
     <>
       <Spotlight.Root
@@ -95,34 +127,98 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
         }}
       >
         <Spotlight.Search
-          placeholder={t("Search...")}
+          placeholder={t("Search pages or type a command...")}
           leftSection={<IconSearch size={20} stroke={1.5} />}
           px="sm"
           pt="sm"
           pb="xs"
         />
 
-        <div
-          style={{
-            padding: "4px 16px",
-          }}
-        >
-          <SearchSpotlightFilters
-            onFiltersChange={handleFiltersChange}
-            spaceId={spaceId}
-          />
-        </div>
+        {hasQuery && (
+          <div
+            style={{
+              padding: "4px 16px",
+            }}
+          >
+            <SearchSpotlightFilters
+              onFiltersChange={handleFiltersChange}
+              spaceId={spaceId}
+            />
+          </div>
+        )}
 
         <Spotlight.ActionsList>
-          {query.length === 0 && resultItems.length === 0 && (
-            <Spotlight.Empty>{t("Start typing to search...")}</Spotlight.Empty>
+          {!hasQuery && filteredCommands.length === 0 && (
+            <Spotlight.Empty>
+              {t("Type to search pages or run a command")}
+            </Spotlight.Empty>
           )}
 
-          {query.length > 0 && !isLoading && resultItems.length === 0 && (
+          {showCommandSection &&
+            GROUP_ORDER.map((group) => {
+              const items = filteredCommands.filter(
+                (command) => command.group === group,
+              );
+              if (items.length === 0) {
+                return null;
+              }
+
+              return (
+                <Spotlight.ActionsGroup label={groupLabel(group)} key={group}>
+                  {items.map((command) => (
+                    <Spotlight.Action
+                      key={command.id}
+                      label={command.label}
+                      description={command.description}
+                      keywords={command.keywords}
+                      leftSection={command.icon}
+                      rightSection={
+                        command.shortcut ? (
+                          <Text size="xs" c="dimmed">
+                            {command.shortcut.replace("Mod+", "⌘")}
+                          </Text>
+                        ) : undefined
+                      }
+                      onClick={() => {
+                        void command.perform();
+                      }}
+                    />
+                  ))}
+                </Spotlight.ActionsGroup>
+              );
+            })}
+
+          {showSearchSection && resultItems.length > 0 && (
+            <Spotlight.ActionsGroup label={t("Pages")}>
+              {resultItems}
+            </Spotlight.ActionsGroup>
+          )}
+
+          {showSearchSection &&
+            !isLoading &&
+            resultItems.length === 0 &&
+            filteredCommands.length > 0 && (
+              <Spotlight.Empty>{t("No page results...")}</Spotlight.Empty>
+            )}
+
+          {noResults && (
             <Spotlight.Empty>{t("No results found...")}</Spotlight.Empty>
           )}
 
-          {resultItems.length > 0 && <>{resultItems}</>}
+          {!hasQuery && (
+            <Group px="sm" pb="sm" justify="space-between">
+              <Text size="xs" c="dimmed">
+                {t("Tip: copy Agent context for MCP tools")}
+              </Text>
+              <Group gap={4}>
+                <Kbd size="xs">↑</Kbd>
+                <Kbd size="xs">↓</Kbd>
+                <Text size="xs" c="dimmed">
+                  {t("to navigate")}
+                </Text>
+              </Group>
+            </Group>
+          )}
         </Spotlight.ActionsList>
       </Spotlight.Root>
     </>

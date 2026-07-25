@@ -12,7 +12,7 @@ import {
   IconSearch,
   IconTrash,
 } from "@tabler/icons-react";
-import React from "react";
+import React, { useEffect } from "react";
 import useToggleAside from "@/hooks/use-toggle-aside.tsx";
 import { useAtom } from "jotai";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
@@ -157,6 +157,21 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
   const handleDeletePage = () => {
     openDeleteModal({ onConfirm: () => tree?.delete(page.id) });
   };
+
+  // Command palette can open the same page modals without duplicating UI state.
+  useEffect(() => {
+    const onExport = () => openExportModal();
+    const onMove = () => openMovePageModal();
+    const onDelete = () => handleDeletePage();
+    document.addEventListener("openPageExportModal", onExport);
+    document.addEventListener("openPageMoveModal", onMove);
+    document.addEventListener("openPageDeleteModal", onDelete);
+    return () => {
+      document.removeEventListener("openPageExportModal", onExport);
+      document.removeEventListener("openPageMoveModal", onMove);
+      document.removeEventListener("openPageDeleteModal", onDelete);
+    };
+  }, [page?.id, tree]);
 
   return (
     <>
