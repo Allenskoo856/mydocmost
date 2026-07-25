@@ -1,0 +1,174 @@
+import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
+import {
+  IconCloudCheck,
+  IconCloudOff,
+  IconCloudUpload,
+  IconRefresh,
+  IconWifiOff,
+} from "@tabler/icons-react";
+import { useAtom } from "jotai";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  collabReconnectAttemptAtom,
+  collabSyncStatusAtom,
+  yjsConnectionStatusAtom,
+  type CollabConnectionStatus,
+  type CollabSyncStatus,
+} from "@/features/editor/atoms/editor-atoms";
+
+interface CollabStatusIndicatorProps {
+  onRetry?: () => void;
+}
+
+function connectionLabel(
+  status: CollabConnectionStatus,
+  attempt: number,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  switch (status) {
+    case "connecting":
+      return t("Connecting to real-time editor...");
+    case "reconnecting":
+      return attempt > 0
+        ? t("Reconnecting to real-time editor (attempt {{count}})...", {
+            count: attempt,
+          })
+        : t("Reconnecting to real-time editor...");
+    case "disconnected":
+      return t("Real-time editor connection lost. Retrying...");
+    case "auth_failed":
+      return t("Editor session expired. Refresh the page to continue.");
+    case "connected":
+      return t("Real-time editor connected");
+    default:
+      return "";
+  }
+}
+
+function syncLabel(
+  status: CollabSyncStatus,
+  t: (key: string) => string,
+): string {
+  switch (status) {
+    case "saving":
+      return t("Saving changes...");
+    case "offline_pending":
+      return t("Unsynced changes. Will upload when reconnected.");
+    case "synced":
+      return t("All changes synced");
+    default:
+      return "";
+  }
+}
+
+export default function CollabStatusIndicator({
+  onRetry,
+}: CollabStatusIndicatorProps) {
+  const { t } = useTranslation();
+  const [connectionStatus] = useAtom(yjsConnectionStatusAtom);
+  const [syncStatus] = useAtom(collabSyncStatusAtom);
+  const [reconnectAttempt] = useAtom(collabReconnectAttemptAtom);
+  const [showSyncedBadge, setShowSyncedBadge] = useState(false);
+
+  useEffect(() => {
+    if (syncStatus !== "synced" || connectionStatus !== "connected") {
+      setShowSyncedBadge(false);
+      return;
+    }
+    setShowSyncedBadge(true);
+    const timer = window.setTimeout(() => setShowSyncedBadge(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [syncStatus, connectionStatus]);
+
+  if (!connectionStatus || connectionStatus === "connected") {
+    // Connected: only show sync posture when there is something to say.
+    if (syncStatus === "saving") {
+      return (
+        <Tooltip label={syncLabel(syncStatus, t)} openDelay={150} withArrow>
+          <Group gap={4} wrap="nowrap" style={{ cursor: "default" }}>
+            <IconCloudUpload size={18} stroke={2} color="var(--mantine-color-blue-6)" />
+            <Text size="xs" c="dimmed" visibleFrom="sm">
+              {t("Saving...")}
+            </Text>
+          </Group>
+        </Tooltip>
+      );
+    }
+
+    if (syncStatus === "offline_pending") {
+      return (
+        <Tooltip label={syncLabel(syncStatus, t)} openDelay={150} withArrow>
+          <Group gap={4} wrap="nowrap" style={{ cursor: "default" }}>
+            <IconCloudOff size={18} stroke={2} color="var(--mantine-color-orange-6)" />
+            <Text size="xs" c="orange" visibleFrom="sm">
+              {t("Unsynced")}
+            </Text>
+          </Group>
+        </Tooltip>
+      );
+    }
+
+    if (syncStatus === "synced" && showSyncedBadge) {
+      return (
+        <Tooltip label={syncLabel(syncStatus, t)} openDelay={250} withArrow>
+          <Group gap={4} wrap="nowrap" style={{ cursor: "default" }}>
+            <IconCloudCheck size={18} stroke={2} color="var(--mantine-color-green-6)" />
+            <Text size="xs" c="dimmed" visibleFrom="md">
+              {t("Synced")}
+            </Text>
+          </Group>
+        </Tooltip>
+      );
+    }
+
+    return null;
+  }
+
+  const label = connectionLabel(connectionStatus, reconnectAttempt, t);
+  const isAuthFailed = connectionStatus === "auth_failed";
+  const isConnecting =
+    connectionStatus === "connecting" || connectionStatus === "reconnecting";
+  const Icon = isAuthFailed
+    ? IconWifiOff
+    : isConnecting
+      ? IconRefresh
+      : IconWifiOff;
+
+  return (
+    <Tooltip label={label} openDelay={100} withArrow>
+      <Group gap={4} wrap="nowrap">
+        <ActionIcon
+          variant="default"
+          c={isAuthFailed ? "red" : isConnecting ? "yellow.8" : "red"}
+          style={{ border: "none" }}
+          onClick={() => {
+            if (isAuthFailed) {
+              window.location.reload();
+              return;
+            }
+            onRetry?.();
+          }}
+          aria-label={label}
+        >
+          <Icon
+            size={20}
+            stroke={2}
+            style={
+              isConnecting
+                ? { animation: "collab-status-spin 1s linear infinite" }
+                : undefined
+            }
+          />
+        </ActionIcon>
+        <Text size="xs" c={isAuthFailed ? "red" : "dimmed"} visibleFrom="sm" lineClamp={1}>
+          {isAuthFailed
+            ? t("Session expired")
+            : isConnecting
+              ? t("Connecting...")
+              : t("Reconnecting...")}
+        </Text>
+      </Group>
+    </Tooltip>
+  );
+}

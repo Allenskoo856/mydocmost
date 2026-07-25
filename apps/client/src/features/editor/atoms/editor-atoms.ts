@@ -16,7 +16,33 @@ export const readOnlyEditorAtom = atom<Editor | null>(
   null,
 ) as PrimitiveAtom<Editor | null>;
 
-export const yjsConnectionStatusAtom = atom<string>("");
+/** Collaborative websocket lifecycle shown in the page header. */
+export type CollabConnectionStatus =
+  | ""
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "disconnected"
+  | "auth_failed";
+
+/**
+ * Document sync posture relative to the collab server.
+ * - idle: not in a collab editor
+ * - synced: fully flushed
+ * - saving: connected with outbound changes still in flight
+ * - offline_pending: local edits exist while the socket is down
+ */
+export type CollabSyncStatus =
+  | "idle"
+  | "synced"
+  | "saving"
+  | "offline_pending";
+
+export const yjsConnectionStatusAtom = atom<CollabConnectionStatus>("");
+export const collabSyncStatusAtom = atom<CollabSyncStatus>("idle");
+export const collabReconnectAttemptAtom = atom(0);
+/** Increment to request an immediate collab reconnect from PageEditor. */
+export const collabRetryRequestAtom = atom(0);
 
 // Set when a user whose default page mode is "read" clicks "Edit" on a page.
 // Upgrades the static read view to the full collaborative editor. Reset on

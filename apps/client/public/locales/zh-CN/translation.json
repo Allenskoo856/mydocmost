@@ -607,5 +607,20 @@
   "Highlight color": "突出显示颜色",
   "Remove color": "移除颜色",
   "Close": "关闭",
-  "Close table of contents": "关闭目录"
+  "Close table of contents": "关闭目录",
+  "Connecting to real-time editor...": "正在连接实时编辑…",
+  "Reconnecting to real-time editor...": "实时编辑连接中断，正在重连…",
+  "Reconnecting to real-time editor (attempt {{count}})...": "实时编辑连接中断，正在重连（第 {{count}} 次）…",
+  "Editor session expired. Refresh the page to continue.": "编辑会话已失效，请刷新页面后继续。",
+  "Real-time editor connected": "实时编辑已连接",
+  "Saving changes...": "正在保存更改…",
+  "Unsynced changes. Will upload when reconnected.": "有未同步更改，恢复连接后将自动上传。",
+  "All changes synced": "所有更改已同步",
+  "Saving...": "保存中…",
+  "Unsynced": "未同步",
+  "Synced": "已同步",
+  "Session expired": "会话失效",
+  "Connecting...": "连接中…",
+  "Reconnecting...": "重连中…",
+  "Loading editor...": "正在加载编辑器…"
 }

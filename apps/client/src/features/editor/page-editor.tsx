@@ -28,6 +28,9 @@ import { useAtom } from "jotai";
 import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
 import {
+  collabReconnectAttemptAtom,
+  collabRetryRequestAtom,
+  collabSyncStatusAtom,
   pageEditorAtom,
   pageForceEditAtom,
   yjsConnectionStatusAtom,
@@ -106,9 +109,10 @@ export default function PageEditor({
   const ydoc = ydocRef.current;
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
-  const [, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom,
-  );
+  const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
+  const [, setCollabSyncStatus] = useAtom(collabSyncStatusAtom);
+  const [, setCollabReconnectAttempt] = useAtom(collabReconnectAttemptAtom);
+  const [collabRetryRequest] = useAtom(collabRetryRequestAtom);
   const menuContainerRef = useRef(null);
   const documentName = `page.${pageId}`;
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
@@ -120,6 +124,8 @@ export default function PageEditor({
   }
   const isRefreshingTokenRef = useRef(false);
   const authRefreshAttemptsRef = useRef(0);
+  const hasConnectedOnceRef = useRef(false);
+  const hasUnsyncedChangesRef = useRef(false);
   const { isIdle, resetIdle } = useIdle(FIVE_MINUTES, { initialState: false });
   const documentState = useDocumentVisibility();
   const { pageSlug } = useParams();
@@ -174,16 +180,19 @@ export default function PageEditor({
           return;
         }
         if (authRefreshAttemptsRef.current >= 5) {
-          setYjsConnectionStatus(WebSocketStatus.Disconnected);
+          setYjsConnectionStatus("auth_failed");
+          setCollabReconnectAttempt(authRefreshAttemptsRef.current);
           return;
         }
         isRefreshingTokenRef.current = true;
         authRefreshAttemptsRef.current += 1;
-        setYjsConnectionStatus(WebSocketStatus.Disconnected);
+        setCollabReconnectAttempt(authRefreshAttemptsRef.current);
+        setYjsConnectionStatus("reconnecting");
         void refetchCollabToken()
           .then((result) => {
             const nextToken = result.data?.token;
             if (!nextToken) {
+              setYjsConnectionStatus("auth_failed");
               return;
             }
             collabTokenRef.current = nextToken;
@@ -196,17 +205,60 @@ export default function PageEditor({
           });
       },
       onStatus: (status) => {
-        // Mirror every provider status so the header "lost signal" icon stays
-        // accurate during reconnects (not only the connected state).
+        // Map provider statuses into a user-facing connection state machine.
         if (status.status === WebSocketStatus.Connected) {
+          hasConnectedOnceRef.current = true;
           authRefreshAttemptsRef.current = 0;
+          setCollabReconnectAttempt(0);
+          setYjsConnectionStatus("connected");
+          setCollabSyncStatus(
+            hasUnsyncedChangesRef.current ? "saving" : "synced",
+          );
+          return;
         }
-        setYjsConnectionStatus(status.status);
+
+        if (status.status === WebSocketStatus.Connecting) {
+          setYjsConnectionStatus(
+            hasConnectedOnceRef.current ? "reconnecting" : "connecting",
+          );
+          return;
+        }
+
+        if (status.status === WebSocketStatus.Disconnected) {
+          setYjsConnectionStatus(
+            hasConnectedOnceRef.current ? "reconnecting" : "disconnected",
+          );
+          if (hasUnsyncedChangesRef.current) {
+            setCollabSyncStatus("offline_pending");
+          }
+        }
       },
     });
-    remote.on("synced", ({ state }) => setRemoteSynced(state));
+    remote.on("synced", ({ state }) => {
+      setRemoteSynced(state);
+      if (state) {
+        hasUnsyncedChangesRef.current = false;
+        if (remote.status === WebSocketStatus.Connected) {
+          setCollabSyncStatus("synced");
+        }
+      }
+    });
+    remote.on("unsyncedChanges", (count: number) => {
+      const pending = count > 0;
+      hasUnsyncedChangesRef.current = pending;
+      if (remote.status === WebSocketStatus.Connected) {
+        setCollabSyncStatus(pending ? "saving" : "synced");
+      } else if (pending) {
+        setCollabSyncStatus("offline_pending");
+      }
+    });
     remote.on("disconnect", () => {
-      setYjsConnectionStatus(WebSocketStatus.Disconnected);
+      setYjsConnectionStatus(
+        hasConnectedOnceRef.current ? "reconnecting" : "disconnected",
+      );
+      if (hasUnsyncedChangesRef.current) {
+        setCollabSyncStatus("offline_pending");
+      }
     });
 
     return { local, remote };
@@ -253,10 +305,41 @@ export default function PageEditor({
     };
   }, [providers]);
 
-  // Clear the global connection badge when leaving the editor page.
+  // Clear the global connection / sync badges when leaving the editor page.
   useEffect(() => {
-    return () => setYjsConnectionStatus("");
-  }, [setYjsConnectionStatus]);
+    return () => {
+      setYjsConnectionStatus("");
+      setCollabSyncStatus("idle");
+      setCollabReconnectAttempt(0);
+    };
+  }, [setYjsConnectionStatus, setCollabSyncStatus, setCollabReconnectAttempt]);
+
+  // Manual retry from the header status indicator.
+  useEffect(() => {
+    if (!collabRetryRequest || !remoteProvider) {
+      return;
+    }
+    if (!collabTokenRef.current) {
+      return;
+    }
+    setYjsConnectionStatus(
+      hasConnectedOnceRef.current ? "reconnecting" : "connecting",
+    );
+    setCollabReconnectAttempt((n) => n + 1);
+    try {
+      remoteProvider.disconnect();
+    } catch {
+      // ignore
+    }
+    window.setTimeout(() => {
+      remoteProvider.connect();
+    }, 150);
+  }, [
+    collabRetryRequest,
+    remoteProvider,
+    setYjsConnectionStatus,
+    setCollabReconnectAttempt,
+  ]);
 
   /*
   useEffect(() => {
@@ -464,7 +547,10 @@ export default function PageEditor({
         if (remoteProvider.status !== WebSocketStatus.Connecting) {
           return;
         }
-        setYjsConnectionStatus(WebSocketStatus.Disconnected);
+        setYjsConnectionStatus(
+          hasConnectedOnceRef.current ? "reconnecting" : "disconnected",
+        );
+        setCollabReconnectAttempt((n) => n + 1);
         try {
           remoteProvider.disconnect();
         } catch {
@@ -481,7 +567,7 @@ export default function PageEditor({
       }, 8000);
       return () => clearTimeout(timeout);
     }
-  }, [remoteProvider?.status]);
+  }, [remoteProvider?.status, setYjsConnectionStatus, setCollabReconnectAttempt]);
 
   // forceEdit (clicking "Edit" in static read mode) overrides the read
   // preference.

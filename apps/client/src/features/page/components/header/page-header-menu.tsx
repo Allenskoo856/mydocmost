@@ -11,7 +11,6 @@ import {
   IconPrinter,
   IconSearch,
   IconTrash,
-  IconWifiOff,
 } from "@tabler/icons-react";
 import React from "react";
 import useToggleAside from "@/hooks/use-toggle-aside.tsx";
@@ -36,9 +35,10 @@ import { PageWidthToggle } from "@/features/user/components/page-width-pref.tsx"
 import { Trans, useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import {
+  collabRetryRequestAtom,
   pageEditorAtom,
-  yjsConnectionStatusAtom,
 } from "@/features/editor/atoms/editor-atoms.ts";
+import CollabStatusIndicator from "@/features/editor/components/collab-status-indicator";
 import { searchAndReplaceStateAtom } from "@/features/editor/components/search-and-replace/atoms/search-and-replace-state-atom.ts";
 import { formattedDate, timeAgo } from "@/lib/time.ts";
 import { PageStateSegmentedControl } from "@/features/user/components/page-state-pref.tsx";
@@ -53,7 +53,7 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
   const { t } = useTranslation();
   const toggleAside = useToggleAside();
   const [{ tab: asideTab, isAsideOpen }] = useAtom(asideStateAtom);
-  const [yjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
+  const [, setCollabRetryRequest] = useAtom(collabRetryRequestAtom);
   const isTocOpen = isAsideOpen && asideTab === "toc";
   const isCommentsOpen = isAsideOpen && asideTab === "comments";
 
@@ -79,17 +79,9 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
 
   return (
     <>
-      {yjsConnectionStatus === "disconnected" && (
-        <Tooltip
-          label={t("Real-time editor connection lost. Retrying...")}
-          openDelay={250}
-          withArrow
-        >
-          <ActionIcon variant="default" c="red" style={{ border: "none" }}>
-            <IconWifiOff size={20} stroke={2} />
-          </ActionIcon>
-        </Tooltip>
-      )}
+      <CollabStatusIndicator
+        onRetry={() => setCollabRetryRequest((n) => n + 1)}
+      />
 
       {!readOnly && <PageStateSegmentedControl size="xs" />}
 

@@ -607,5 +607,20 @@
   "Highlight color": "Highlight color",
   "Remove color": "Remove color",
   "Close": "Close",
-  "Close table of contents": "Close table of contents"
+  "Close table of contents": "Close table of contents",
+  "Connecting to real-time editor...": "Connecting to real-time editor...",
+  "Reconnecting to real-time editor...": "Reconnecting to real-time editor...",
+  "Reconnecting to real-time editor (attempt {{count}})...": "Reconnecting to real-time editor (attempt {{count}})...",
+  "Editor session expired. Refresh the page to continue.": "Editor session expired. Refresh the page to continue.",
+  "Real-time editor connected": "Real-time editor connected",
+  "Saving changes...": "Saving changes...",
+  "Unsynced changes. Will upload when reconnected.": "Unsynced changes. Will upload when reconnected.",
+  "All changes synced": "All changes synced",
+  "Saving...": "Saving...",
+  "Unsynced": "Unsynced",
+  "Synced": "Synced",
+  "Session expired": "Session expired",
+  "Connecting...": "Connecting...",
+  "Reconnecting...": "Reconnecting...",
+  "Loading editor...": "Loading editor..."
 }
