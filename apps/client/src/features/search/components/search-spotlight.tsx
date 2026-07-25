@@ -3,7 +3,7 @@ import { IconSearch } from "@tabler/icons-react";
 import React, { useMemo, useState } from "react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useTranslation } from "react-i18next";
-import { Group, Kbd, Text } from "@mantine/core";
+import { Text } from "@mantine/core";
 import { searchSpotlightStore } from "../constants.ts";
 import { SearchSpotlightFilters } from "./search-spotlight-filters.tsx";
 import { useUnifiedSearch } from "../hooks/use-unified-search.ts";
@@ -211,21 +211,6 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
 
           {noResults && (
             <Spotlight.Empty>{t("No results found...")}</Spotlight.Empty>
-          )}
-
-          {!hasQuery && (
-            <Group px="sm" pb="sm" justify="space-between">
-              <Text size="xs" c="dimmed">
-                {t("Tip: copy Agent context for MCP tools")}
-              </Text>
-              <Group gap={4}>
-                <Kbd size="xs">↑</Kbd>
-                <Kbd size="xs">↓</Kbd>
-                <Text size="xs" c="dimmed">
-                  {t("to navigate")}
-                </Text>
-              </Group>
-            </Group>
           )}
         </Spotlight.ActionsList>
       </Spotlight.Root>

@@ -1,13 +1,11 @@
-import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Tooltip } from "@mantine/core";
 import {
-  IconCloudCheck,
   IconCloudOff,
   IconCloudUpload,
   IconRefresh,
   IconWifiOff,
 } from "@tabler/icons-react";
 import { useAtom } from "jotai";
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   collabReconnectAttemptAtom,
@@ -69,29 +67,20 @@ export default function CollabStatusIndicator({
   const [connectionStatus] = useAtom(yjsConnectionStatusAtom);
   const [syncStatus] = useAtom(collabSyncStatusAtom);
   const [reconnectAttempt] = useAtom(collabReconnectAttemptAtom);
-  const [showSyncedBadge, setShowSyncedBadge] = useState(false);
 
-  useEffect(() => {
-    if (syncStatus !== "synced" || connectionStatus !== "connected") {
-      setShowSyncedBadge(false);
-      return;
-    }
-    setShowSyncedBadge(true);
-    const timer = window.setTimeout(() => setShowSyncedBadge(false), 2000);
-    return () => window.clearTimeout(timer);
-  }, [syncStatus, connectionStatus]);
-
+  // Connected + healthy: stay silent. Only surface actionable/non-idle states.
   if (!connectionStatus || connectionStatus === "connected") {
-    // Connected: only show sync posture when there is something to say.
     if (syncStatus === "saving") {
       return (
         <Tooltip label={syncLabel(syncStatus, t)} openDelay={150} withArrow>
-          <Group gap={4} wrap="nowrap" style={{ cursor: "default" }}>
-            <IconCloudUpload size={18} stroke={2} color="var(--mantine-color-blue-6)" />
-            <Text size="xs" c="dimmed" visibleFrom="sm">
-              {t("Saving...")}
-            </Text>
-          </Group>
+          <ActionIcon
+            variant="default"
+            c="blue"
+            style={{ border: "none", cursor: "default" }}
+            aria-label={syncLabel(syncStatus, t)}
+          >
+            <IconCloudUpload size={20} stroke={2} />
+          </ActionIcon>
         </Tooltip>
       );
     }
@@ -99,25 +88,14 @@ export default function CollabStatusIndicator({
     if (syncStatus === "offline_pending") {
       return (
         <Tooltip label={syncLabel(syncStatus, t)} openDelay={150} withArrow>
-          <Group gap={4} wrap="nowrap" style={{ cursor: "default" }}>
-            <IconCloudOff size={18} stroke={2} color="var(--mantine-color-orange-6)" />
-            <Text size="xs" c="orange" visibleFrom="sm">
-              {t("Unsynced")}
-            </Text>
-          </Group>
-        </Tooltip>
-      );
-    }
-
-    if (syncStatus === "synced" && showSyncedBadge) {
-      return (
-        <Tooltip label={syncLabel(syncStatus, t)} openDelay={250} withArrow>
-          <Group gap={4} wrap="nowrap" style={{ cursor: "default" }}>
-            <IconCloudCheck size={18} stroke={2} color="var(--mantine-color-green-6)" />
-            <Text size="xs" c="dimmed" visibleFrom="md">
-              {t("Synced")}
-            </Text>
-          </Group>
+          <ActionIcon
+            variant="default"
+            c="orange"
+            style={{ border: "none", cursor: "default" }}
+            aria-label={syncLabel(syncStatus, t)}
+          >
+            <IconCloudOff size={20} stroke={2} />
+          </ActionIcon>
         </Tooltip>
       );
     }
@@ -139,62 +117,39 @@ export default function CollabStatusIndicator({
       : isConnecting
         ? IconRefresh
         : IconWifiOff;
+  const color = isAuthFailed
+    ? "red"
+    : hasPendingLocalChanges
+      ? "orange"
+      : isConnecting
+        ? "yellow.8"
+        : "red";
 
   return (
     <Tooltip label={label} openDelay={100} withArrow>
-      <Group gap={4} wrap="nowrap">
-        <ActionIcon
-          variant="default"
-          c={
-            isAuthFailed
-              ? "red"
-              : hasPendingLocalChanges
-                ? "orange"
-                : isConnecting
-                  ? "yellow.8"
-                  : "red"
+      <ActionIcon
+        variant="default"
+        c={color}
+        style={{ border: "none" }}
+        onClick={() => {
+          if (isAuthFailed) {
+            window.location.reload();
+            return;
           }
-          style={{ border: "none" }}
-          onClick={() => {
-            if (isAuthFailed) {
-              window.location.reload();
-              return;
-            }
-            onRetry?.();
-          }}
-          aria-label={label}
-        >
-          <Icon
-            size={20}
-            stroke={2}
-            style={
-              isConnecting && !hasPendingLocalChanges
-                ? { animation: "collab-status-spin 1s linear infinite" }
-                : undefined
-            }
-          />
-        </ActionIcon>
-        <Text
-          size="xs"
-          c={
-            isAuthFailed
-              ? "red"
-              : hasPendingLocalChanges
-                ? "orange"
-                : "dimmed"
+          onRetry?.();
+        }}
+        aria-label={label}
+      >
+        <Icon
+          size={20}
+          stroke={2}
+          style={
+            isConnecting && !hasPendingLocalChanges
+              ? { animation: "collab-status-spin 1s linear infinite" }
+              : undefined
           }
-          visibleFrom="sm"
-          lineClamp={1}
-        >
-          {isAuthFailed
-            ? t("Session expired")
-            : hasPendingLocalChanges
-              ? t("Unsynced")
-              : isConnecting
-                ? t("Connecting...")
-                : t("Reconnecting...")}
-        </Text>
-      </Group>
+        />
+      </ActionIcon>
     </Tooltip>
   );
 }
