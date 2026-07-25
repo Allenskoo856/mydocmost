@@ -13,10 +13,10 @@ import {
   buildPageUrl,
   buildSharedPageUrl,
 } from "@/features/page/page.utils.ts";
-import { useClipboard } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useNavigate } from "react-router-dom";
 import { useDeleteShareMutation } from "@/features/share/queries/share-query.ts";
+import { copyTextToClipboard } from "@/lib/clipboard.ts";
 
 interface Props {
   share: ISharedItem;
@@ -24,7 +24,6 @@ interface Props {
 export default function ShareActionMenu({ share }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const clipboard = useClipboard();
   const deleteShareMutation = useDeleteShareMutation();
 
   const openPage = () => {
@@ -36,15 +35,20 @@ export default function ShareActionMenu({ share }: Props) {
     navigate(pageLink);
   };
 
-  const copyLink = () => {
+  const copyLink = async () => {
     const shareLink = buildSharedPageUrl({
       shareId: share.key,
       pageTitle: share.page.title,
       pageSlugId: share.page.slugId,
     });
 
-    clipboard.copy(shareLink);
-    notifications.show({ message: t("Link copied") });
+    const copied = await copyTextToClipboard(shareLink);
+    notifications.show({
+      message: copied
+        ? t("Link copied")
+        : t("Copy failed, please copy manually"),
+      color: copied ? undefined : "red",
+    });
   };
   const onDelete = async () => {
     deleteShareMutation.mutateAsync(share.key);

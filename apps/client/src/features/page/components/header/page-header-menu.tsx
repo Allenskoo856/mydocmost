@@ -17,12 +17,7 @@ import useToggleAside from "@/hooks/use-toggle-aside.tsx";
 import { useAtom } from "jotai";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
 import { historyAtoms } from "@/features/page-history/atoms/history-atoms.ts";
-import {
-  getHotkeyHandler,
-  useClipboard,
-  useDisclosure,
-  useHotkeys,
-} from "@mantine/hooks";
+import { getHotkeyHandler, useDisclosure, useHotkeys } from "@mantine/hooks";
 import { useParams } from "react-router-dom";
 import { usePageQuery } from "@/features/page/queries/page-query.ts";
 import { buildPageUrl } from "@/features/page/page.utils.ts";
@@ -45,6 +40,8 @@ import { PageStateSegmentedControl } from "@/features/user/components/page-state
 import MovePageModal from "@/features/page/components/move-page-modal.tsx";
 import { useTimeAgo } from "@/hooks/use-time-ago.tsx";
 import ShareModal from "@/features/share/components/share-modal.tsx";
+import CopyAgentContextButton from "@/features/page/components/header/copy-agent-context-button.tsx";
+import { copyTextToClipboard } from "@/lib/clipboard.ts";
 
 interface PageHeaderMenuProps {
   readOnly?: boolean;
@@ -87,6 +84,8 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
 
       <ShareModal readOnly={readOnly} />
 
+      <CopyAgentContextButton />
+
       <Tooltip label={t("Comments")} openDelay={250} withArrow>
         <ActionIcon
           variant={isCommentsOpen ? "light" : "default"}
@@ -120,7 +119,6 @@ interface PageActionMenuProps {
 function PageActionMenu({ readOnly }: PageActionMenuProps) {
   const { t } = useTranslation();
   const [, setHistoryModalOpen] = useAtom(historyAtoms);
-  const clipboard = useClipboard({ timeout: 500 });
   const { pageSlug, spaceSlug } = useParams();
   const { data: page, isLoading } = usePageQuery({
     pageId: extractPageSlugId(pageSlug),
@@ -136,12 +134,17 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
   const [pageEditor] = useAtom(pageEditorAtom);
   const pageUpdatedAt = useTimeAgo(page?.updatedAt);
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const pageUrl =
       getAppUrl() + buildPageUrl(spaceSlug, page.slugId, page.title);
 
-    clipboard.copy(pageUrl);
-    notifications.show({ message: t("Link copied") });
+    const copied = await copyTextToClipboard(pageUrl);
+    notifications.show({
+      message: copied
+        ? t("Link copied")
+        : t("Copy failed, please copy manually"),
+      color: copied ? undefined : "red",
+    });
   };
 
   const handlePrint = () => {

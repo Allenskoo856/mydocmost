@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAtom } from "jotai";
-import { useClipboard } from "@mantine/hooks";
 import { useMantineColorScheme } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useTranslation } from "react-i18next";
@@ -44,6 +43,7 @@ import {
   buildAgentPageContext,
   getSelectedEditorText,
 } from "@/features/search/commands/agent-context";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { CommandPaletteItem } from "@/features/search/commands/types";
 
 function icon(node: React.ReactNode) {
@@ -81,7 +81,6 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
   const slugId = pageSlug ? extractPageSlugId(pageSlug) : undefined;
   const { data: page } = usePageQuery({ pageId: slugId });
   const createPageMutation = useCreatePageMutation();
-  const clipboard = useClipboard({ timeout: 500 });
   const toggleAside = useToggleAside();
   const toggleDesktopSidebar = useToggleSidebar(desktopSidebarAtom);
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
@@ -106,9 +105,14 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
         group: "page",
         enabled: onPage,
         icon: icon(createElement(IconLink, { size: 16 })),
-        perform: () => {
-          clipboard.copy(pageUrl);
-          notifications.show({ message: t("Link copied") });
+        perform: async () => {
+          const copied = await copyTextToClipboard(pageUrl);
+          notifications.show({
+            message: copied
+              ? t("Link copied")
+              : t("Copy failed, please copy manually"),
+            color: copied ? undefined : "red",
+          });
         },
       },
       {
@@ -127,15 +131,20 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
         group: "agent",
         enabled: onPage,
         icon: icon(createElement(IconRobot, { size: 16 })),
-        perform: () => {
+        perform: async () => {
           const text = buildAgentPageContext({
             page,
             spaceSlug,
             pageUrl,
             selectedText: getSelectedEditorText(),
           });
-          clipboard.copy(text);
-          notifications.show({ message: t("Agent context copied") });
+          const copied = await copyTextToClipboard(text);
+          notifications.show({
+            message: copied
+              ? t("Agent context copied")
+              : t("Copy failed, please copy manually"),
+            color: copied ? undefined : "red",
+          });
         },
       },
       {
@@ -294,7 +303,9 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
       {
         id: "toggle-theme",
         label:
-          colorScheme === "dark" ? t("Switch to light mode") : t("Switch to dark mode"),
+          colorScheme === "dark"
+            ? t("Switch to light mode")
+            : t("Switch to dark mode"),
         keywords: ["theme", "dark", "light", "主题", "暗色", "亮色"],
         group: "navigation",
         icon: icon(
@@ -314,7 +325,6 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
     onPage,
     page,
     spaceSlug,
-    clipboard,
     toggleAside,
     setHistoryModalOpen,
     setForceEdit,

@@ -8,8 +8,8 @@ import {
 } from "@/features/workspace/queries/workspace-query.ts";
 import { useTranslation } from "react-i18next";
 import { notifications } from "@mantine/notifications";
-import { useClipboard } from "@mantine/hooks";
 import { getInviteLink } from "@/features/workspace/services/workspace-service.ts";
+import { copyTextToClipboard } from "@/lib/clipboard.ts";
 import useUserRole from "@/hooks/use-user-role.tsx";
 import { isCloud } from "@/lib/config.ts";
 
@@ -21,13 +21,17 @@ export default function InviteActionMenu({ invitationId }: Props) {
   const resendInvitationMutation = useResendInvitationMutation();
   const revokeInvitationMutation = useRevokeInvitationMutation();
   const { isAdmin } = useUserRole();
-  const clipboard = useClipboard();
 
   const handleCopyLink = async (invitationId: string) => {
     try {
       const link = await getInviteLink({ invitationId });
-      clipboard.copy(link.inviteLink);
-      notifications.show({ message: t("Link copied") });
+      const copied = await copyTextToClipboard(link.inviteLink);
+      notifications.show({
+        message: copied
+          ? t("Link copied")
+          : t("Copy failed, please copy manually"),
+        color: copied ? undefined : "red",
+      });
     } catch (err) {
       notifications.show({
         message: err["response"]?.data?.message,

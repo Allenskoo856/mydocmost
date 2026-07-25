@@ -54,18 +54,14 @@ import {
 import { IPage, SidebarPagesParams } from "@/features/page/types/page.types.ts";
 import { queryClient } from "@/main.tsx";
 import { OpenMap } from "react-arborist/dist/main/state/open-slice";
-import {
-  useClipboard,
-  useDisclosure,
-  useElementSize,
-  useMergedRef,
-} from "@mantine/hooks";
+import { useDisclosure, useElementSize, useMergedRef } from "@mantine/hooks";
 import { dfs } from "react-arborist/dist/module/utils";
 import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
 import { buildPageUrl } from "@/features/page/page.utils.ts";
 import { notifications } from "@mantine/notifications";
 import { getAppUrl } from "@/lib/config.ts";
 import { extractPageSlugId } from "@/lib";
+import { copyTextToClipboard } from "@/lib/clipboard.ts";
 import { useDeletePageModal } from "@/features/page/hooks/use-delete-page-modal.tsx";
 import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
@@ -494,7 +490,6 @@ interface NodeMenuProps {
 
 function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
   const { t } = useTranslation();
-  const clipboard = useClipboard({ timeout: 500 });
   const { spaceSlug } = useParams();
   const { openDeleteModal } = useDeletePageModal();
   const [data, setData] = useAtom(treeDataAtom);
@@ -519,11 +514,16 @@ function NodeMenu({ node, treeApi, spaceId }: NodeMenuProps) {
     setImportModalState({ isOpen: true, targetParentId: node.id });
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const pageUrl =
       getAppUrl() + buildPageUrl(spaceSlug, node.data.slugId, node.data.name);
-    clipboard.copy(pageUrl);
-    notifications.show({ message: t("Link copied") });
+    const copied = await copyTextToClipboard(pageUrl);
+    notifications.show({
+      message: copied
+        ? t("Link copied")
+        : t("Copy failed, please copy manually"),
+      color: copied ? undefined : "red",
+    });
   };
 
   const handleDuplicatePage = async () => {
