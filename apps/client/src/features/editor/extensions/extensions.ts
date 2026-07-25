@@ -46,10 +46,7 @@ import {
   Highlight,
   UniqueID,
 } from "@docmost/editor-ext";
-import {
-  randomElement,
-  userColors,
-} from "@/features/editor/extensions/utils.ts";
+import { stableUserColor } from "@/features/editor/extensions/utils.ts";
 import { IUser } from "@/features/user/types/user.types.ts";
 import MathInlineView from "@/features/editor/components/math/math-inline.tsx";
 import MathBlockView from "@/features/editor/components/math/math-block.tsx";
@@ -266,8 +263,11 @@ export const collabExtensions: CollabExtensions = (provider, user) => [
   CollaborationCursor.configure({
     provider,
     user: {
+      id: user.id,
       name: user.name,
-      color: randomElement(userColors),
+      avatarUrl: user.avatarUrl,
+      color: stableUserColor(user.id),
+      mode: "editing",
     },
   }),
 ];

@@ -1,5 +1,6 @@
 import classes from "./page-header.module.css";
 import PageHeaderMenu from "@/features/page/components/header/page-header-menu.tsx";
+import PagePresenceAvatars from "@/features/page/components/header/page-presence-avatars.tsx";
 import { Button, Group, Tooltip } from "@mantine/core";
 import { IconEdit } from "@tabler/icons-react";
 import Breadcrumb from "@/features/page/components/breadcrumbs/breadcrumb.tsx";
@@ -82,6 +83,7 @@ export default function PageHeader({ readOnly, contentSize }: Props) {
           wrap="nowrap"
           gap="var(--mantine-spacing-xs)"
         >
+          <PagePresenceAvatars />
           {showEditButton && (
             <Button
               size="compact-sm"

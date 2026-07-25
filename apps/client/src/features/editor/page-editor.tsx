@@ -33,6 +33,7 @@ import {
   collabSyncStatusAtom,
   pageEditorAtom,
   pageForceEditAtom,
+  pagePresenceAtom,
   yjsConnectionStatusAtom,
 } from "@/features/editor/atoms/editor-atoms";
 import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom";
@@ -72,6 +73,7 @@ import {
   isLargeDocumentContent,
   isLargeDocumentSize,
 } from "./utils/large-document";
+import { collectPagePresence } from "./utils/page-presence";
 import { PageContentSnapshot } from "./readonly-page-snapshot";
 
 interface PageEditorProps {
@@ -112,6 +114,7 @@ export default function PageEditor({
   const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
   const [, setCollabSyncStatus] = useAtom(collabSyncStatusAtom);
   const [, setCollabReconnectAttempt] = useAtom(collabReconnectAttemptAtom);
+  const [, setPagePresence] = useAtom(pagePresenceAtom);
   const [collabRetryRequest, setCollabRetryRequest] = useAtom(
     collabRetryRequestAtom,
   );
@@ -316,12 +319,14 @@ export default function PageEditor({
       setCollabSyncStatus("idle");
       setCollabReconnectAttempt(0);
       setCollabRetryRequest(0);
+      setPagePresence([]);
     };
   }, [
     setYjsConnectionStatus,
     setCollabSyncStatus,
     setCollabReconnectAttempt,
     setCollabRetryRequest,
+    setPagePresence,
   ]);
 
   // Manual retry from the header status indicator.
@@ -372,6 +377,39 @@ export default function PageEditor({
     }
   }, [collabQuery?.token]);
    */
+
+  // Publish active editors from Yjs awareness into the page header avatar strip.
+  useEffect(() => {
+    if (!remoteProvider) {
+      setPagePresence([]);
+      return;
+    }
+
+    const refresh = () => {
+      if (remoteProvider.status !== WebSocketStatus.Connected) {
+        setPagePresence([]);
+        return;
+      }
+      setPagePresence(
+        collectPagePresence(remoteProvider, currentUser?.user?.id),
+      );
+    };
+
+    refresh();
+    const awareness = remoteProvider.awareness;
+    awareness?.on("update", refresh);
+    remoteProvider.on("status", refresh);
+    remoteProvider.on("connect", refresh);
+    remoteProvider.on("disconnect", refresh);
+
+    return () => {
+      awareness?.off("update", refresh);
+      remoteProvider.off("status", refresh);
+      remoteProvider.off("connect", refresh);
+      remoteProvider.off("disconnect", refresh);
+      setPagePresence([]);
+    };
+  }, [remoteProvider, currentUser?.user?.id, setPagePresence]);
 
   // Proactively refresh the collab JWT ~1 hour before expiry so long editing
   // sessions do not hit an auth wall mid-edit.

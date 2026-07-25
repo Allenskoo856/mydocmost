@@ -48,3 +48,15 @@ export const collabRetryRequestAtom = atom(0);
 // Upgrades the static read view to the full collaborative editor. Reset on
 // page switch (FullEditor unmount).
 export const pageForceEditAtom = atom<boolean>(false);
+
+/** One collaborator currently present on the open collaborative page. */
+export interface PagePresenceUser {
+  userId: string;
+  name: string;
+  avatarUrl?: string | null;
+  color: string;
+  isSelf: boolean;
+}
+
+/** Active editors on the current page (from Yjs awareness). Empty when not editing. */
+export const pagePresenceAtom = atom<PagePresenceUser[]>([]);
