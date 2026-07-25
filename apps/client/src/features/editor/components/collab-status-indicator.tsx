@@ -125,22 +125,35 @@ export default function CollabStatusIndicator({
     return null;
   }
 
-  const label = connectionLabel(connectionStatus, reconnectAttempt, t);
+  const hasPendingLocalChanges = syncStatus === "offline_pending";
+  const label = hasPendingLocalChanges
+    ? t("Unsynced changes. Reconnecting...")
+    : connectionLabel(connectionStatus, reconnectAttempt, t);
   const isAuthFailed = connectionStatus === "auth_failed";
   const isConnecting =
     connectionStatus === "connecting" || connectionStatus === "reconnecting";
   const Icon = isAuthFailed
     ? IconWifiOff
-    : isConnecting
-      ? IconRefresh
-      : IconWifiOff;
+    : hasPendingLocalChanges
+      ? IconCloudOff
+      : isConnecting
+        ? IconRefresh
+        : IconWifiOff;
 
   return (
     <Tooltip label={label} openDelay={100} withArrow>
       <Group gap={4} wrap="nowrap">
         <ActionIcon
           variant="default"
-          c={isAuthFailed ? "red" : isConnecting ? "yellow.8" : "red"}
+          c={
+            isAuthFailed
+              ? "red"
+              : hasPendingLocalChanges
+                ? "orange"
+                : isConnecting
+                  ? "yellow.8"
+                  : "red"
+          }
           style={{ border: "none" }}
           onClick={() => {
             if (isAuthFailed) {
@@ -155,18 +168,31 @@ export default function CollabStatusIndicator({
             size={20}
             stroke={2}
             style={
-              isConnecting
+              isConnecting && !hasPendingLocalChanges
                 ? { animation: "collab-status-spin 1s linear infinite" }
                 : undefined
             }
           />
         </ActionIcon>
-        <Text size="xs" c={isAuthFailed ? "red" : "dimmed"} visibleFrom="sm" lineClamp={1}>
+        <Text
+          size="xs"
+          c={
+            isAuthFailed
+              ? "red"
+              : hasPendingLocalChanges
+                ? "orange"
+                : "dimmed"
+          }
+          visibleFrom="sm"
+          lineClamp={1}
+        >
           {isAuthFailed
             ? t("Session expired")
-            : isConnecting
-              ? t("Connecting...")
-              : t("Reconnecting...")}
+            : hasPendingLocalChanges
+              ? t("Unsynced")
+              : isConnecting
+                ? t("Connecting...")
+                : t("Reconnecting...")}
         </Text>
       </Group>
     </Tooltip>

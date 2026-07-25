@@ -112,7 +112,11 @@ export default function PageEditor({
   const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
   const [, setCollabSyncStatus] = useAtom(collabSyncStatusAtom);
   const [, setCollabReconnectAttempt] = useAtom(collabReconnectAttemptAtom);
-  const [collabRetryRequest] = useAtom(collabRetryRequestAtom);
+  const [collabRetryRequest, setCollabRetryRequest] = useAtom(
+    collabRetryRequestAtom,
+  );
+  // Only act on newly clicked retries; ignore residual atom values from prior pages.
+  const lastHandledRetryRequestRef = useRef(collabRetryRequest);
   const menuContainerRef = useRef(null);
   const documentName = `page.${pageId}`;
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
@@ -311,12 +315,25 @@ export default function PageEditor({
       setYjsConnectionStatus("");
       setCollabSyncStatus("idle");
       setCollabReconnectAttempt(0);
+      setCollabRetryRequest(0);
     };
-  }, [setYjsConnectionStatus, setCollabSyncStatus, setCollabReconnectAttempt]);
+  }, [
+    setYjsConnectionStatus,
+    setCollabSyncStatus,
+    setCollabReconnectAttempt,
+    setCollabRetryRequest,
+  ]);
 
   // Manual retry from the header status indicator.
   useEffect(() => {
-    if (!collabRetryRequest || !remoteProvider) {
+    if (!remoteProvider) {
+      return;
+    }
+    if (collabRetryRequest === lastHandledRetryRequestRef.current) {
+      return;
+    }
+    lastHandledRetryRequestRef.current = collabRetryRequest;
+    if (!collabRetryRequest) {
       return;
     }
     if (!collabTokenRef.current) {

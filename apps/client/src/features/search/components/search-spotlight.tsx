@@ -21,6 +21,14 @@ interface SearchSpotlightProps {
 
 const GROUP_ORDER: CommandGroupId[] = ["page", "agent", "navigation"];
 
+function formatShortcut(shortcut: string): string {
+  const isApple =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+  const mod = isApple ? "⌘" : "Ctrl";
+  return shortcut.replace(/Mod\+/gi, `${mod}+`);
+}
+
 export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -175,7 +183,7 @@ export function SearchSpotlight({ spaceId }: SearchSpotlightProps) {
                       rightSection={
                         command.shortcut ? (
                           <Text size="xs" c="dimmed">
-                            {command.shortcut.replace("Mod+", "⌘")}
+                            {formatShortcut(command.shortcut)}
                           </Text>
                         ) : undefined
                       }

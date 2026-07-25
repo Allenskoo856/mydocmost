@@ -40,7 +40,6 @@ import {
 import { buildPageUrl } from "@/features/page/page.utils";
 import { extractPageSlugId } from "@/lib";
 import { getAppUrl } from "@/lib/config";
-import { treeApiAtom } from "@/features/page/tree/atoms/tree-api-atom";
 import {
   buildAgentPageContext,
   getSelectedEditorText,
@@ -49,6 +48,30 @@ import type { CommandPaletteItem } from "@/features/search/commands/types";
 
 function icon(node: React.ReactNode) {
   return node;
+}
+
+/**
+ * Fire a page command event and surface a toast when no page-header listener
+ * is currently mounted (read-only shells, early mount, etc.).
+ */
+function dispatchPageCommand(
+  eventName: string,
+  unavailableMessage: string,
+): void {
+  const detail = { handled: false };
+  document.dispatchEvent(
+    new CustomEvent(eventName, {
+      cancelable: true,
+      detail,
+    }),
+  );
+  // Listeners set detail.handled = true synchronously when mounted.
+  if (!detail.handled) {
+    notifications.show({
+      message: unavailableMessage,
+      color: "yellow",
+    });
+  }
 }
 
 export function useCommandPaletteActions(): CommandPaletteItem[] {
@@ -64,7 +87,6 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
   const [, setHistoryModalOpen] = useAtom(historyAtoms);
   const [, setForceEdit] = useAtom(pageForceEditAtom);
-  const [tree] = useAtom(treeApiAtom);
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   const onPage = Boolean(page?.id && spaceSlug);
@@ -178,10 +200,9 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
         icon: icon(createElement(IconFilePlus, { size: 16 })),
         perform: async () => {
           if (!page?.spaceId) return;
-          if (tree) {
-            tree.create({ type: "internal", parentId: page.id });
-            return;
-          }
+          // Prefer the API mutation over tree.create(): arborist create fails when
+          // parent children are not loaded yet, while invalidateOnCreatePage keeps
+          // the sidebar in sync.
           const created = await createPageMutation.mutateAsync({
             spaceId: page.spaceId,
             parentPageId: page.id,
@@ -197,7 +218,10 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
         enabled: onPage,
         icon: icon(createElement(IconFileExport, { size: 16 })),
         perform: () => {
-          document.dispatchEvent(new CustomEvent("openPageExportModal"));
+          dispatchPageCommand(
+            "openPageExportModal",
+            t("Page action is unavailable on this screen"),
+          );
         },
       },
       {
@@ -208,7 +232,10 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
         enabled: onPage,
         icon: icon(createElement(IconArrowRight, { size: 16 })),
         perform: () => {
-          document.dispatchEvent(new CustomEvent("openPageMoveModal"));
+          dispatchPageCommand(
+            "openPageMoveModal",
+            t("Page action is unavailable on this screen"),
+          );
         },
       },
       {
@@ -219,7 +246,10 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
         enabled: onPage,
         icon: icon(createElement(IconTrash, { size: 16 })),
         perform: () => {
-          document.dispatchEvent(new CustomEvent("openPageDeleteModal"));
+          dispatchPageCommand(
+            "openPageDeleteModal",
+            t("Page action is unavailable on this screen"),
+          );
         },
       },
       {
@@ -288,7 +318,6 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
     toggleAside,
     setHistoryModalOpen,
     setForceEdit,
-    tree,
     createPageMutation,
     colorScheme,
     setColorScheme,

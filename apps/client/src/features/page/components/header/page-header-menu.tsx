@@ -160,9 +160,25 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
 
   // Command palette can open the same page modals without duplicating UI state.
   useEffect(() => {
-    const onExport = () => openExportModal();
-    const onMove = () => openMovePageModal();
-    const onDelete = () => handleDeletePage();
+    const markHandled = (event: Event) => {
+      const custom = event as CustomEvent<{ handled?: boolean }>;
+      if (custom.detail) {
+        custom.detail.handled = true;
+      }
+      event.preventDefault();
+    };
+    const onExport = (event: Event) => {
+      markHandled(event);
+      openExportModal();
+    };
+    const onMove = (event: Event) => {
+      markHandled(event);
+      openMovePageModal();
+    };
+    const onDelete = (event: Event) => {
+      markHandled(event);
+      handleDeletePage();
+    };
     document.addEventListener("openPageExportModal", onExport);
     document.addEventListener("openPageMoveModal", onMove);
     document.addEventListener("openPageDeleteModal", onDelete);

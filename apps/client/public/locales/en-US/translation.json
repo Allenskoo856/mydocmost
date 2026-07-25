@@ -648,5 +648,7 @@
   "Open settings": "Open settings",
   "Toggle sidebar": "Toggle sidebar",
   "Switch to light mode": "Switch to light mode",
-  "Switch to dark mode": "Switch to dark mode"
+  "Switch to dark mode": "Switch to dark mode",
+  "Unsynced changes. Reconnecting...": "Unsynced changes. Reconnecting...",
+  "Page action is unavailable on this screen": "Page action is unavailable on this screen"
 }

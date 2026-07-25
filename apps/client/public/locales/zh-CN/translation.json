@@ -648,5 +648,7 @@
   "Open settings": "打开设置",
   "Toggle sidebar": "打开/关闭侧栏",
   "Switch to light mode": "切换到浅色模式",
-  "Switch to dark mode": "切换到深色模式"
+  "Switch to dark mode": "切换到深色模式",
+  "Unsynced changes. Reconnecting...": "有未同步更改，正在重连…",
+  "Page action is unavailable on this screen": "当前页面无法执行该操作"
 }
