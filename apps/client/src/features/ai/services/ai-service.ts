@@ -1,5 +1,22 @@
 import { getBackendUrl } from "@/lib/config";
+import api from "@/lib/api-client";
 import { AiStreamEvent } from "../types";
+
+export interface AiStatus {
+  enabled: boolean;
+  totalPages: number;
+  indexedPages: number;
+}
+
+export async function getAiStatus(): Promise<AiStatus> {
+  const req = await api.get<AiStatus>("/ai/status");
+  return req.data;
+}
+
+export async function reindexWorkspace(): Promise<{ ok: boolean }> {
+  const req = await api.post<{ ok: boolean }>("/ai/reindex-workspace");
+  return req.data;
+}
 
 export interface AskParams {
   question: string;

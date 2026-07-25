@@ -131,6 +131,20 @@ export class AiIndexingService {
     this.logger.debug(`Embedded page ${page.id} (${rows.length} chunks)`);
   }
 
+  async getWorkspaceStats(
+    workspaceId: string,
+  ): Promise<{ totalPages: number; indexedPages: number }> {
+    const totalRow = await this.db
+      .selectFrom('pages')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('workspaceId', '=', workspaceId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst();
+    const indexedPages =
+      await this.pageEmbeddingRepo.countIndexedPagesByWorkspace(workspaceId);
+    return { totalPages: Number(totalRow?.count ?? 0), indexedPages };
+  }
+
   async reindexWorkspace(workspaceId: string): Promise<void> {
     if (!(await this.ready())) return;
 

@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
+  BadRequestException,
   Get,
   HttpCode,
   HttpStatus,
@@ -8,23 +10,70 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { FastifyReply } from 'fastify';
 import { AuthUser } from '../../common/decorators/auth-user.decorator';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User, Workspace } from '@docmost/db/types/entity.types';
+import { QueueJob, QueueName } from '../../integrations/queue/constants';
+import WorkspaceAbilityFactory from '../casl/abilities/workspace-ability.factory';
+import {
+  WorkspaceCaslAction,
+  WorkspaceCaslSubject,
+} from '../casl/interfaces/workspace-ability.type';
 import { AiService, AskEvent } from './ai.service';
+import { AiIndexingService } from './ai-indexing.service';
 import { AskDto } from './dto/ask.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly aiIndexingService: AiIndexingService,
+    private readonly workspaceAbility: WorkspaceAbilityFactory,
+    @InjectQueue(QueueName.AI_QUEUE) private readonly aiQueue: Queue,
+  ) {}
 
   @HttpCode(HttpStatus.OK)
   @Get('status')
-  status() {
-    return { enabled: this.aiService.isEnabled() };
+  async status(@AuthWorkspace() workspace: Workspace) {
+    if (!this.aiService.isEnabled()) {
+      return { enabled: false, totalPages: 0, indexedPages: 0 };
+    }
+    const stats = await this.aiIndexingService.getWorkspaceStats(workspace.id);
+    return { enabled: true, ...stats };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('reindex-workspace')
+  async reindexWorkspace(
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const ability = this.workspaceAbility.createForUser(user, workspace);
+    if (
+      ability.cannot(WorkspaceCaslAction.Manage, WorkspaceCaslSubject.Settings)
+    ) {
+      throw new ForbiddenException();
+    }
+    if (!this.aiService.isEnabled()) {
+      throw new BadRequestException('AI is not enabled');
+    }
+
+    // Stable jobId dedupes concurrent rebuilds of the same workspace.
+    await this.aiQueue.add(
+      QueueJob.WORKSPACE_CREATE_EMBEDDINGS,
+      { workspaceId: workspace.id },
+      {
+        jobId: `ai-workspace-reindex-${workspace.id}`,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+    return { ok: true };
   }
 
   @Post('ask')

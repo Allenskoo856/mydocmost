@@ -70,4 +70,13 @@ export class PageEmbeddingRepo {
       .executeTakeFirst();
     return Number(row?.count ?? 0);
   }
+
+  async countIndexedPagesByWorkspace(workspaceId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('pageEmbeddings')
+      .select(sql<number>`count(distinct page_id)`.as('count'))
+      .where('workspaceId', '=', workspaceId)
+      .executeTakeFirst();
+    return Number(row?.count ?? 0);
+  }
 }
