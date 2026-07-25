@@ -9,6 +9,7 @@ import {
   IconList,
   IconMessage,
   IconPrinter,
+  IconRobot,
   IconSearch,
   IconTrash,
 } from "@tabler/icons-react";
@@ -42,6 +43,8 @@ import { useTimeAgo } from "@/hooks/use-time-ago.tsx";
 import ShareModal from "@/features/share/components/share-modal.tsx";
 import CopyAgentContextButton from "@/features/page/components/header/copy-agent-context-button.tsx";
 import { copyTextToClipboard } from "@/lib/clipboard.ts";
+import { isAiEnabled } from "@/lib/config.ts";
+import { aiPanelOpenAtom } from "@/features/ai/atoms/ai-atoms.ts";
 
 interface PageHeaderMenuProps {
   readOnly?: boolean;
@@ -51,6 +54,7 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
   const toggleAside = useToggleAside();
   const [{ tab: asideTab, isAsideOpen }] = useAtom(asideStateAtom);
   const [, setCollabRetryRequest] = useAtom(collabRetryRequestAtom);
+  const [, setAiPanelOpen] = useAtom(aiPanelOpenAtom);
   const isTocOpen = isAsideOpen && asideTab === "toc";
   const isCommentsOpen = isAsideOpen && asideTab === "comments";
 
@@ -85,6 +89,19 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
       <ShareModal readOnly={readOnly} />
 
       <CopyAgentContextButton />
+
+      {isAiEnabled() && (
+        <Tooltip label={t("Ask AI")} openDelay={250} withArrow>
+          <ActionIcon
+            variant="default"
+            style={{ border: "none" }}
+            onClick={() => setAiPanelOpen(true)}
+            aria-label={t("Ask AI")}
+          >
+            <IconRobot size={20} stroke={2} />
+          </ActionIcon>
+        </Tooltip>
+      )}
 
       <Tooltip label={t("Comments")} openDelay={250} withArrow>
         <ActionIcon

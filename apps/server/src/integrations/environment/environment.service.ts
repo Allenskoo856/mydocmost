@@ -237,6 +237,10 @@ export class EnvironmentService {
     return this.configService.get<string>('AI_DRIVER');
   }
 
+  isAiEnabled(): boolean {
+    return Boolean(this.getAiDriver()?.trim());
+  }
+
   getAiEmbeddingModel(): string {
     return this.configService.get<string>('AI_EMBEDDING_MODEL');
   }
@@ -269,6 +273,54 @@ export class EnvironmentService {
       'OLLAMA_API_URL',
       'http://localhost:11434',
     );
+  }
+
+  getAiRagTopK(): number {
+    const value = parseInt(
+      this.configService.get<string>('AI_RAG_TOP_K', '8'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 8;
+  }
+
+  getAiVectorCandidateLimit(): number {
+    const value = parseInt(
+      this.configService.get<string>('AI_VECTOR_CANDIDATE_LIMIT', '300'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 300;
+  }
+
+  getAiChunkSize(): number {
+    const value = parseInt(
+      this.configService.get<string>('AI_CHUNK_SIZE', '1600'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 1600;
+  }
+
+  getAiChunkOverlap(): number {
+    const value = parseInt(
+      this.configService.get<string>('AI_CHUNK_OVERLAP', '200'),
+      10,
+    );
+    return Number.isFinite(value) && value >= 0 ? value : 200;
+  }
+
+  getAiMaxContextChars(): number {
+    const value = parseInt(
+      this.configService.get<string>('AI_MAX_CONTEXT_CHARS', '8000'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 8000;
+  }
+
+  getAiRequestTimeoutMs(): number {
+    const value = parseInt(
+      this.configService.get<string>('AI_REQUEST_TIMEOUT_MS', '60000'),
+      10,
+    );
+    return Number.isFinite(value) && value > 0 ? value : 60000;
   }
 
   getMcpApiToken(): string | undefined {

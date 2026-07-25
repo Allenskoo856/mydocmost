@@ -60,6 +60,26 @@ export class McpSearchPagesDto {
   offset = 0;
 }
 
+export class McpSemanticSearchDto {
+  @IsOptional()
+  @IsUUID()
+  workspaceId?: string;
+
+  @IsString()
+  @MinLength(1)
+  query: string;
+
+  @IsOptional()
+  @IsString()
+  spaceId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  limit = 8;
+}
+
 export class McpGetPageDto {
   @IsOptional()
   @IsUUID()

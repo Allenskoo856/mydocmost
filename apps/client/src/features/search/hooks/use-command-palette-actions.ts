@@ -44,6 +44,8 @@ import {
   getSelectedEditorText,
 } from "@/features/search/commands/agent-context";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { isAiEnabled } from "@/lib/config";
+import { aiPanelOpenAtom } from "@/features/ai/atoms/ai-atoms";
 import type { CommandPaletteItem } from "@/features/search/commands/types";
 
 function icon(node: React.ReactNode) {
@@ -86,6 +88,7 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
   const toggleMobileSidebar = useToggleSidebar(mobileSidebarAtom);
   const [, setHistoryModalOpen] = useAtom(historyAtoms);
   const [, setForceEdit] = useAtom(pageForceEditAtom);
+  const [, setAiPanelOpen] = useAtom(aiPanelOpenAtom);
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   const onPage = Boolean(page?.id && spaceSlug);
@@ -114,6 +117,16 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
             color: copied ? undefined : "red",
           });
         },
+      },
+      {
+        id: "ask-ai",
+        label: t("Ask AI"),
+        description: t("Ask a question about your documents"),
+        keywords: ["ai", "ask", "assistant", "rag", "问答", "助手", "提问"],
+        group: "agent",
+        enabled: isAiEnabled(),
+        icon: icon(createElement(IconRobot, { size: 16 })),
+        perform: () => setAiPanelOpen(true),
       },
       {
         id: "copy-agent-context",
@@ -328,6 +341,7 @@ export function useCommandPaletteActions(): CommandPaletteItem[] {
     toggleAside,
     setHistoryModalOpen,
     setForceEdit,
+    setAiPanelOpen,
     createPageMutation,
     colorScheme,
     setColorScheme,

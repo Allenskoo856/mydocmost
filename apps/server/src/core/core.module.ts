@@ -17,6 +17,7 @@ import { CaslModule } from './casl/casl.module';
 import { DomainMiddleware } from '../common/middlewares/domain.middleware';
 import { ShareModule } from './share/share.module';
 import { McpModule } from './mcp/mcp.module';
+import { AiModule } from './ai/ai.module';
 import { getMcpControllerPath } from './mcp/mcp-path.util';
 
 @Module({
@@ -33,6 +34,7 @@ import { getMcpControllerPath } from './mcp/mcp-path.util';
     CaslModule,
     ShareModule,
     McpModule,
+    AiModule,
   ],
 })
 export class CoreModule implements NestModule {

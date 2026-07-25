@@ -46,6 +46,10 @@ export function isCloud(): boolean {
   return castToBoolean(getConfigValue("CLOUD"));
 }
 
+export function isAiEnabled(): boolean {
+  return castToBoolean(getConfigValue("AI_ENABLED"));
+}
+
 export function getAvatarUrl(
   avatarUrl: string,
   type: AvatarIconType = AvatarIconType.AVATAR,
@@ -90,7 +94,6 @@ export function getDrawioUrl() {
 export function getBillingTrialDays() {
   return getConfigValue("BILLING_TRIAL_DAYS");
 }
-
 
 function getConfigValue(key: string, defaultValue: string = undefined): string {
   const rawValue = import.meta.env.DEV

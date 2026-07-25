@@ -44,8 +44,10 @@ import {
   McpGetPageDto,
   McpListSpacesDto,
   McpSearchPagesDto,
+  McpSemanticSearchDto,
 } from './dto/discovery.dto';
 import { McpContextService } from './mcp-context.service';
+import { AiRetrievalService } from '../ai/ai-retrieval.service';
 import {
   McpPlannedOperation,
   McpSessionContext,
@@ -120,6 +122,7 @@ export class McpToolsService {
     private readonly collaborationGateway: CollaborationGateway,
     private readonly environmentService: EnvironmentService,
     private readonly sessionStateService: McpSessionStateService,
+    private readonly aiRetrievalService: AiRetrievalService,
     @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
@@ -256,6 +259,39 @@ export class McpToolsService {
         ),
         annotations: {
           title: 'Search pages',
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: 'semantic_search',
+        description:
+          'Semantic (embedding) search over page content in the resolved workspace, optionally limited to one space. Returns the most relevant page snippets with their source page. Requires AI to be enabled on the server.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workspaceId: workspaceIdSchema,
+            query: { type: 'string', minLength: 1 },
+            spaceId: {
+              type: 'string',
+              description: 'Optional space UUID or slug.',
+            },
+            limit: { type: 'integer', minimum: 1, maximum: 20, default: 8 },
+          },
+          required: ['query'],
+          additionalProperties: false,
+        },
+        outputSchema: objectOutput(
+          {
+            total: { type: 'integer' },
+            items: { type: 'array', items: { type: 'object' } },
+          },
+          ['total', 'items'],
+        ),
+        annotations: {
+          title: 'Semantic search',
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,
@@ -690,6 +726,8 @@ export class McpToolsService {
           return await this.listSpaces(args, sessionContext);
         case 'search_pages':
           return await this.searchPages(args, sessionContext);
+        case 'semantic_search':
+          return await this.semanticSearch(args, sessionContext);
         case 'create_space':
           return await this.createSpace(args, sessionContext);
         case 'insert_page_tree':
@@ -940,6 +978,49 @@ export class McpToolsService {
       items,
       pageInfo: this.pageInfo(dto.offset, dto.limit, total, items.length),
     });
+  }
+
+  private async semanticSearch(
+    args: unknown,
+    sessionContext: McpSessionContext,
+  ): Promise<CallToolResult> {
+    const dto = await validateMcpDto(McpSemanticSearchDto, args);
+    const { workspace } = await this.loadContext(
+      dto.workspaceId,
+      sessionContext,
+    );
+
+    if (!this.aiRetrievalService.isEnabled()) {
+      throw new McpToolError('AI_DISABLED', 'AI is not enabled on this server');
+    }
+
+    let allowedSpaceIds: string[];
+    if (dto.spaceId) {
+      const space = await this.requireSpace(dto.spaceId, workspace.id);
+      allowedSpaceIds = [space.id];
+    } else {
+      allowedSpaceIds = await this.aiRetrievalService.getWorkspaceSpaceIds(
+        workspace.id,
+      );
+    }
+
+    const chunks = await this.aiRetrievalService.retrieve(dto.query, {
+      workspaceId: workspace.id,
+      allowedSpaceIds,
+      topK: dto.limit,
+    });
+
+    const items = chunks.map((chunk) => ({
+      pageId: chunk.pageId,
+      slugId: chunk.slugId,
+      title: chunk.title,
+      icon: chunk.icon,
+      snippet: chunk.text,
+      score: Number(chunk.score.toFixed(4)),
+      space: { id: chunk.spaceId, slug: chunk.spaceSlug },
+    }));
+
+    return this.success({ total: items.length, items });
   }
 
   private async createSpace(
