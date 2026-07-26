@@ -80,6 +80,24 @@ export interface ISpacePagePropertyStatusConfig {
   spaceId: string;
   workspaceId: string;
   statusOptions: string[];
+  enabledProperties: PagePropertyKey[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export const PAGE_PROPERTY_KEYS = [
+  "tags",
+  "owner",
+  "status",
+  "priority",
+  "dueAt",
+] as const;
+
+export type PagePropertyKey = (typeof PAGE_PROPERTY_KEYS)[number];
+
+export interface IPagePropertyOwner {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
 }

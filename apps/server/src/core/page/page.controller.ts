@@ -61,6 +61,7 @@ export class PageController {
       includeSpace: true,
       includeContent: includeContent || dto.includeRenderedContent,
       includeCreator: true,
+      includePropertyOwner: true,
       includeLastUpdatedBy: true,
       includeContributors: true,
     });

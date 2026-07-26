@@ -57,6 +57,7 @@ export class PageRepo {
       includeYdoc?: boolean;
       includeSpace?: boolean;
       includeCreator?: boolean;
+      includePropertyOwner?: boolean;
       includeLastUpdatedBy?: boolean;
       includeContributors?: boolean;
       includeHasChildren?: boolean;
@@ -78,6 +79,10 @@ export class PageRepo {
 
     if (opts?.includeCreator) {
       query = query.select((eb) => this.withCreator(eb));
+    }
+
+    if (opts?.includePropertyOwner) {
+      query = query.select((eb) => this.withPropertyOwner(eb));
     }
 
     if (opts?.includeLastUpdatedBy) {
@@ -369,6 +374,15 @@ export class PageRepo {
         .select(['users.id', 'users.name', 'users.avatarUrl'])
         .whereRef('users.id', '=', 'pages.creatorId'),
     ).as('creator');
+  }
+
+  withPropertyOwner(eb: ExpressionBuilder<DB, 'pages'>) {
+    return jsonObjectFrom(
+      eb
+        .selectFrom('users')
+        .select(['users.id', 'users.name', 'users.avatarUrl'])
+        .whereRef('users.id', '=', 'pages.propertyOwnerId'),
+    ).as('propertyOwner');
   }
 
   withLastUpdatedBy(eb: ExpressionBuilder<DB, 'pages'>) {

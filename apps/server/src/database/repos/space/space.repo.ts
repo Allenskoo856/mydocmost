@@ -183,21 +183,45 @@ export class SpaceRepo {
     spaceId: string,
     workspaceId: string,
     statusOptions: string[],
+    enabledProperties?: string[],
   ) {
+    const values = {
+      spaceId,
+      workspaceId,
+      statusOptions,
+      ...(enabledProperties ? { enabledProperties } : {}),
+    };
+    const updateValues = {
+      statusOptions,
+      ...(enabledProperties ? { enabledProperties } : {}),
+      updatedAt: new Date(),
+    };
+
     return this.db
       .insertInto('spacePagePropertyConfigs')
-      .values({
-        spaceId,
-        workspaceId,
-        statusOptions,
-      })
+      .values(values)
       .onConflict((oc) =>
         oc.column('spaceId').doUpdateSet({
-          statusOptions,
-          updatedAt: new Date(),
+          ...updateValues,
         }),
       )
       .returningAll()
       .executeTakeFirst();
+  }
+
+  async countPagesUsingStatuses(spaceId: string, statuses: string[]) {
+    if (statuses.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .selectFrom('pages')
+      .select(['propertyStatus'])
+      .select((eb) => eb.fn.countAll<number>().as('pageCount'))
+      .where('spaceId', '=', spaceId)
+      .where('deletedAt', 'is', null)
+      .where('propertyStatus', 'in', statuses)
+      .groupBy('propertyStatus')
+      .execute();
   }
 }

@@ -193,6 +193,24 @@ export interface GroupUsers {
   userId: string;
 }
 
+export interface PageEmbeddings {
+  attachmentId: string | null;
+  chunkIndex: Generated<number>;
+  chunkLength: Generated<number>;
+  chunkStart: Generated<number>;
+  createdAt: Generated<Timestamp>;
+  deletedAt: Timestamp | null;
+  embedding: number[];
+  id: Generated<string>;
+  metadata: Generated<Json>;
+  modelDimensions: number;
+  modelName: string;
+  pageId: string;
+  spaceId: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
+}
+
 export interface PageHistory {
   content: Json | null;
   coverPhoto: string | null;
@@ -223,12 +241,12 @@ export interface Pages {
   isLocked: Generated<boolean>;
   lastUpdatedById: string | null;
   parentPageId: string | null;
+  position: string | null;
   propertyDueAt: Timestamp | null;
   propertyOwnerId: string | null;
   propertyPriority: string | null;
   propertyStatus: string | null;
   propertyTags: Generated<string[]>;
-  position: string | null;
   slugId: string;
   spaceId: string;
   textContent: string | null;
@@ -237,14 +255,6 @@ export interface Pages {
   updatedAt: Generated<Timestamp>;
   workspaceId: string;
   ydoc: Buffer | null;
-}
-
-export interface SpacePagePropertyConfigs {
-  createdAt: Generated<Timestamp>;
-  spaceId: string;
-  statusOptions: Json;
-  updatedAt: Generated<Timestamp>;
-  workspaceId: string;
 }
 
 export interface Shares {
@@ -271,6 +281,15 @@ export interface SpaceMembers {
   spaceId: string;
   updatedAt: Generated<Timestamp>;
   userId: string | null;
+}
+
+export interface SpacePagePropertyConfigs {
+  createdAt: Generated<Timestamp>;
+  enabledProperties: Generated<Json>;
+  spaceId: string;
+  statusOptions: Json;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface Spaces {
@@ -380,6 +399,7 @@ export interface DB {
   fileTasks: FileTasks;
   groups: Groups;
   groupUsers: GroupUsers;
+  pageEmbeddings: PageEmbeddings;
   pageHistory: PageHistory;
   pages: Pages;
   shares: Shares;

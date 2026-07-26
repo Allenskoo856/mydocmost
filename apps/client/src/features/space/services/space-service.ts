@@ -5,6 +5,8 @@ import {
   IExportSpaceParams,
   IRemoveSpaceMember,
   ISpacePagePropertyStatusConfig,
+  IPagePropertyOwner,
+  PagePropertyKey,
   ISpace,
   ISpaceMember,
 } from "@/features/space/types/space.types";
@@ -86,10 +88,22 @@ export async function getSpacePagePropertyStatusConfig(
 export async function updateSpacePagePropertyStatusConfig(
   spaceId: string,
   statusOptions: string[],
+  enabledProperties: PagePropertyKey[],
 ): Promise<ISpacePagePropertyStatusConfig> {
   const req = await api.post<ISpacePagePropertyStatusConfig>(
     "/spaces/page-properties/status-config/update",
-    { spaceId, statusOptions },
+    { spaceId, statusOptions, enabledProperties },
+  );
+  return req.data;
+}
+
+export async function getSpacePagePropertyOwners(
+  spaceId: string,
+  params?: QueryParams,
+): Promise<IPagination<IPagePropertyOwner>> {
+  const req = await api.post<IPagination<IPagePropertyOwner>>(
+    "/spaces/page-properties/owners",
+    { spaceId, ...params },
   );
   return req.data;
 }

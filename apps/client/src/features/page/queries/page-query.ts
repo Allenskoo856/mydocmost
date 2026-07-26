@@ -40,7 +40,9 @@ import { useEffect } from "react";
 import { validate as isValidUuid } from "uuid";
 import { useTranslation } from "react-i18next";
 import { useAtom } from "jotai";
+import { getDefaultStore } from "jotai";
 import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom";
+import { pageInheritanceSuggestionsAtom } from "@/features/page/atoms/page-property-inheritance-atom";
 import { SimpleTree } from "react-arborist";
 import { SpaceTreeNode } from "@/features/page/tree/types";
 import { useQueryEmit } from "@/features/websocket/use-query-emit";
@@ -74,11 +76,56 @@ export function useCreatePageMutation() {
     mutationFn: (data) => createPage(data),
     onSuccess: (data) => {
       invalidateOnCreatePage(data);
+      void seedPageInheritanceSuggestion(data);
     },
     onError: (error) => {
       notifications.show({ message: t("Failed to create page"), color: "red" });
     },
   });
+}
+
+// After a child page is created, stage a session-only inheritance suggestion
+// (parent owner/tags) that the page surfaces via PagePropertyInheritance. No
+// backend record is written; the suggestion lives only in the jotai store.
+async function seedPageInheritanceSuggestion(page: IPage) {
+  if (!page.parentPageId) return;
+
+  let parent = queryClient.getQueryData<IPage>(["pages", page.parentPageId]);
+  if (!parent) {
+    try {
+      parent = await getPageById({ pageId: page.parentPageId });
+    } catch {
+      return;
+    }
+  }
+  if (!parent) return;
+  const parentPage = parent;
+
+  const ownerId =
+    parentPage.propertyOwnerId &&
+    parentPage.propertyOwnerId !== page.propertyOwnerId
+      ? parentPage.propertyOwnerId
+      : undefined;
+
+  const existing = new Set(
+    (page.propertyTags ?? []).map((tag) => tag.trim().toLowerCase()),
+  );
+  const tags = (parentPage.propertyTags ?? []).filter(
+    (tag) => !existing.has(tag.trim().toLowerCase()),
+  );
+
+  if (!ownerId && tags.length === 0) return;
+
+  getDefaultStore().set(pageInheritanceSuggestionsAtom, (prev) => ({
+    ...prev,
+    [page.id]: {
+      pageId: page.id,
+      parentPageId: parentPage.id,
+      ownerId,
+      ownerName: parentPage.propertyOwner?.name,
+      tags,
+    },
+  }));
 }
 
 export function updatePageData(data: IPage) {
@@ -115,15 +162,13 @@ export function useUpdatePageMutation() {
   return useMutation<IPage, Error, Partial<IPageInput>>({
     mutationFn: (data) => updatePage(data),
     onSuccess: (data) => {
-      updatePage(data);
+      updatePageData(data);
 
-      invalidateOnUpdatePage(
-        data.spaceId,
-        data.parentPageId,
-        data.id,
-        data.title,
-        data.icon,
-      );
+      queryClient.invalidateQueries({ queryKey: ["page-manage-list"] });
+      queryClient.invalidateQueries({
+        queryKey: ["page-property-tags", data.spaceId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["page-search"] });
     },
   });
 }

@@ -10,6 +10,8 @@ import {
   IChangeSpaceMemberRole,
   IRemoveSpaceMember,
   ISpacePagePropertyStatusConfig,
+  IPagePropertyOwner,
+  PagePropertyKey,
   ISpace,
   ISpaceMember,
 } from "@/features/space/types/space.types";
@@ -25,6 +27,7 @@ import {
   deleteSpace,
   getSpacePagePropertyStatusConfig,
   updateSpacePagePropertyStatusConfig,
+  getSpacePagePropertyOwners,
 } from "@/features/space/services/space-service.ts";
 import { notifications } from "@mantine/notifications";
 import { IPagination, QueryParams } from "@/lib/types.ts";
@@ -278,10 +281,18 @@ export function useUpdateSpacePagePropertyStatusConfigMutation() {
   return useMutation<
     ISpacePagePropertyStatusConfig,
     Error,
-    { spaceId: string; statusOptions: string[] }
+    {
+      spaceId: string;
+      statusOptions: string[];
+      enabledProperties: PagePropertyKey[];
+    }
   >({
-    mutationFn: ({ spaceId, statusOptions }) =>
-      updateSpacePagePropertyStatusConfig(spaceId, statusOptions),
+    mutationFn: ({ spaceId, statusOptions, enabledProperties }) =>
+      updateSpacePagePropertyStatusConfig(
+        spaceId,
+        statusOptions,
+        enabledProperties,
+      ),
     onSuccess: (data, variables) => {
       notifications.show({ message: t("Space updated successfully") });
       queryClient.invalidateQueries({
@@ -292,5 +303,21 @@ export function useUpdateSpacePagePropertyStatusConfigMutation() {
       const errorMessage = error["response"]?.data?.message;
       notifications.show({ message: errorMessage, color: "red" });
     },
+  });
+}
+
+export function useSpacePagePropertyOwnersQuery(
+  spaceId?: string,
+  query?: string,
+): UseQueryResult<IPagination<IPagePropertyOwner>, Error> {
+  return useQuery({
+    queryKey: ["space-page-property-owners", spaceId, query],
+    queryFn: () =>
+      getSpacePagePropertyOwners(spaceId, {
+        query,
+        page: 1,
+        limit: 50,
+      }),
+    enabled: Boolean(spaceId),
   });
 }

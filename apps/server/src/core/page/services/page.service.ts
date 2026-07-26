@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -44,16 +45,17 @@ import { PageManageListDto, PagePropertiesBatchUpdateDto } from '../dto/page-pro
 import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 import { sql } from 'kysely';
+import {
+  DEFAULT_ENABLED_PAGE_PROPERTIES,
+  DEFAULT_PAGE_STATUS_OPTIONS,
+  PAGE_PROPERTY_FIELD_TO_KEY,
+  PagePropertyKey,
+} from '../constants/page-properties.constants';
 
 @Injectable()
 export class PageService {
   private readonly logger = new Logger(PageService.name);
-  private readonly defaultStatusOptions = [
-    'Backlog',
-    'Todo',
-    'In Progress',
-    'Done',
-  ];
+  private readonly defaultStatusOptions = [...DEFAULT_PAGE_STATUS_OPTIONS];
 
   constructor(
     private pageRepo: PageRepo,
@@ -84,19 +86,31 @@ export class PageService {
     return normalized;
   }
 
-  async getSpaceStatusOptions(spaceId: string, workspaceId: string) {
+  async getSpacePropertyConfig(spaceId: string, workspaceId: string) {
     const config = await this.spaceRepo.findPagePropertyStatusConfig(
       spaceId,
       workspaceId,
     );
-    if (!config?.statusOptions || !Array.isArray(config.statusOptions)) {
-      return this.defaultStatusOptions;
-    }
-    return config.statusOptions as string[];
+
+    return {
+      statusOptions:
+        config?.statusOptions && Array.isArray(config.statusOptions)
+          ? (config.statusOptions as string[])
+          : this.defaultStatusOptions,
+      enabledProperties:
+        config?.enabledProperties && Array.isArray(config.enabledProperties)
+          ? (config.enabledProperties as PagePropertyKey[])
+          : DEFAULT_ENABLED_PAGE_PROPERTIES,
+    };
+  }
+
+  async getSpaceStatusOptions(spaceId: string, workspaceId: string) {
+    return (await this.getSpacePropertyConfig(spaceId, workspaceId))
+      .statusOptions;
   }
 
   async assertValidOwner(
-    ownerId: string | undefined,
+    ownerId: string | null | undefined,
     spaceId: string,
     workspaceId: string,
   ) {
@@ -130,10 +144,32 @@ export class PageService {
       dueAt?: string | Date | null;
       tags?: string[];
     },
-    opts?: { allowNull?: boolean },
+    opts?: {
+      allowNull?: boolean;
+      enabledProperties?: PagePropertyKey[];
+    },
   ) {
     const updateData: Record<string, any> = {};
     const allowNull = Boolean(opts?.allowNull);
+    const enabledProperties =
+      opts?.enabledProperties ??
+      (await this.getSpacePropertyConfig(spaceId, workspaceId))
+        .enabledProperties;
+
+    for (const [field, propertyKey] of Object.entries(
+      PAGE_PROPERTY_FIELD_TO_KEY,
+    )) {
+      if (
+        dto[field as keyof typeof dto] !== undefined &&
+        !enabledProperties.includes(propertyKey)
+      ) {
+        throw new BadRequestException({
+          code: 'PROPERTY_DISABLED',
+          message: `Page property is disabled: ${propertyKey}`,
+          property: propertyKey,
+        });
+      }
+    }
 
     if (dto.ownerId !== undefined) {
       if (dto.ownerId === null && allowNull) {
@@ -157,6 +193,7 @@ export class PageService {
     }
 
     if (dto.priority !== undefined) {
+      // Priority values are validated at the DTO level (P0-P3); a null clears it.
       updateData.propertyPriority = dto.priority;
     }
 
@@ -173,7 +210,16 @@ export class PageService {
     }
 
     if (dto.tags !== undefined) {
-      updateData.propertyTags = this.normalizeTags(dto.tags);
+      const tags = this.normalizeTags(dto.tags);
+      if (tags.length > 50) {
+        throw new BadRequestException('A page can have at most 50 tags');
+      }
+      if (tags.some((tag) => tag.length > 64)) {
+        throw new BadRequestException(
+          'Each page property tag must be at most 64 characters',
+        );
+      }
+      updateData.propertyTags = tags;
     }
 
     return updateData;
@@ -212,16 +258,23 @@ export class PageService {
       parentPageId = parentPage.id;
     }
 
+    const propertyConfig = await this.getSpacePropertyConfig(
+      createPageDto.spaceId,
+      workspaceId,
+    );
     const propertyUpdateData = await this.buildPropertyUpdateData(
       createPageDto.spaceId,
       workspaceId,
       {
-        ownerId: createPageDto.ownerId,
+        ownerId: propertyConfig.enabledProperties.includes('owner')
+          ? (createPageDto.ownerId ?? userId)
+          : createPageDto.ownerId,
         status: createPageDto.status,
         priority: createPageDto.priority,
         dueAt: createPageDto.dueAt,
         tags: createPageDto.tags,
       },
+      { enabledProperties: propertyConfig.enabledProperties },
     );
 
     const createdPage = await this.pageRepo.insertPage({
@@ -303,6 +356,7 @@ export class PageService {
         dueAt: updatePageDto.dueAt,
         tags: updatePageDto.tags,
       },
+      { allowNull: true },
     );
 
     await this.pageRepo.updatePage(
@@ -321,6 +375,7 @@ export class PageService {
       includeSpace: true,
       includeContent: true,
       includeCreator: true,
+      includePropertyOwner: true,
       includeLastUpdatedBy: true,
       includeContributors: true,
     });
@@ -407,15 +462,17 @@ export class PageService {
   }
 
   async getSpacePropertyTags(spaceId: string) {
-    const rows = await this.db
-      .selectFrom('pages')
-      .select('propertyTags')
-      .where('spaceId', '=', spaceId)
-      .where('deletedAt', 'is', null)
-      .execute();
+    const result = await sql<{ tag: string; usageCount: number }>`
+      select min(tag) as tag, count(*)::int as "usageCount"
+      from pages
+      cross join lateral unnest(property_tags) as tag
+      where space_id = ${spaceId}
+        and deleted_at is null
+      group by lower(tag)
+      order by count(*) desc, lower(min(tag)) asc
+    `.execute(this.db);
 
-    const normalized = this.normalizeTags(rows.flatMap((row) => row.propertyTags || []));
-    return normalized.sort((a, b) => a.localeCompare(b));
+    return result.rows.map((row) => row.tag);
   }
 
   async batchUpdatePageProperties(
@@ -423,10 +480,11 @@ export class PageService {
     userId: string,
     workspaceId: string,
   ) {
+    const pageIds = Array.from(new Set(dto.pageIds));
     const pageRows = await this.db
       .selectFrom('pages')
       .select(['id', 'spaceId', 'workspaceId'])
-      .where('id', 'in', dto.pageIds)
+      .where('id', 'in', pageIds)
       .where('deletedAt', 'is', null)
       .execute();
 
@@ -443,13 +501,16 @@ export class PageService {
         { allowNull: true },
       );
     } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
       const message = err instanceof Error ? err.message : 'Invalid patch payload';
       throw new BadRequestException(message);
     }
 
     const userSpaces = await this.spaceMemberRepo.getUserSpaceIds(userId);
 
-    for (const pageId of dto.pageIds) {
+    for (const pageId of pageIds) {
       const page = pageMap.get(pageId);
       if (!page) {
         failed.push({
@@ -477,14 +538,30 @@ export class PageService {
         continue;
       }
 
-      await this.pageRepo.updatePage(
-        {
-          ...patchData,
-          lastUpdatedById: userId,
-        },
-        pageId,
-      );
-      successCount += 1;
+      try {
+        await this.pageRepo.updatePage(
+          {
+            ...patchData,
+            lastUpdatedById: userId,
+          },
+          pageId,
+        );
+        successCount += 1;
+      } catch (error) {
+        this.logger.warn(
+          `Failed to update page properties for ${pageId}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        );
+        failed.push({
+          pageId,
+          code: 'UPDATE_FAILED',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Failed to update page properties',
+        });
+      }
     }
 
     return { successCount, failed };
@@ -550,6 +627,42 @@ export class PageService {
       }
 
       if (pageIds.length > 0) {
+        const targetPropertyConfig = await this.getSpacePropertyConfig(
+          spaceId,
+          rootPage.workspaceId,
+        );
+
+        await trx
+          .updateTable('pages')
+          .set({ propertyOwnerId: null })
+          .where('id', 'in', pageIds)
+          .where('propertyOwnerId', 'is not', null)
+          .where(
+            sql<boolean>`not exists (
+              select 1
+              from space_members sm
+              left join group_users gu on gu.group_id = sm.group_id
+              where sm.space_id = ${spaceId}
+                and (
+                  sm.user_id = pages.property_owner_id
+                  or gu.user_id = pages.property_owner_id
+                )
+            )`,
+          )
+          .execute();
+
+        await trx
+          .updateTable('pages')
+          .set({ propertyStatus: null })
+          .where('id', 'in', pageIds)
+          .where('propertyStatus', 'is not', null)
+          .where(
+            'propertyStatus',
+            'not in',
+            targetPropertyConfig.statusOptions,
+          )
+          .execute();
+
         // update spaceId in shares
         await trx
           .updateTable('shares')

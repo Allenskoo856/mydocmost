@@ -29,6 +29,11 @@ export interface IPage {
   propertyPriority?: "P0" | "P1" | "P2" | "P3" | null;
   propertyDueAt?: Date | string | null;
   propertyTags?: string[];
+  propertyOwner?: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+  } | null;
   ownerId?: string | null;
   ownerName?: string | null;
   ownerAvatarUrl?: string | null;

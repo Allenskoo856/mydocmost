@@ -35,6 +35,7 @@ import {
 import WorkspaceAbilityFactory from '../casl/abilities/workspace-ability.factory';
 import { CreateSpaceDto } from './dto/create-space.dto';
 import {
+  SpacePagePropertyOwnerQueryDto,
   SpacePagePropertyStatusConfigDto,
   UpdateSpacePagePropertyStatusConfigDto,
 } from './dto/page-property-status.dto';
@@ -274,6 +275,27 @@ export class SpaceController {
       dto.spaceId,
       workspace.id,
       dto.statusOptions,
+      dto.enabledProperties,
+    );
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('page-properties/owners')
+  async getPagePropertyOwners(
+    @Body() dto: SpacePagePropertyOwnerQueryDto,
+    @Body() pagination: PaginationOptions,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.spaceService.getPagePropertyOwners(
+      dto.spaceId,
+      workspace.id,
+      pagination,
     );
   }
 }
