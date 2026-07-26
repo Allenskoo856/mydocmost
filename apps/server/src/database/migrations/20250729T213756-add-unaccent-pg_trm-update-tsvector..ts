@@ -1,4 +1,8 @@
 import { type Kysely, sql } from 'kysely';
+import {
+  createUnaccentWrapper,
+  getExtensionSchema,
+} from '../utils/postgres-extension.util';
 
 export async function up(db: Kysely<any>): Promise<void> {
   // Create unaccent extension
@@ -7,15 +11,12 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create pg_trgm extension
   await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.execute(db);
 
+  const unaccentSchema = await getExtensionSchema(db, 'unaccent');
+
   // Create IMMUTABLE wrapper function for unaccent
   // This allows us to create indexes on unaccented columns for better performance
   // https://stackoverflow.com/a/11007216/8299075
-  await sql`
-    CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text
-    AS $$
-      SELECT unaccent($1);
-    $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
-  `.execute(db);
+  await createUnaccentWrapper(unaccentSchema).execute(db);
 
   // Update the pages tsvector trigger to use the immutable function
   await sql`
