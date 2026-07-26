@@ -53,7 +53,7 @@ export default function PagePresenceAvatars() {
   const overflow = presence.length - visible.length;
 
   return (
-    <Avatar.Group spacing={8} visibleFrom="sm">
+    <Avatar.Group spacing={8} visibleFrom="lg">
       {visible.map((user) => {
         const label = user.isSelf
           ? t("{{name}} (you) · Editing", { name: user.name })

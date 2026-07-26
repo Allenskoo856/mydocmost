@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Menu, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Box, Group, Menu, Text, Tooltip } from "@mantine/core";
 import {
   IconArrowRight,
   IconArrowsHorizontal,
@@ -88,19 +88,23 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
 
       <ShareModal readOnly={readOnly} />
 
-      <CopyAgentContextButton />
+      <Box visibleFrom="lg">
+        <CopyAgentContextButton />
+      </Box>
 
       {isAiEnabled() && (
-        <Tooltip label={t("Ask AI")} openDelay={250} withArrow>
-          <ActionIcon
-            variant="default"
-            style={{ border: "none" }}
-            onClick={() => setAiPanelOpen(true)}
-            aria-label={t("Ask AI")}
-          >
-            <IconRobot size={20} stroke={2} />
-          </ActionIcon>
-        </Tooltip>
+        <Box visibleFrom="lg">
+          <Tooltip label={t("Ask AI")} openDelay={250} withArrow>
+            <ActionIcon
+              variant="default"
+              style={{ border: "none" }}
+              onClick={() => setAiPanelOpen(true)}
+              aria-label={t("Ask AI")}
+            >
+              <IconRobot size={20} stroke={2} />
+            </ActionIcon>
+          </Tooltip>
+        </Box>
       )}
 
       <Tooltip label={t("Comments")} openDelay={250} withArrow>

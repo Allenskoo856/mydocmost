@@ -13,7 +13,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`
     CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text
     AS $$
-      SELECT unaccent('unaccent', $1);
+      SELECT unaccent($1);
     $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
   `.execute(db);
 
