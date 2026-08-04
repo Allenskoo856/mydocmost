@@ -137,10 +137,47 @@ export default function PageProperties({
     }
   }, [activeProperty, page?.propertyTags]);
 
-  if (!page) return null;
-
   const isSaving = (property: PagePropertyKey) =>
     savingProperties.has(property);
+
+  const setSaving = (property: PagePropertyKey, saving: boolean) => {
+    setSavingProperties((prev) => {
+      const next = new Set(prev);
+      if (saving) next.add(property);
+      else next.delete(property);
+      return next;
+    });
+  };
+
+  const saveField = async (
+    property: PagePropertyKey,
+    payload: Record<string, unknown>,
+    close = true,
+  ) => {
+    if (!editable || isSaving(property)) return;
+    setSaving(property, true);
+    try {
+      await updatePageMutation.mutateAsync({ pageId, ...payload });
+      if (close) setActiveProperty(null);
+    } catch (error) {
+      // Restore the last known server value so the UI never shows a fake
+      // success. Controlled editors read straight from the page cache; only
+      // the local tag draft needs an explicit reset.
+      if (property === "tags") setTagDraft(page?.propertyTags ?? []);
+      notifications.show({
+        color: "red",
+        message: getErrorMessage(error, t("Failed to update page property")),
+      });
+    } finally {
+      setSaving(property, false);
+    }
+  };
+
+  const saveTags = useDebouncedCallback((tags: string[]) => {
+    void saveField("tags", { tags }, false);
+  }, 350);
+
+  if (!page) return null;
 
   const propertyHasValue: Record<PagePropertyKey, boolean> = {
     owner: Boolean(page.propertyOwnerId),
@@ -168,43 +205,6 @@ export default function PageProperties({
     : visibleProperties;
 
   if (!editable && visibleProperties.length === 0) return null;
-
-  const setSaving = (property: PagePropertyKey, saving: boolean) => {
-    setSavingProperties((prev) => {
-      const next = new Set(prev);
-      if (saving) next.add(property);
-      else next.delete(property);
-      return next;
-    });
-  };
-
-  const saveField = async (
-    property: PagePropertyKey,
-    payload: Record<string, unknown>,
-    close = true,
-  ) => {
-    if (!editable || isSaving(property)) return;
-    setSaving(property, true);
-    try {
-      await updatePageMutation.mutateAsync({ pageId, ...payload });
-      if (close) setActiveProperty(null);
-    } catch (error) {
-      // Restore the last known server value so the UI never shows a fake
-      // success. Controlled editors read straight from the page cache; only
-      // the local tag draft needs an explicit reset.
-      if (property === "tags") setTagDraft(page.propertyTags ?? []);
-      notifications.show({
-        color: "red",
-        message: getErrorMessage(error, t("Failed to update page property")),
-      });
-    } finally {
-      setSaving(property, false);
-    }
-  };
-
-  const saveTags = useDebouncedCallback((tags: string[]) => {
-    void saveField("tags", { tags }, false);
-  }, 350);
 
   const clearProperty = (property: PagePropertyKey) => {
     const payload = property === "tags" ? { tags: [] } : { [property]: null };

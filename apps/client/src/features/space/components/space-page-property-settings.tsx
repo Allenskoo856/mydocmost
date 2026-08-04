@@ -9,6 +9,7 @@ import {
   ResponsiveSettingsControl,
   ResponsiveSettingsRow,
 } from "@/components/ui/responsive-settings-row.tsx";
+import { PAGE_PROPERTY_KEYS } from "@/features/space/types/space.types";
 import { useTranslation } from "react-i18next";
 
 interface SpacePagePropertySettingsProps {
@@ -24,6 +25,7 @@ export default function SpacePagePropertySettings({
   const { data } = useSpacePagePropertyStatusConfigQuery(spaceId);
   const updateMutation = useUpdateSpacePagePropertyStatusConfigMutation();
   const [statusOptions, setStatusOptions] = useState<string[]>([]);
+  const enabledProperties = data?.enabledProperties ?? [...PAGE_PROPERTY_KEYS];
 
   useEffect(() => {
     if (data?.statusOptions) {
@@ -32,7 +34,11 @@ export default function SpacePagePropertySettings({
   }, [data?.statusOptions]);
 
   const handleSave = async () => {
-    await updateMutation.mutateAsync({ spaceId, statusOptions });
+    await updateMutation.mutateAsync({
+      spaceId,
+      statusOptions,
+      enabledProperties,
+    });
   };
 
   return (
